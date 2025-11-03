@@ -14,14 +14,6 @@
 - **Form Peminjaman Dinamis** – Validasi stok otomatis dengan pengalaman form baru yang ringkas untuk siswa.
 - **Dashboard Modular** – Statistik utama dipresentasikan dengan kartu warna-warni yang mudah dipindai.
 
-<<<<<<< HEAD
-## Screenshot
-
-
-
-=======
->>>>>>> 9fe1208b0c9a12fce021d7b4d16fe261627e766e
-## Teknologi
 
 - Laravel 12 + PHP 8.2
 - Laravel Breeze (Blade + TailwindCSS)
