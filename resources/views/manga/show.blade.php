@@ -1,8 +1,63 @@
 <x-manga-layout :title="$manga['title'] . ' — Baca Manga Online di BiblioManga'">
     <div class="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 space-y-8"
-         x-data="{ 
-            activeTab: '{{ !empty($indoChapters) ? 'id' : (!empty($enChapters) ? 'en' : 'all') }}',
-            expandedDesc: false
+         x-data="{
+            activeTab: @js($activeTab),
+            expandedDesc: false,
+            mangaId: @js($manga['id']),
+            chaptersUrl: @js($chaptersUrl),
+            chapterData: @js($chapterPayload),
+            loading: @js(! $chaptersPreloaded),
+            loadError: false,
+            visibleLimit: 80,
+            init() {
+                if (this.loading) {
+                    this.fetchChapters();
+                }
+            },
+            async fetchChapters() {
+                this.loading = true;
+                this.loadError = false;
+                try {
+                    const response = await fetch(this.chaptersUrl, { headers: { 'Accept': 'application/json' } });
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                    this.chapterData = await response.json();
+                    if (this.chapterData.counts.id > 0) {
+                        this.activeTab = 'id';
+                    } else if (this.chapterData.counts.en > 0) {
+                        this.activeTab = 'en';
+                    }
+                } catch (e) {
+                    this.loadError = true;
+                } finally {
+                    this.loading = false;
+                }
+            },
+            get counts() {
+                return this.chapterData.counts || { all: 0, id: 0, en: 0 };
+            },
+            get filteredChapters() {
+                const list = this.chapterData.chapters || [];
+                if (this.activeTab === 'all') {
+                    return list;
+                }
+                return list.filter(chapter => chapter.language === this.activeTab);
+            },
+            get visibleChapters() {
+                return this.filteredChapters.slice(0, this.visibleLimit);
+            },
+            get filteredCount() {
+                return this.filteredChapters.length;
+            },
+            readUrl(chapter) {
+                if (!chapter) return '#';
+                if (chapter.externalUrl) return chapter.externalUrl;
+                return '/manga/' + encodeURIComponent(this.mangaId)
+                    + '/chapter/' + encodeURIComponent(chapter.id)
+                    + '?source=' + encodeURIComponent(chapter.provider || 'MangaDex')
+                    + '&ch=' + encodeURIComponent(chapter.chapter || '0');
+            }
          }">
 
         <!-- Navigation Breadcrumb -->
@@ -18,7 +73,7 @@
         <!-- Manga Detail Card -->
         <section class="relative overflow-hidden rounded-[2.5rem] border border-[#dcd2bd] bg-white/95 p-6 sm:p-10 shadow-[0_20px_60px_-35px_rgba(15,87,82,0.35)]">
             <div class="grid gap-8 md:grid-cols-[260px_1fr] lg:grid-cols-[300px_1fr]">
-                
+
                 <!-- Left: Poster Cover -->
                 <div class="space-y-4">
                     <div class="relative aspect-[3/4] w-full overflow-hidden rounded-[2rem] bg-[#eaddc2] shadow-lg border border-[#eaddc2]">
@@ -115,23 +170,23 @@
                         </div>
                     </div>
 
-                    <!-- Quick CTA Start Reading -->
+                    <!-- Quick CTA Start Reading (filled after the async chapter list arrives) -->
                     <div class="flex flex-wrap items-center gap-3 pt-6 border-t border-[#e0d9c8]">
-                        @if($firstChapter)
-                            <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $firstChapter['id'], 'source' => $firstChapter['provider'] ?? 'MangaDex', 'ch' => $firstChapter['chapter'] ?? '0']) }}"
+                        <template x-if="chapterData.first">
+                            <a :href="readUrl(chapterData.first)"
                                class="inline-flex items-center gap-2 rounded-full bg-[#0f766e] px-6 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider text-white shadow-lg shadow-[#0f766e]/25 transition hover:scale-105 hover:bg-[#115e59]">
                                 <span class="material-symbols-rounded text-base">play_arrow</span>
-                                Baca Chapter Pertama (Ch. {{ $firstChapter['chapter'] }})
+                                <span>Baca Chapter Pertama (Ch. <span x-text="chapterData.first.chapter"></span>)</span>
                             </a>
-                        @endif
+                        </template>
 
-                        @if($latestChapter && $latestChapter['id'] !== ($firstChapter['id'] ?? null))
-                            <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $latestChapter['id'], 'source' => $latestChapter['provider'] ?? 'MangaDex', 'ch' => $latestChapter['chapter'] ?? '0']) }}"
+                        <template x-if="chapterData.latest && (!chapterData.first || chapterData.latest.id !== chapterData.first.id)">
+                            <a :href="readUrl(chapterData.latest)"
                                class="inline-flex items-center gap-2 rounded-full border border-[#dcd2bd] bg-white px-5 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider text-[#172a37] transition hover:border-[#0f766e] hover:text-[#0f766e]">
                                 <span class="material-symbols-rounded text-base">skip_next</span>
-                                Chapter Terbaru (Ch. {{ $latestChapter['chapter'] }})
+                                <span>Chapter Terbaru (Ch. <span x-text="chapterData.latest.chapter"></span>)</span>
                             </a>
-                        @endif
+                        </template>
                     </div>
                 </div>
 
@@ -156,70 +211,93 @@
                             class="rounded-full px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5"
                             :class="activeTab === 'id' ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#4c5b54] hover:text-[#0f766e]'">
                         <span>Indo</span>
-                        <span class="rounded-full bg-black/10 dark:bg-white/20 px-1.5 text-[10px]">{{ count($indoChapters) }}</span>
+                        <span class="rounded-full bg-black/10 dark:bg-white/20 px-1.5 text-[10px]" x-text="counts.id"></span>
                     </button>
                     <button type="button" @click="activeTab = 'en'"
                             class="rounded-full px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5"
                             :class="activeTab === 'en' ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#4c5b54] hover:text-[#0f766e]'">
                         <span>Eng</span>
-                        <span class="rounded-full bg-black/10 dark:bg-white/20 px-1.5 text-[10px]">{{ count($enChapters) }}</span>
+                        <span class="rounded-full bg-black/10 dark:bg-white/20 px-1.5 text-[10px]" x-text="counts.en"></span>
                     </button>
                     <button type="button" @click="activeTab = 'all'"
                             class="rounded-full px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5"
                             :class="activeTab === 'all' ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#4c5b54] hover:text-[#0f766e]'">
                         <span>Semua</span>
-                        <span class="rounded-full bg-black/10 dark:bg-white/20 px-1.5 text-[10px]">{{ count($allChapters) }}</span>
+                        <span class="rounded-full bg-black/10 dark:bg-white/20 px-1.5 text-[10px]" x-text="counts.all"></span>
                     </button>
                 </div>
             </div>
 
             <!-- Chapter Table / List -->
             <div class="space-y-2 max-h-[600px] overflow-y-auto pr-1 custom-scroll">
-                @php
-                    $renderChapters = function($chapters) use ($manga) {
-                        if (empty($chapters)) {
-                            return '<div class="py-12 text-center text-[#84948a] text-sm">Tidak ada chapter untuk bahasa ini.</div>';
-                        }
-                        $html = '';
-                        foreach ($chapters as $chap) {
-                            $isExt = !empty($chap['externalUrl']);
-                            $readUrl = $isExt ? $chap['externalUrl'] : route('manga.read', ['id' => $manga['id'], 'chapterId' => $chap['id'], 'source' => $chap['provider'] ?? 'MangaDex', 'ch' => $chap['chapter'] ?? '0']);
-                            $target = $isExt ? 'target="_blank"' : '';
-                            $langFlag = $chap['language'] === 'id' ? 'Indo' : ($chap['language'] === 'en' ? 'Eng' : strtoupper($chap['language']));
 
-                            $html .= '<div onmouseenter="window.prefetchRead && window.prefetchRead(\'' . $readUrl . '\')" ontouchstart="window.prefetchRead && window.prefetchRead(\'' . $readUrl . '\')" class="group flex items-center justify-between gap-4 rounded-2xl border border-[#eaddc2] bg-[#fbf9f4] p-3.5 transition hover:border-[#0f766e] hover:bg-white hover:shadow-sm">
-                                <div class="min-w-0">
-                                    <div class="flex items-center gap-2">
-                                        <span class="font-bold text-sm text-[#172a37] group-hover:text-[#0f766e] transition-colors">
-                                            Chapter ' . e($chap['chapter']) . '
-                                        </span>
-                                        <span class="rounded-md bg-[#0f766e]/10 px-1.5 py-0.5 text-[10px] font-bold text-[#0f766e]">
-                                            ' . $langFlag . '
-                                        </span>
-                                        ' . ($chap['title'] ? '<span class="text-xs text-[#6f7e75] truncate max-w-xs font-medium">' . e($chap['title']) . '</span>' : '') . '
-                                    </div>
-                                    <div class="mt-1 flex items-center gap-3 text-[11px] text-[#84948a]">
-                                        <span>' . e($chap['publishAt']) . '</span>
-                                    </div>
-                                </div>
-                                <a href="' . $readUrl . '" ' . $target . ' class="inline-flex items-center gap-1 rounded-xl bg-[#0f766e] px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-white shadow-sm transition hover:bg-[#115e59]">
-                                    <span>' . ($isExt ? 'Buka Eksternal' : 'Baca') . '</span>
-                                    <span class="material-symbols-rounded text-sm">' . ($isExt ? 'open_in_new' : 'arrow_forward') . '</span>
-                                </a>
-                            </div>';
-                        }
-                        return $html;
-                    };
-                @endphp
-
-                <!-- Indonesian Tab Content -->
-                <div x-show="activeTab === 'id' || activeTab === 'all'" class="space-y-2">
-                    {!! $renderChapters($indoChapters) !!}
+                <!-- Skeleton while the async endpoint aggregates sources -->
+                <div x-show="loading" x-cloak class="space-y-2">
+                    <template x-for="i in 6" :key="'skeleton-' + i">
+                        <div class="animate-pulse flex items-center justify-between gap-4 rounded-2xl border border-[#eaddc2] bg-[#fbf9f4] p-3.5">
+                            <div class="min-w-0 flex-1 space-y-2">
+                                <div class="h-4 w-32 rounded bg-[#e6dfcd]"></div>
+                                <div class="h-3 w-24 rounded bg-[#ece6d7]"></div>
+                            </div>
+                            <div class="h-8 w-20 rounded-xl bg-[#e6dfcd]"></div>
+                        </div>
+                    </template>
                 </div>
 
-                <!-- English Tab Content -->
-                <div x-show="activeTab === 'en' || (activeTab === 'all' && {{ empty($indoChapters) ? 'true' : 'false' }})" class="space-y-2">
-                    {!! $renderChapters($enChapters) !!}
+                <!-- Error state -->
+                <div x-show="!loading && loadError" x-cloak class="py-12 text-center">
+                    <span class="material-symbols-rounded text-4xl text-[#c1cbbb]">cloud_off</span>
+                    <p class="mt-2 text-sm font-medium text-[#6f7e75]">Daftar chapter gagal dimuat.</p>
+                    <button type="button" @click="fetchChapters()"
+                            class="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#0f766e] px-4 py-2 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-[#115e59]">
+                        <span class="material-symbols-rounded text-sm">refresh</span>
+                        Coba lagi
+                    </button>
+                </div>
+
+                <!-- Empty state -->
+                <div x-show="!loading && !loadError && filteredCount === 0" x-cloak
+                     class="py-12 text-center text-[#84948a] text-sm">
+                    Tidak ada chapter untuk bahasa ini.
+                </div>
+
+                <!-- Rendered chapters -->
+                <div x-show="!loading && !loadError" x-cloak class="space-y-2">
+                    <template x-for="chap in visibleChapters" :key="chap.language + '-' + chap.id + '-' + chap.chapter">
+                        <div @mouseenter="prefetchRead(readUrl(chap))"
+                             @touchstart.passive="prefetchRead(readUrl(chap))"
+                             class="group flex items-center justify-between gap-4 rounded-2xl border border-[#eaddc2] bg-[#fbf9f4] p-3.5 transition hover:border-[#0f766e] hover:bg-white hover:shadow-sm">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-sm text-[#172a37] group-hover:text-[#0f766e] transition-colors">
+                                        Chapter <span x-text="chap.chapter"></span>
+                                    </span>
+                                    <span class="rounded-md bg-[#0f766e]/10 px-1.5 py-0.5 text-[10px] font-bold text-[#0f766e]"
+                                          x-text="chap.language === 'id' ? 'Indo' : (chap.language === 'en' ? 'Eng' : (chap.language || '').toUpperCase())"></span>
+                                    <span x-show="chap.title" x-text="chap.title"
+                                          class="text-xs text-[#6f7e75] truncate max-w-xs font-medium"></span>
+                                </div>
+                                <div class="mt-1 flex items-center gap-3 text-[11px] text-[#84948a]">
+                                    <span x-text="chap.publishAt"></span>
+                                </div>
+                            </div>
+                            <a :href="readUrl(chap)" :target="chap.externalUrl ? '_blank' : null"
+                               class="inline-flex items-center gap-1 rounded-xl bg-[#0f766e] px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-white shadow-sm transition hover:bg-[#115e59]">
+                                <span x-text="chap.externalUrl ? 'Buka Eksternal' : 'Baca'"></span>
+                                <span class="material-symbols-rounded text-sm"
+                                      x-text="chap.externalUrl ? 'open_in_new' : 'arrow_forward'"></span>
+                            </a>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Load more -->
+                <div x-show="!loading && !loadError && filteredCount > visibleLimit" x-cloak class="pt-2 text-center">
+                    <button type="button" @click="visibleLimit += 100"
+                            class="inline-flex items-center gap-1.5 rounded-full border border-[#dcd2bd] bg-[#fbf9f4] px-5 py-2 text-xs font-bold text-[#0f766e] transition hover:bg-[#0f766e]/10">
+                        <span class="material-symbols-rounded text-sm">expand_more</span>
+                        Tampilkan lebih banyak
+                    </button>
                 </div>
             </div>
         </section>

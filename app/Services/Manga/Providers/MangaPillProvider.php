@@ -59,7 +59,7 @@ class MangaPillProvider
     {
         $cacheKey = 'mangapill_ch_v2_' . md5($title);
 
-        return Cache::remember($cacheKey, 3600, function () use ($title, $altTitles) {
+        $result = Cache::remember($cacheKey, 43200, function () use ($title, $altTitles) {
             $normalize = fn(string $s) => strtolower(trim(preg_replace('/[^a-z0-9]/', '', $s)));
             $targetNorms = array_values(array_filter(array_map($normalize, array_merge([$title], $altTitles))));
 
@@ -68,13 +68,22 @@ class MangaPillProvider
                 $searchQueries[] = $alt;
             }
 
-            $candidateList = [];
+            // Wave 1 — every search query concurrently.
+            $searchUrls = [];
             foreach ($searchQueries as $q) {
                 $cleanQ = trim(preg_replace('/[^a-zA-Z0-9\s]/', '', $q));
                 if (empty($cleanQ)) continue;
+                $searchUrls[$cleanQ] = "{$this->baseUrl}/search?q=" . urlencode($cleanQ);
+            }
 
-                $searchUrl = "{$this->baseUrl}/search?q=" . urlencode($cleanQ);
-                $html = $this->request($searchUrl);
+            $searchResponses = \App\Services\Manga\Support\HttpFetcher::getMany(
+                array_values($searchUrls),
+                ['resolve' => $this->dnsResolves, 'referer' => 'https://mangapill.com/']
+            );
+
+            $candidateList = [];
+            foreach ($searchUrls as $searchUrl) {
+                $html = $searchResponses[$searchUrl] ?? null;
                 if (!$html) continue;
 
                 preg_match_all('/<a[^>]+href="(\/manga\/\d+\/([^"]+))"[^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER);
@@ -114,14 +123,23 @@ class MangaPillProvider
             $bestChapters = [];
             $highestScore = reset($candidateList);
 
-            foreach ($candidateList as $mangaPath => $score) {
-                // If candidate is substantially worse than best match, skip
+            // Wave 2 — fetch the best candidate detail pages concurrently.
+            $candidateUrls = [];
+            foreach (array_slice($candidateList, 0, 5, true) as $mangaPath => $score) {
                 if ($score < ($highestScore - 15)) {
                     continue;
                 }
+                $candidateUrls[$mangaPath] = "{$this->baseUrl}{$mangaPath}";
+            }
 
-                $url = "{$this->baseUrl}{$mangaPath}";
-                $html = $this->request($url);
+            $detailResponses = \App\Services\Manga\Support\HttpFetcher::getMany(
+                array_values($candidateUrls),
+                ['resolve' => $this->dnsResolves, 'referer' => 'https://mangapill.com/']
+            );
+
+            foreach ($candidateUrls as $mangaPath => $url) {
+                $score = $candidateList[$mangaPath] ?? 0;
+                $html = $detailResponses[$url] ?? null;
                 if (!$html) continue;
 
                 preg_match_all('/<a[^>]+href="(\/chapters\/([0-9\-]+)\/[^"]+)"[^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER);
@@ -160,6 +178,12 @@ class MangaPillProvider
 
             return $bestChapters;
         });
+
+        if (empty($result)) {
+            Cache::forget($cacheKey);
+        }
+
+        return $result;
     }
 
     /**
@@ -169,7 +193,7 @@ class MangaPillProvider
     {
         $cacheKey = 'mangapill_pages_' . md5($chapterId);
 
-        return Cache::remember($cacheKey, 7200, function () use ($chapterId) {
+        return Cache::remember($cacheKey, 604800, function () use ($chapterId) {
             $path = '/' . str_replace('__', '/', str_replace('mp_', '', $chapterId));
             $url = "{$this->baseUrl}{$path}";
 

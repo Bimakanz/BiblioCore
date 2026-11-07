@@ -6,7 +6,6 @@ use App\Services\Manga\MangaService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class MangaController extends Controller
@@ -25,23 +24,27 @@ class MangaController extends Controller
     {
         $query = trim((string) $request->input('q', ''));
         if (strlen($query) < 2) {
-            return response()->json(['data' => []]);
+            return response()
+                ->json(['data' => []])
+                ->header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600');
         }
 
         $cacheKey = 'live_search_'.md5(strtolower($query));
-        $results = \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($query) {
+        $results = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($query) {
             $res = $this->mangaService->search($query, 1, 8);
 
             return $res['data'] ?? [];
         });
 
-        return response()->json(['data' => array_slice($results, 0, 8)]);
+        return response()
+            ->json(['data' => array_slice($results, 0, 8)])
+            ->header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600');
     }
 
     /**
      * Display the public manga catalogue / explore page.
      */
-    public function index(Request $request): View
+    public function index(Request $request): Response
     {
         $search = trim((string) $request->input('q', ''));
         $category = $request->input('category', 'popular'); // 'popular', 'trending', 'ongoing', 'completed'
@@ -60,79 +63,223 @@ class MangaController extends Controller
 
         $genres = $this->mangaService->getGenres();
 
-        return view('manga.index', [
-            'mangas' => $result['data'] ?? [],
-            'total' => $result['total'] ?? 0,
-            'page' => $page,
-            'totalPages' => $result['totalPages'] ?? 1,
-            'search' => $search,
-            'currentCategory' => $categoryFilter,
-            'currentGenre' => $genre,
-            'genres' => $genres,
-        ]);
+        return response()
+            ->view('manga.index', [
+                'mangas' => $result['data'] ?? [],
+                'total' => $result['total'] ?? 0,
+                'page' => $page,
+                'totalPages' => $result['totalPages'] ?? 1,
+                'search' => $search,
+                'currentCategory' => $categoryFilter,
+                'currentGenre' => $genre,
+                'genres' => $genres,
+            ])
+            ->header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400');
     }
 
     /**
-     * Display manga details and chapter list.
-     * Uses parallel fetching: detail + chapters load concurrently for speed.
+     * Display manga details.
+     *
+     * The chapter list is NEVER aggregated on this request. We only read it
+     * from cache (instant when warm) and otherwise render a skeleton while
+     * Alpine fetches /manga/{id}/chapters.json in the background. This turns
+     * the old 7-9s first paint into a single cached AniList lookup.
      */
-    public function show(string $id, Request $request): View
+    public function show(string $id, Request $request): Response
     {
-        // Check if chapters are already cached — if so, skip expensive re-fetch
-        $cachedChapters = \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_all");
-
-        // Fetch manga detail (this is itself cached)
         $manga = $this->mangaService->getDetail($id);
         if (! $manga) {
             abort(404, 'Manga tidak ditemukan.');
         }
 
-        // Cache manga detail explicitly for fast reader access
-        \Illuminate\Support\Facades\Cache::put("manga_detail_{$id}", $manga, 7200);
+        $cachedChapters = $this->preloadChapters($id);
+        $payload = $this->buildChapterPayload($cachedChapters, $id);
 
-        // Chapters: use cache if available, otherwise fetch (the service method itself caches)
-        $allChapters = $cachedChapters ?: $this->mangaService->getChapters($id);
+        return response()
+            ->view('manga.show', [
+                'manga' => $manga,
+                'chapterPayload' => $payload,
+                'chaptersPreloaded' => ! empty($cachedChapters),
+                'chaptersUrl' => route('manga.chapters.json', ['id' => $id]),
+                'activeTab' => $payload['counts']['id'] > 0 ? 'id' : ($payload['counts']['en'] > 0 ? 'en' : 'all'),
+            ])
+            ->header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400');
+    }
 
-        // Re-sync URL caches for all non-MangaDex chapters to prevent 404 on reader
-        foreach ($allChapters as $chap) {
-            if (! empty($chap['readPath'])) {
-                $chapId = $chap['id'];
-                $prefix = explode('_', $chapId)[0] ?? '';
-                $cacheKey = match ($prefix) {
-                    'kmd' => "kmd_url_{$chapId}",
-                    'bk' => "bk_url_{$chapId}",
-                    'wm' => "wm_url_{$chapId}",
-                    'shn' => "shn_url_{$chapId}",
-                    'mh' => "mh_url_{$chapId}",
-                    default => null,
-                };
-                if ($cacheKey) {
-                    \Illuminate\Support\Facades\Cache::put($cacheKey, $chap['readPath'], 86400);
+    /**
+     * Async chapter list endpoint. Runs the expensive aggregation only when
+     * the shared cache is cold.
+     */
+    public function chaptersJson(string $id, Request $request): \Illuminate\Http\JsonResponse
+    {
+        $language = $request->query('lang');
+        if (! in_array($language, ['id', 'en'], true)) {
+            $language = null;
+        }
+
+        $failed = false;
+        try {
+            $chapters = $this->mangaService->getChapters($id, $language) ?: [];
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("chaptersJson failed for {$id}: ".$e->getMessage());
+            $chapters = [];
+            $failed = true;
+        }
+
+        $payload = $this->buildChapterPayload($chapters, $id);
+
+        // Do not let a transient upstream failure poison the edge cache.
+        $cacheControl = ($failed || empty($chapters))
+            ? 'public, max-age=0, s-maxage=60, stale-while-revalidate=60'
+            : 'public, max-age=300, s-maxage=43200, stale-while-revalidate=86400';
+
+        return response()
+            ->json($payload)
+            ->header('Cache-Control', $cacheControl);
+    }
+
+    /**
+     * Warm the shared cache for the most popular manga. Intended to be called
+     * by an external cron (Vercel Hobby only allows daily crons).
+     */
+    public function warm(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $expected = (string) ($_ENV['WARM_TOKEN'] ?? $_SERVER['WARM_TOKEN'] ?? getenv('WARM_TOKEN') ?: '');
+        if ($expected !== '' && ! hash_equals($expected, (string) $request->query('token', ''))) {
+            abort(403, 'Invalid warm token.');
+        }
+
+        @set_time_limit(25);
+
+        $limit = max(1, min(12, (int) $request->query('limit', 6)));
+        $start = microtime(true);
+        $deadline = $start + 20;
+        $warmed = [];
+        $failed = [];
+
+        try {
+            $popular = $this->mangaService->getPopular(1, $limit);
+            $ids = array_values(array_filter(array_column($popular['data'] ?? [], 'id')));
+        } catch (\Throwable $e) {
+            $ids = [];
+        }
+
+        foreach ($ids as $id) {
+            if (microtime(true) > $deadline) {
+                break;
+            }
+            try {
+                $chapters = $this->mangaService->getChapters($id);
+                if (! empty($chapters)) {
+                    $warmed[] = $id;
+                } else {
+                    $failed[] = $id;
                 }
+            } catch (\Throwable $e) {
+                $failed[] = $id;
             }
         }
 
-        $indoChapters = array_values(array_filter($allChapters, fn ($c) => $c['language'] === 'id'));
-        $enChapters = array_values(array_filter($allChapters, fn ($c) => $c['language'] === 'en'));
+        return response()
+            ->json([
+                'warmed' => $warmed,
+                'failed' => $failed,
+                'elapsed' => round(microtime(true) - $start, 2),
+            ])
+            ->header('Cache-Control', 'no-store');
+    }
 
-        // Determine first and latest chapter for quick CTA buttons
-        $firstChapter = ! empty($allChapters) ? end($allChapters) : null;
-        $latestChapter = ! empty($allChapters) ? reset($allChapters) : null;
+    /**
+     * Read whatever chapter list is already cached without triggering any
+     * network aggregation. Merges the per-language caches when the "all"
+     * cache has not been built yet.
+     */
+    protected function preloadChapters(string $id): array
+    {
+        $all = Cache::get("aggregated_v4_chapters_{$id}_all");
+        if (is_array($all) && ! empty($all)) {
+            return $all;
+        }
 
-        return view('manga.show', [
-            'manga' => $manga,
-            'allChapters' => $allChapters,
-            'indoChapters' => $indoChapters,
-            'enChapters' => $enChapters,
-            'firstChapter' => $firstChapter,
-            'latestChapter' => $latestChapter,
-        ]);
+        $merged = [];
+        foreach (['id', 'en'] as $language) {
+            $cached = Cache::get("aggregated_v4_chapters_{$id}_{$language}");
+            if (is_array($cached) && ! empty($cached)) {
+                $merged = array_merge($merged, $cached);
+            }
+        }
+
+        if (empty($merged)) {
+            return [];
+        }
+
+        usort($merged, function ($a, $b) {
+            $numA = (float) ($a['chapter'] ?? 0);
+            $numB = (float) ($b['chapter'] ?? 0);
+            if ($numA == $numB) {
+                return strcmp($a['language'] ?? '', $b['language'] ?? '');
+            }
+
+            return ($numA < $numB) ? 1 : -1;
+        });
+
+        return array_values($merged);
+    }
+
+    /**
+     * Build the compact JSON payload consumed by the detail page.
+     */
+    protected function buildChapterPayload(array $chapters, string $mangaId): array
+    {
+        $total = count($chapters);
+        $indoCount = 0;
+        $enCount = 0;
+        foreach ($chapters as $chapter) {
+            if (($chapter['language'] ?? '') === 'id') {
+                $indoCount++;
+            } elseif (($chapter['language'] ?? '') === 'en') {
+                $enCount++;
+            }
+        }
+
+        // Keep the payload small: the 400 newest chapters are enough for the
+        // UI, while "first chapter" is still resolved from the full list.
+        $visible = $total > 400 ? array_slice($chapters, 0, 400) : $chapters;
+
+        return [
+            'mangaId' => $mangaId,
+            'chapters' => array_values(array_map([$this, 'chapterSummary'], $visible)),
+            'counts' => [
+                'all' => $total,
+                'id' => $indoCount,
+                'en' => $enCount,
+            ],
+            'first' => $total > 0 ? $this->chapterSummary(end($chapters)) : null,
+            'latest' => $total > 0 ? $this->chapterSummary(reset($chapters)) : null,
+            'truncated' => $total > count($visible),
+        ];
+    }
+
+    /**
+     * Only the fields the client needs to render / navigate a chapter.
+     */
+    protected function chapterSummary(array $chapter): array
+    {
+        return [
+            'id' => (string) ($chapter['id'] ?? ''),
+            'chapter' => (string) ($chapter['chapter'] ?? '0'),
+            'title' => (string) ($chapter['title'] ?? ''),
+            'language' => (string) ($chapter['language'] ?? 'en'),
+            'provider' => (string) ($chapter['provider'] ?? 'MangaDex'),
+            'publishAt' => (string) ($chapter['publishAt'] ?? ''),
+            'externalUrl' => $chapter['externalUrl'] ?? null,
+        ];
     }
 
     /**
      * Manga chapter reader interface (vertical & single-page modes).
      */
-    public function read(string $id, string $chapterId, Request $request): View
+    public function read(string $id, string $chapterId, Request $request): Response
     {
         $source = $request->query('source');
         $chNum = $request->query('ch');
@@ -163,16 +310,18 @@ class MangaController extends Controller
         // 4. Resolve prev/next within the same language from the cached chapter list
         $navigation = $this->resolveChapterNavigation($id, $chapterId, $chNum, $currentChapter);
 
-        return view('manga.read', [
-            'manga' => $manga,
-            'currentChapter' => $navigation['currentChapter'],
-            'prevChapter' => $navigation['prevChapter'],
-            'nextChapter' => $navigation['nextChapter'],
-            'allChapters' => $navigation['chapters'],
-            'sameLangChapters' => $navigation['sameLangChapters'],
-            'pages' => $chapterData['pages'],
-            'totalPages' => count($chapterData['pages']),
-        ]);
+        return response()
+            ->view('manga.read', [
+                'manga' => $manga,
+                'currentChapter' => $navigation['currentChapter'],
+                'prevChapter' => $navigation['prevChapter'],
+                'nextChapter' => $navigation['nextChapter'],
+                'allChapters' => $navigation['chapters'],
+                'sameLangChapters' => $navigation['sameLangChapters'],
+                'pages' => $chapterData['pages'],
+                'totalPages' => count($chapterData['pages']),
+            ])
+            ->header('Cache-Control', 'public, max-age=120, s-maxage=3600, stale-while-revalidate=86400');
     }
 
     /**
@@ -194,13 +343,15 @@ class MangaController extends Controller
         $currentChapter = $this->buildCurrentChapter($chapterId, $chNum, $source);
         $navigation = $this->resolveChapterNavigation($id, $chapterId, $chNum, $currentChapter);
 
-        return response()->json([
-            'currentChapter' => $navigation['currentChapter'],
-            'prevChapter' => $navigation['prevChapter'],
-            'nextChapter' => $navigation['nextChapter'],
-            'pages' => $chapterData['pages'],
-            'totalPages' => count($chapterData['pages']),
-        ]);
+        return response()
+            ->json([
+                'currentChapter' => $navigation['currentChapter'],
+                'prevChapter' => $navigation['prevChapter'],
+                'nextChapter' => $navigation['nextChapter'],
+                'pages' => $chapterData['pages'],
+                'totalPages' => count($chapterData['pages']),
+            ])
+            ->header('Cache-Control', 'public, max-age=300, s-maxage=7200, stale-while-revalidate=86400');
     }
 
     /**
@@ -226,6 +377,8 @@ class MangaController extends Controller
         $keys = [
             "aggregated_v4_chapters_{$mangaId}_{$language}",
             "aggregated_v4_chapters_{$mangaId}_all",
+            "aggregated_v4_chapters_{$mangaId}_id",
+            "aggregated_v4_chapters_{$mangaId}_en",
             "aggregated_v4_chapters_{$mangaId}_null",
             "aggregated_v4_chapters_{$mangaId}_",
         ];
@@ -400,12 +553,12 @@ class MangaController extends Controller
         if (! empty($data['filePath']) && file_exists($data['filePath'])) {
             return response()->file($data['filePath'], [
                 'Content-Type' => $data['contentType'],
-                'Cache-Control' => 'public, max-age=604800, immutable',
+                'Cache-Control' => 'public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400, immutable',
             ]);
         }
 
         return response($data['content'])
             ->header('Content-Type', $data['contentType'])
-            ->header('Cache-Control', 'public, max-age=604800, immutable');
+            ->header('Cache-Control', 'public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400, immutable');
     }
 }

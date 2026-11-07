@@ -64,13 +64,11 @@ test('manga homepage can be rendered', function () {
     $response->assertSee('Chainsaw Man');
 });
 
-test('manga detail page can be rendered for a valid manga id', function () {
+test('manga detail page renders without waiting for chapter aggregation', function () {
     $this->mock(MangaService::class, function ($mock) {
         $mock->shouldReceive('getDetail')->once()->andReturn(fakeMangaDetail());
-        $mock->shouldReceive('getChapters')->once()->andReturn([
-            fakeChapter('chapter-2', '2', 'en'),
-            fakeChapter('chapter-1', '1', 'en'),
-        ]);
+        // Chapters must NOT be aggregated during the initial HTML render.
+        $mock->shouldNotReceive('getChapters');
     });
 
     $response = $this->get('/manga/a77742b1-befd-49a4-bff5-1ad4e6b0ef7b');
@@ -78,6 +76,27 @@ test('manga detail page can be rendered for a valid manga id', function () {
     $response->assertStatus(200);
     $response->assertSee('Chainsaw Man');
     $response->assertSee('Daftar Chapter');
+    $response->assertHeader('Cache-Control', 'max-age=60, public, s-maxage=300, stale-while-revalidate=86400');
+});
+
+test('chapters json endpoint aggregates and returns the chapter list', function () {
+    $this->mock(MangaService::class, function ($mock) {
+        $mock->shouldReceive('getChapters')->once()
+            ->with('a77742b1-befd-49a4-bff5-1ad4e6b0ef7b', null)
+            ->andReturn([
+                fakeChapter('chapter-2', '2', 'en'),
+                fakeChapter('chapter-1', '1', 'en'),
+            ]);
+    });
+
+    $response = $this->getJson('/manga/a77742b1-befd-49a4-bff5-1ad4e6b0ef7b/chapters.json');
+
+    $response->assertOk()
+        ->assertJsonPath('counts.all', 2)
+        ->assertJsonPath('counts.en', 2)
+        ->assertJsonPath('first.chapter', '1')
+        ->assertJsonPath('latest.chapter', '2')
+        ->assertHeader('Cache-Control', 'max-age=300, public, s-maxage=43200, stale-while-revalidate=86400');
 });
 
 test('image proxy rejects local and non-http urls', function () {

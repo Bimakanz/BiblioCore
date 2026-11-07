@@ -50,7 +50,7 @@ class AniListProvider
     {
         $cacheKey = "anilist_catalog_{$category}_{$page}_{$limit}_" . md5((string)$genre);
 
-        return Cache::remember($cacheKey, 1800, function () use ($page, $limit, $category, $genre) {
+        return Cache::remember($cacheKey, 21600, function () use ($page, $limit, $category, $genre) {
             $variables = [
                 'page' => $page,
                 'perPage' => $limit,
@@ -168,7 +168,7 @@ class AniListProvider
     {
         $cacheKey = "anilist_search_" . md5("{$query}_{$page}_{$limit}_{$category}_{$genre}");
 
-        return Cache::remember($cacheKey, 900, function () use ($query, $page, $limit, $genre) {
+        return Cache::remember($cacheKey, 3600, function () use ($query, $page, $limit, $genre) {
             $variables = [
                 'page' => $page,
                 'perPage' => $limit,
@@ -277,7 +277,7 @@ class AniListProvider
 
         $cacheKey = "anilist_detail_{$numericId}";
 
-        return Cache::remember($cacheKey, 3600, function () use ($numericId) {
+        return Cache::remember($cacheKey, 86400, function () use ($numericId) {
             $gql = '
             query ($id: Int) {
               Media(id: $id, type: MANGA) {

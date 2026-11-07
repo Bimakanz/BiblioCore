@@ -1,35 +1,17 @@
 <?php
 
-use App\Http\Controllers\MangaController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Web Routes - BiblioManga (Open Manga Reader)
+| Web Routes - BiblioManga (authenticated area)
 |--------------------------------------------------------------------------
 |
-| Akses publik tanpa batas untuk membaca manga dalam Bahasa Indonesia
-| dan Bahasa Inggris tanpa perlu registrasi, login, ataupun admin.
+| Public manga pages live in routes/public.php and are registered without
+| the "web" middleware group so Vercel can cache them at the edge.
 |
 */
-
-// Beranda & Katalog Manga Publik
-Route::get('/', [MangaController::class, 'index'])->name('manga.index');
-Route::get('/landing', [MangaController::class, 'index'])->name('landing');
-
-// API Live Search Debounce
-Route::get('/manga/api/live-search', [MangaController::class, 'liveSearch'])->name('manga.api.live-search');
-
-// Detail Manga & Daftar Chapter
-Route::get('/manga/{id}', [MangaController::class, 'show'])->name('manga.show');
-
-// Pembaca Manga (Manga Reader)
-Route::get('/manga/{id}/chapter/{chapterId}', [MangaController::class, 'read'])->name('manga.read');
-Route::get('/manga/{id}/chapter/{chapterId}/pages-json', [MangaController::class, 'chapterPagesJson'])->name('manga.chapter.pages-json');
-
-// Proxy Gambar untuk Bypass Blokir ISP / Sensor DNS
-Route::get('/manga/proxy/image', [MangaController::class, 'proxyImage'])->name('manga.proxy.image');
 
 // Optional User Profile & Auth routes (untuk kompatibilitas)
 Route::middleware('auth')->group(function () {

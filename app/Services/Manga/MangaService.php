@@ -133,7 +133,7 @@ class MangaService
     {
         $cacheKey = "manga_detail_{$id}";
 
-        return Cache::remember($cacheKey, 3600, function () use ($id) {
+        return Cache::remember($cacheKey, 86400, function () use ($id) {
             if (str_starts_with($id, 'al_') || is_numeric($id)) {
                 try {
                     $manga = $this->aniListProvider->getDetail($id);
@@ -192,7 +192,7 @@ class MangaService
         $langKey = $language ?: 'all';
         $cacheKey = "aggregated_v4_chapters_{$id}_{$langKey}";
 
-        return Cache::remember($cacheKey, 43200, function () use ($id, $language) {
+        $chapters = Cache::remember($cacheKey, 43200, function () use ($id, $language) {
             $manga = $this->getDetail($id);
             $title = $manga['title'] ?? '';
             $altTitles = $manga['altTitles'] ?? [];
@@ -226,20 +226,29 @@ class MangaService
                 Log::warning("MangaDex chapter fetch failed for {$id}: " . $e->getMessage());
             }
 
+            // Count what MangaDex already delivered. When it has a healthy
+            // archive we skip the slower scrapers entirely: this is the single
+            // biggest cold-start win and avoids hammering external sites.
+            $dexIndoCount = count(array_filter($dexChapters, fn ($c) => ($c['language'] ?? '') === 'id'));
+            $dexEnCount = count(array_filter($dexChapters, fn ($c) => ($c['language'] ?? '') === 'en'));
+            $enoughChapters = 40;
+
             // 2. Indonesian Sources (Komiku + KomikIndo + WestManga + Bacakomik + Shinigami ID)
             $indoChapters = [];
-            if (!$language || $language === 'id') {
+            if ((!$language || $language === 'id') && $dexIndoCount < $enoughChapters) {
                 // Indonesian Source 1: Komiku
                 try {
-                    $komiku = $this->komikuProvider->getChapters($title, $altTitles);
-                    $indoChapters = array_merge($indoChapters, $komiku);
+                    if (count($indoChapters) + $dexIndoCount < $enoughChapters) {
+                        $komiku = $this->komikuProvider->getChapters($title, $altTitles);
+                        $indoChapters = array_merge($indoChapters, $komiku);
+                    }
                 } catch (\Throwable $e) {
                     Log::warning("Komiku chapter fetch failed: " . $e->getMessage());
                 }
 
                 // Indonesian Source 2: KomikIndo
                 try {
-                    if (count($indoChapters) < 40) {
+                    if (count($indoChapters) + $dexIndoCount < $enoughChapters) {
                         $komikindo = $this->komikIndoProvider->getChapters($title, $altTitles);
                         $indoChapters = array_merge($indoChapters, $komikindo);
                     }
@@ -249,7 +258,7 @@ class MangaService
 
                 // Indonesian Source 3: MultiSource (Bacakomik, WestManga)
                 try {
-                    if (count($indoChapters) < 40) {
+                    if (count($indoChapters) + $dexIndoCount < $enoughChapters) {
                         $multiId = $this->multiSourceProvider->getIndoChapters($title, $altTitles);
                         $indoChapters = array_merge($indoChapters, $multiId);
                     }
@@ -260,18 +269,20 @@ class MangaService
 
             // 3. English Sources (MangaPill + MangaNato + WeebCentral + MangaHere)
             $enChapters = [];
-            if (!$language || $language === 'en') {
+            if ((!$language || $language === 'en') && $dexEnCount < $enoughChapters) {
                 // English Source 1: MangaPill (comprehensive English archive)
                 try {
-                    $mp = $this->mangaPillProvider->getChapters($title, $altTitles);
-                    $enChapters = array_merge($enChapters, $mp);
+                    if (count($enChapters) + $dexEnCount < $enoughChapters) {
+                        $mp = $this->mangaPillProvider->getChapters($title, $altTitles);
+                        $enChapters = array_merge($enChapters, $mp);
+                    }
                 } catch (\Throwable $e) {
                     Log::warning("MangaPill chapter fetch failed: " . $e->getMessage());
                 }
 
                 // English Source 2: WeebCentral & MangaHere
                 try {
-                    if (count($enChapters) < 10) {
+                    if (count($enChapters) + $dexEnCount < $enoughChapters) {
                         $multiEn = $this->multiSourceProvider->getEnglishChapters($title, $altTitles);
                         $enChapters = array_merge($enChapters, $multiEn);
                     }
@@ -281,7 +292,7 @@ class MangaService
 
                 // English Source 3: MangaNato (fallback)
                 try {
-                    if (count($enChapters) < 10) {
+                    if (count($enChapters) + $dexEnCount < $enoughChapters) {
                         $nato = $this->mangaNatoProvider->getChapters($title, $altTitles);
                         $enChapters = array_merge($enChapters, $nato);
                     }
@@ -337,6 +348,14 @@ class MangaService
 
             return $merged;
         });
+
+        // Never keep an empty aggregation around: a transient upstream failure
+        // should be retried on the next visit instead of sticking for 12 hours.
+        if (empty($chapters)) {
+            Cache::forget($cacheKey);
+        }
+
+        return $chapters;
     }
 
     /**

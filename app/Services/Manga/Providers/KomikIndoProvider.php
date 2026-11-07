@@ -60,7 +60,7 @@ class KomikIndoProvider
     {
         $cacheKey = 'komikindo_ch_' . md5($title);
 
-        return Cache::remember($cacheKey, 3600, function () use ($title, $altTitles) {
+        $result = Cache::remember($cacheKey, 43200, function () use ($title, $altTitles) {
             $clean = strtolower(trim(preg_replace('/[^a-zA-Z0-9\s]/', '', $title)));
             $slug = preg_replace('/\s+/', '-', $clean);
 
@@ -76,9 +76,13 @@ class KomikIndoProvider
                 $candidates[] = 'solo-leveling';
             }
 
-            foreach ($candidates as $candidate) {
-                $url = "https://komikindo.ch/komik/{$candidate}/";
-                $html = $this->request($url);
+            $urls = array_map(fn (string $candidate) => "https://komikindo.ch/komik/{$candidate}/", $candidates);
+            $responses = \App\Services\Manga\Support\HttpFetcher::getMany($urls, [
+                'resolve' => $this->dnsResolves,
+            ]);
+
+            foreach ($urls as $url) {
+                $html = $responses[$url] ?? null;
                 if ($html && str_contains($html, 'chapter-list')) {
                     preg_match_all('/<a[^>]+href="([^"]+\/chapter-[0-9\.]+[^"]*)"[^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER);
                     if (!empty($matches)) {
@@ -90,7 +94,7 @@ class KomikIndoProvider
                             $chapNum = !empty($num[1]) ? (string)$num[1] : '0';
 
                             $id = 'kmd_' . md5($chapUrl);
-                            Cache::put("kmd_url_{$id}", $chapUrl, 86400);
+                            Cache::put("kmd_url_{$id}", $chapUrl, 604800);
 
                             $chapters[] = [
                                 'id' => $id,
@@ -111,6 +115,12 @@ class KomikIndoProvider
 
             return [];
         });
+
+        if (empty($result)) {
+            Cache::forget($cacheKey);
+        }
+
+        return $result;
     }
 
     /**
@@ -124,7 +134,7 @@ class KomikIndoProvider
         }
 
         $cacheKey = 'kmd_pages_' . md5($chapterId);
-        return Cache::remember($cacheKey, 7200, function () use ($chapUrl, $chapterId) {
+        return Cache::remember($cacheKey, 604800, function () use ($chapUrl, $chapterId) {
             $html = $this->request($chapUrl);
             if (!$html) {
                 return null;

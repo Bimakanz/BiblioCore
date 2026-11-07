@@ -99,17 +99,22 @@ class KomikuProvider
     {
         $cacheKey = 'komiku_ch_' . md5($title);
 
-        return Cache::remember($cacheKey, 3600, function () use ($title, $altTitles) {
+        $result = Cache::remember($cacheKey, 43200, function () use ($title, $altTitles) {
             $slugs = $this->getSlugCandidates($title, $altTitles);
+            $urls = array_map(fn (string $slug) => "{$this->baseUrl}/manga/{$slug}/", $slugs);
+            $responses = \App\Services\Manga\Support\HttpFetcher::getMany($urls, [
+                'resolve' => $this->dnsResolves,
+                'referer' => 'https://komiku.org/',
+            ]);
+
             $html = null;
             $matchedSlug = null;
 
-            foreach ($slugs as $slug) {
-                $url = "{$this->baseUrl}/manga/{$slug}/";
-                $res = $this->request($url);
+            foreach ($urls as $index => $url) {
+                $res = $responses[$url] ?? null;
                 if ($res && str_contains($res, 'id="Daftar_Chapter"')) {
                     $html = $res;
-                    $matchedSlug = $slug;
+                    $matchedSlug = $slugs[$index] ?? null;
                     break;
                 }
             }
@@ -145,6 +150,12 @@ class KomikuProvider
 
             return $chapters;
         });
+
+        if (empty($result)) {
+            Cache::forget($cacheKey);
+        }
+
+        return $result;
     }
 
     /**
@@ -154,7 +165,7 @@ class KomikuProvider
     {
         $cacheKey = 'komiku_pages_' . md5($chapterSlug);
 
-        return Cache::remember($cacheKey, 7200, function () use ($chapterSlug) {
+        return Cache::remember($cacheKey, 604800, function () use ($chapterSlug) {
             $slug = str_replace('kmk_', '', $chapterSlug);
             $url = "{$this->baseUrl}/{$slug}/";
 

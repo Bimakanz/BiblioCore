@@ -112,7 +112,7 @@ class MangaDexProvider implements MangaProviderInterface
 
         $cacheKey = 'al_covers_batch_'.md5(implode(',', $alIds));
 
-        return Cache::remember($cacheKey, 86400, function () use ($alIds) {
+        return Cache::remember($cacheKey, 604800, function () use ($alIds) {
             $query = '
             query ($ids: [Int]) {
               Page (page: 1, perPage: 50) {
@@ -156,7 +156,7 @@ class MangaDexProvider implements MangaProviderInterface
         $category = in_array($category, ['popular', 'trending', 'ongoing', 'completed']) ? $category : 'popular';
         $cacheKey = "mangadex_category_{$category}_{$page}_{$limit}_{$genre}";
 
-        return Cache::remember($cacheKey, 1800, function () use ($offset, $limit, $category, $genre, $page) {
+        return Cache::remember($cacheKey, 21600, function () use ($offset, $limit, $category, $genre, $page) {
             $params = [
                 'limit' => $limit,
                 'offset' => $offset,
@@ -222,7 +222,7 @@ class MangaDexProvider implements MangaProviderInterface
         $offset = ($page - 1) * $limit;
         $cacheKey = 'mangadex_search_'.md5("{$query}_{$page}_{$limit}_{$category}_{$genre}");
 
-        return Cache::remember($cacheKey, 900, function () use ($query, $offset, $limit, $category, $genre, $page) {
+        return Cache::remember($cacheKey, 3600, function () use ($query, $offset, $limit, $category, $genre, $page) {
             $params = [
                 'limit' => $limit,
                 'offset' => $offset,
@@ -284,7 +284,7 @@ class MangaDexProvider implements MangaProviderInterface
     {
         $cacheKey = "mangadex_detail_{$id}";
 
-        return Cache::remember($cacheKey, 3600, function () use ($id) {
+        return Cache::remember($cacheKey, 86400, function () use ($id) {
             $raw = $this->request("/manga/{$id}", [
                 'includes' => ['cover_art', 'author', 'artist'],
             ]);
@@ -328,7 +328,7 @@ class MangaDexProvider implements MangaProviderInterface
     {
         $cacheKey = "mangadex_chapters_{$id}_{$language}_{$limit}_{$offset}";
 
-        return Cache::remember($cacheKey, 1800, function () use ($id, $language, $limit, $offset) {
+        return Cache::remember($cacheKey, 43200, function () use ($id, $language, $limit, $offset) {
             $params = [
                 'limit' => $limit,
                 'offset' => $offset,
@@ -399,7 +399,7 @@ class MangaDexProvider implements MangaProviderInterface
     {
         $cacheKey = "mangadex_pages_{$chapterId}";
 
-        return Cache::remember($cacheKey, 7200, function () use ($chapterId) {
+        return Cache::remember($cacheKey, 604800, function () use ($chapterId) {
             $raw = $this->request("/at-home/server/{$chapterId}");
             if (! $raw || empty($raw['baseUrl']) || empty($raw['chapter']['hash'])) {
                 return null;
@@ -640,7 +640,7 @@ class MangaDexProvider implements MangaProviderInterface
 
         $cacheKey = 'cover_by_title_'.md5($cleanTitle);
 
-        return Cache::remember($cacheKey, 86400, function () use ($cleanTitle) {
+        return Cache::remember($cacheKey, 604800, function () use ($cleanTitle) {
             try {
                 $ch = curl_init('https://kitsu.io/api/edge/manga?filter%5Btext%5D='.urlencode($cleanTitle).'&page%5Blimit%5D=1');
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

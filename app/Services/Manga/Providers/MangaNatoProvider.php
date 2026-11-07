@@ -59,7 +59,7 @@ class MangaNatoProvider
     {
         $cacheKey = 'manganato_ch_v2_' . md5($title);
 
-        return Cache::remember($cacheKey, 3600, function () use ($title, $altTitles) {
+        $result = Cache::remember($cacheKey, 43200, function () use ($title, $altTitles) {
             $normalize = fn(string $s) => strtolower(trim(preg_replace('/[^a-z0-9]/', '', $s)));
             $targetNorms = array_values(array_filter(array_map($normalize, array_merge([$title], $altTitles))));
 
@@ -120,7 +120,7 @@ class MangaNatoProvider
                 $chapterNum = !empty($num[1]) ? (string)$num[1] : '0';
 
                 $chapId = 'nato_' . md5($chapUrl);
-                Cache::put("nato_url_{$chapId}", $chapUrl, 86400);
+                Cache::put("nato_url_{$chapId}", $chapUrl, 604800);
 
                 $chapters[] = [
                     'id' => $chapId,
@@ -137,6 +137,12 @@ class MangaNatoProvider
 
             return $chapters;
         });
+
+        if (empty($result)) {
+            Cache::forget($cacheKey);
+        }
+
+        return $result;
     }
 
     /**
@@ -150,7 +156,7 @@ class MangaNatoProvider
         }
 
         $cacheKey = 'nato_pages_' . md5($chapterId);
-        return Cache::remember($cacheKey, 7200, function () use ($chapUrl, $chapterId) {
+        return Cache::remember($cacheKey, 604800, function () use ($chapUrl, $chapterId) {
             $html = $this->request($chapUrl);
             if (!$html) {
                 return null;
