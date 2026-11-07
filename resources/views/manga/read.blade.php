@@ -483,6 +483,7 @@
                         <!-- Pure Image -->
                         <img :src="pSrc"
                              :alt="'Halaman ' + p.page"
+                             loading="lazy"
                              referrerpolicy="no-referrer"
                              x-on:load="pLoaded = true; pShowError = false"
                              x-on:error="handleError()"

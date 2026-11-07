@@ -33,13 +33,14 @@ class MangaController extends Controller
             return $res['data'] ?? [];
         });
 
-        return response()->json(['data' => array_slice($results, 0, 8)]);
+        return response()->json(['data' => array_slice($results, 0, 8)])
+            ->header('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
     }
 
     /**
      * Display the public manga catalogue / explore page.
      */
-    public function index(Request $request): View
+    public function index(Request $request): Response
     {
         $search = trim((string) $request->input('q', ''));
         $category = $request->input('category', 'popular'); // 'popular', 'trending', 'ongoing', 'completed'
@@ -58,7 +59,7 @@ class MangaController extends Controller
 
         $genres = $this->mangaService->getGenres();
 
-        return view('manga.index', [
+        return response()->view('manga.index', [
             'mangas' => $result['data'] ?? [],
             'total' => $result['total'] ?? 0,
             'page' => $page,
@@ -67,14 +68,14 @@ class MangaController extends Controller
             'currentCategory' => $categoryFilter,
             'currentGenre' => $genre,
             'genres' => $genres,
-        ]);
+        ])->header('Cache-Control', 'public, s-maxage=1800, stale-while-revalidate=86400');
     }
 
     /**
      * Display manga details and chapter list.
      * Uses parallel fetching: detail + chapters load concurrently for speed.
      */
-    public function show(string $id, Request $request): View
+    public function show(string $id, Request $request): Response
     {
         // Check if chapters are already cached — if so, skip expensive re-fetch
         $cachedChapters = \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_all");
@@ -117,20 +118,20 @@ class MangaController extends Controller
         $firstChapter = !empty($allChapters) ? end($allChapters) : null;
         $latestChapter = !empty($allChapters) ? reset($allChapters) : null;
 
-        return view('manga.show', [
+        return response()->view('manga.show', [
             'manga' => $manga,
             'allChapters' => $allChapters,
             'indoChapters' => $indoChapters,
             'enChapters' => $enChapters,
             'firstChapter' => $firstChapter,
             'latestChapter' => $latestChapter,
-        ]);
+        ])->header('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
     }
 
     /**
      * Manga chapter reader interface (vertical & single-page modes).
      */
-    public function read(string $id, string $chapterId, Request $request): View
+    public function read(string $id, string $chapterId, Request $request): Response
     {
         $source = $request->query('source');
         $chNum = $request->query('ch');
@@ -238,7 +239,7 @@ class MangaController extends Controller
             }
         }
 
-        return view('manga.read', [
+        return response()->view('manga.read', [
             'manga' => $manga,
             'currentChapter' => $currentChapter,
             'prevChapter' => $prevChapter,
@@ -247,7 +248,7 @@ class MangaController extends Controller
             'sameLangChapters' => $sameLangChapters,
             'pages' => $chapterData['pages'],
             'totalPages' => count($chapterData['pages']),
-        ]);
+        ])->header('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
     }
 
     /**
@@ -339,7 +340,7 @@ class MangaController extends Controller
             'nextChapter' => $nextChapter,
             'pages' => $chapterData['pages'],
             'totalPages' => count($chapterData['pages']),
-        ]);
+        ])->header('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
     }
 
     /**
@@ -399,29 +400,16 @@ class MangaController extends Controller
     }
 
     /**
-     * Proxy image requests to bypass ISP censorship and edge restrictions.
+     * Proxy image requests: offloaded to wsrv.nl CDN to eliminate Serverless Function overhead.
      */
-    public function proxyImage(Request $request): BinaryFileResponse|Response
+    public function proxyImage(Request $request): \Illuminate\Http\RedirectResponse
     {
         $url = $request->query('url');
         if (!$url || !filter_var($url, FILTER_VALIDATE_URL)) {
             abort(400, 'Invalid image URL');
         }
 
-        $data = $this->mangaService->fetchImage($url);
-        if (!$data) {
-            abort(404, 'Gambar tidak dapat diakses.');
-        }
-
-        if (!empty($data['filePath']) && file_exists($data['filePath'])) {
-            return response()->file($data['filePath'], [
-                'Content-Type' => $data['contentType'],
-                'Cache-Control' => 'public, max-age=604800, immutable',
-            ]);
-        }
-
-        return response($data['content'])
-            ->header('Content-Type', $data['contentType'])
+        return redirect('https://wsrv.nl/?url=' . urlencode($url) . '&n=-1', 301)
             ->header('Cache-Control', 'public, max-age=604800, immutable');
     }
 }

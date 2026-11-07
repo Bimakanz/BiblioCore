@@ -175,7 +175,7 @@ class KomikuProvider
 
             $pages = [];
             foreach ($rawImgs as $idx => $directUrl) {
-                $proxyUrl = "/manga/proxy/image?url=" . urlencode($directUrl);
+                $proxyUrl = "https://wsrv.nl/?url=" . urlencode($directUrl) . "&n=-1";
                 $pages[] = [
                     'page' => $idx + 1,
                     'directUrl' => $directUrl,
