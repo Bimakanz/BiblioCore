@@ -26,6 +26,7 @@ Route::get('/manga/{id}', [MangaController::class, 'show'])->name('manga.show');
 
 // Pembaca Manga (Manga Reader)
 Route::get('/manga/{id}/chapter/{chapterId}', [MangaController::class, 'read'])->name('manga.read');
+Route::get('/manga/{id}/chapter/{chapterId}/pages-json', [MangaController::class, 'chapterPagesJson'])->name('manga.chapter.pages-json');
 
 // Proxy Gambar untuk Bypass Blokir ISP / Sensor DNS
 Route::get('/manga/proxy/image', [MangaController::class, 'proxyImage'])->name('manga.proxy.image');

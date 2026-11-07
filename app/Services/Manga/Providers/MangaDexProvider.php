@@ -481,6 +481,10 @@ class MangaDexProvider implements MangaProviderInterface
             $referer = 'https://readmanganato.com/';
         } elseif (str_contains($url, 'komikindo') || str_contains($host, 'komikindo')) {
             $referer = 'https://komikindo.tv/';
+        } elseif (str_contains($url, 'bacakomik') || str_contains($host, 'bacakomik')) {
+            $referer = 'https://bacakomik.my/';
+        } elseif (str_contains($url, 'westmanga') || str_contains($host, 'westmanga')) {
+            $referer = 'https://westmanga.site/';
         }
         curl_setopt($ch, CURLOPT_REFERER, $referer);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);

@@ -239,7 +239,7 @@ class MangaService
 
                 // Indonesian Source 2: KomikIndo
                 try {
-                    if (count($indoChapters) < 10) {
+                    if (count($indoChapters) < 40) {
                         $komikindo = $this->komikIndoProvider->getChapters($title, $altTitles);
                         $indoChapters = array_merge($indoChapters, $komikindo);
                     }
@@ -247,9 +247,9 @@ class MangaService
                     Log::warning("KomikIndo chapter fetch failed: " . $e->getMessage());
                 }
 
-                // Indonesian Source 3: MultiSource (WestManga, Bacakomik, Shinigami ID)
+                // Indonesian Source 3: MultiSource (Bacakomik, WestManga)
                 try {
-                    if (count($indoChapters) < 10) {
+                    if (count($indoChapters) < 40) {
                         $multiId = $this->multiSourceProvider->getIndoChapters($title, $altTitles);
                         $indoChapters = array_merge($indoChapters, $multiId);
                     }

@@ -18,100 +18,87 @@
         .reader-scroll::-webkit-scrollbar { width: 5px; }
         .reader-scroll::-webkit-scrollbar-track { background: #16181d; }
         .reader-scroll::-webkit-scrollbar-thumb { background: #0f766e; border-radius: 9999px; }
-        
-        /* Smooth fade in for manga images */
-        .manga-panel {
-            transition: opacity 0.3s ease-in-out;
-        }
-        .manga-panel.loading {
-            opacity: 0;
-        }
-        .manga-panel.loaded {
-            opacity: 1;
-        }
     </style>
 </head>
 <body x-data="{
+        mangaId: @js($manga['id']),
+        mangaTitle: @js($manga['title']),
+        mangaCoverUrl: @js($manga['coverUrl']),
         mode: localStorage.getItem('reader_mode') || 'paged',
         widthMode: localStorage.getItem('reader_width') || 'normal',
         quality: localStorage.getItem('reader_quality') || 'hd',
         handMode: localStorage.getItem('reader_hand_mode') || 'right', // 'right' (default) or 'left'
         currentPage: 1,
+        pages: @js($pages),
         totalPages: {{ $totalPages }},
+        currentChapter: @js($currentChapter),
+        prevChapter: @js($prevChapter),
+        nextChapter: @js($nextChapter),
+        latestChapNum: {{ !empty($sameLangChapters[0]['chapter']) ? (int)$sameLangChapters[0]['chapter'] : (count($sameLangChapters) ?: 1) }},
+        prefetchedNextChapter: null,
+        prefetchedPrevChapter: null,
         progress: 0,
         showMenu: false,
         isFullscreen: false,
         toastOpen: false,
         toastMsg: '',
-        nextChapterUrl: @js($nextChapter ? route('manga.read', ['id' => $manga['id'], 'chapterId' => $nextChapter['id'], 'source' => $nextChapter['provider'] ?? 'MangaDex', 'ch' => $nextChapter['chapter'] ?? '0']) : null),
-        prevChapterUrl: @js($prevChapter ? route('manga.read', ['id' => $manga['id'], 'chapterId' => $prevChapter['id'], 'source' => $prevChapter['provider'] ?? 'MangaDex', 'ch' => $prevChapter['chapter'] ?? '0']) : null),
         
         init() {
+            this.totalPages = this.pages.length;
+            this.saveHistory();
+            this.preloadUpcomingPages();
+            // Silently prefetch next chapter in background for 0-delay instant reading
+            setTimeout(() => {
+                this.prefetchAdjacentChapters();
+            }, 600);
+        },
+
+        saveHistory() {
             try {
                 let hist = JSON.parse(localStorage.getItem('bibliomanga_history') || '[]');
-                hist = hist.filter(h => h.id !== '{{ $manga['id'] }}');
+                hist = hist.filter(h => h.id !== this.mangaId);
                 hist.unshift({
-                    id: '{{ $manga['id'] }}',
-                    title: @js($manga['title']),
-                    coverUrl: @js($manga['coverUrl']),
-                    chapterId: '{{ $currentChapter['id'] }}',
-                    chapterNumber: '{{ $currentChapter['chapter'] }}',
-                    chapterTitle: @js($currentChapter['title'] ?? ''),
-                    source: '{{ $currentChapter['provider'] ?? 'MangaDex' }}',
+                    id: this.mangaId,
+                    title: this.mangaTitle,
+                    coverUrl: this.mangaCoverUrl,
+                    chapterId: this.currentChapter.id,
+                    chapterNumber: this.currentChapter.chapter,
+                    chapterTitle: this.currentChapter.title || '',
+                    source: this.currentChapter.provider || 'MangaDex',
                     readAt: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) + ', ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
                 });
                 if (hist.length > 50) hist = hist.slice(0, 50);
                 localStorage.setItem('bibliomanga_history', JSON.stringify(hist));
             } catch(e) {}
         },
-        
+
+        buildReadUrl(chap) {
+            if (!chap) return null;
+            return '/manga/' + this.mangaId + '/chapter/' + chap.id + '?ch=' + encodeURIComponent(chap.chapter || '0') + '&source=' + encodeURIComponent(chap.provider || 'MangaDex');
+        },
+
         showToast(msg) {
             this.toastMsg = msg;
             this.toastOpen = true;
-            setTimeout(() => { this.toastOpen = false; }, 2600);
+            setTimeout(() => { this.toastOpen = false; }, 2400);
         },
+
         toggleHandMode() {
             this.handMode = (this.handMode === 'right') ? 'left' : 'right';
             localStorage.setItem('reader_hand_mode', this.handMode);
             this.showToast(this.handMode === 'left' ? 'Mode Tangan Kiri Aktif: Ketuk kiri untuk lanjut' : 'Mode Tangan Kanan: Ketuk kanan untuk lanjut');
         },
+
         toggleMode() {
             this.mode = (this.mode === 'paged') ? 'webtoon' : 'paged';
             localStorage.setItem('reader_mode', this.mode);
         },
+
         setMode(newMode) {
             this.mode = newMode;
             localStorage.setItem('reader_mode', newMode);
         },
-        setWidth(w) {
-            this.widthMode = w;
-            localStorage.setItem('reader_width', w);
-        },
-        toggleQuality() {
-            this.quality = (this.quality === 'hd') ? 'saver' : 'hd';
-            localStorage.setItem('reader_quality', this.quality);
-            window.location.reload();
-        },
-        nextPage() {
-            if (this.currentPage < this.totalPages) {
-                this.currentPage++;
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            } else if (this.nextChapterUrl) {
-                this.showToast('Memuat Chapter Selanjutnya...');
-                window.location.href = this.nextChapterUrl;
-            } else {
-                this.showToast('Ini adalah chapter terakhir yang tersedia.');
-            }
-        },
-        prevPage() {
-            if (this.currentPage > 1) {
-                this.currentPage--;
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            } else if (this.prevChapterUrl) {
-                this.showToast('Memuat Chapter Sebelumnya...');
-                window.location.href = this.prevChapterUrl;
-            }
-        },
+
         toggleFullscreen() {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().then(() => {
@@ -123,15 +110,145 @@
                 }).catch(() => {});
             }
         },
+
         scrollToTop() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         },
+
         updateProgress() {
             const h = document.documentElement, 
                   b = document.body,
                   st = 'scrollTop',
                   sh = 'scrollHeight';
             this.progress = Math.min(100, Math.round(((h[st]||b[st]) / ((h[sh]||b[sh]) - h.clientHeight)) * 100)) || 0;
+        },
+
+        // Background Preload next 2-3 images for zero-delay page turning
+        preloadUpcomingPages() {
+            if (!this.pages || this.pages.length === 0) return;
+            for (let i = 1; i <= 3; i++) {
+                const targetIdx = this.currentPage - 1 + i;
+                if (this.pages[targetIdx]) {
+                    const img = new Image();
+                    img.src = this.pages[targetIdx].proxyUrl;
+                }
+            }
+        },
+
+        // Background Prefetch adjacent chapter pages
+        async prefetchAdjacentChapters() {
+            if (this.nextChapter && !this.prefetchedNextChapter) {
+                try {
+                    const url = '/manga/' + this.mangaId + '/chapter/' + this.nextChapter.id + '/pages-json?ch=' + encodeURIComponent(this.nextChapter.chapter || '0') + '&source=' + encodeURIComponent(this.nextChapter.provider || 'MangaDex');
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.pages && data.pages.length > 0) {
+                            this.prefetchedNextChapter = data;
+                            // Preload first 3 images into cache
+                            data.pages.slice(0, 3).forEach(pg => {
+                                const img = new Image();
+                                img.src = pg.proxyUrl;
+                            });
+                        }
+                    }
+                } catch(e) {}
+            }
+        },
+
+        // ZERO DELAY Chapter Transition (In-place state swap without page reload)
+        applyChapterData(data) {
+            this.pages = data.pages;
+            this.totalPages = data.pages.length;
+            this.currentPage = 1;
+            this.currentChapter = data.currentChapter;
+            this.nextChapter = data.nextChapter;
+            this.prevChapter = data.prevChapter;
+            this.prefetchedNextChapter = null;
+
+            // Push state URL
+            const newUrl = this.buildReadUrl(this.currentChapter);
+            if (newUrl) {
+                window.history.pushState(null, '', newUrl);
+            }
+            document.title = 'Ch. ' + this.currentChapter.chapter + ' — ' + this.mangaTitle + ' | BiblioManga';
+
+            this.saveHistory();
+            window.scrollTo({ top: 0, behavior: 'instant' });
+            this.showToast('Chapter ' + this.currentChapter.chapter);
+
+            // Preload next chapter and pages for ongoing zero-delay
+            this.preloadUpcomingPages();
+            setTimeout(() => {
+                this.prefetchAdjacentChapters();
+            }, 600);
+        },
+
+        async goToNextChapter() {
+            if (!this.nextChapter) {
+                this.showToast('Ini adalah chapter terakhir yang tersedia.');
+                return;
+            }
+
+            // If already prefetched in RAM: INSTANT 0ms ZERO DELAY SWAP!
+            if (this.prefetchedNextChapter && this.prefetchedNextChapter.pages && this.prefetchedNextChapter.pages.length > 0) {
+                this.applyChapterData(this.prefetchedNextChapter);
+                return;
+            }
+
+            // In-place fast fetch
+            this.showToast('Memuat Chapter ' + this.nextChapter.chapter + '...');
+            try {
+                const url = '/manga/' + this.mangaId + '/chapter/' + this.nextChapter.id + '/pages-json?ch=' + encodeURIComponent(this.nextChapter.chapter || '0') + '&source=' + encodeURIComponent(this.nextChapter.provider || 'MangaDex');
+                const res = await fetch(url);
+                if (res.ok) {
+                    const data = await res.json();
+                    this.applyChapterData(data);
+                    return;
+                }
+            } catch(e) {}
+
+            window.location.href = this.buildReadUrl(this.nextChapter);
+        },
+
+        async goToPrevChapter() {
+            if (!this.prevChapter) {
+                this.showToast('Ini adalah chapter pertama.');
+                return;
+            }
+            this.showToast('Memuat Chapter ' + this.prevChapter.chapter + '...');
+            try {
+                const url = '/manga/' + this.mangaId + '/chapter/' + this.prevChapter.id + '/pages-json?ch=' + encodeURIComponent(this.prevChapter.chapter || '0') + '&source=' + encodeURIComponent(this.prevChapter.provider || 'MangaDex');
+                const res = await fetch(url);
+                if (res.ok) {
+                    const data = await res.json();
+                    this.applyChapterData(data);
+                    return;
+                }
+            } catch(e) {}
+
+            window.location.href = this.buildReadUrl(this.prevChapter);
+        },
+
+        nextPage() {
+            if (this.currentPage < this.totalPages) {
+                this.currentPage++;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                this.preloadUpcomingPages();
+            } else if (this.nextChapter) {
+                this.goToNextChapter();
+            } else {
+                this.showToast('Ini adalah chapter terakhir yang tersedia.');
+            }
+        },
+
+        prevPage() {
+            if (this.currentPage > 1) {
+                this.currentPage--;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else if (this.prevChapter) {
+                this.goToPrevChapter();
+            }
         }
       }"
       @fullscreenchange.window="isFullscreen = !!document.fullscreenElement"
@@ -151,7 +268,7 @@
          OVERLAY CONTROLS (Muncul saat tekan tengah layar)
          ============================================== -->
 
-    <!-- 1. Top Chapter Pill: < Ch. X / Y > -->
+    <!-- 1. Top Chapter Pill: < Ch. X / Y > (Instant Zero Delay Action) -->
     <div x-show="showMenu"
          x-cloak
          x-transition:enter="transition ease-out duration-200"
@@ -163,45 +280,34 @@
          class="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-2xl bg-[#14171d]/95 backdrop-blur-md border border-white/10 px-4 py-2.5 shadow-2xl">
         
         <!-- Prev Chapter Button -->
-        @if($prevChapter && empty($prevChapter['externalUrl']))
-            <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $prevChapter['id'], 'source' => $prevChapter['provider'] ?? 'MangaDex', 'ch' => $prevChapter['chapter'] ?? '0']) }}"
-               @click.stop
-               class="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 text-white/80 hover:bg-white/15 hover:text-white transition"
-               title="Chapter Sebelumnya">
-                <span class="material-symbols-rounded text-lg">chevron_left</span>
-            </a>
-        @else
-            <span class="flex h-8 w-8 items-center justify-center rounded-xl text-white/20 cursor-not-allowed">
-                <span class="material-symbols-rounded text-lg">chevron_left</span>
-            </span>
-        @endif
+        <button type="button"
+                @click.stop="goToPrevChapter()"
+                :disabled="!prevChapter"
+                class="flex h-8 w-8 items-center justify-center rounded-xl transition"
+                :class="prevChapter ? 'bg-white/5 text-white/80 hover:bg-white/15 hover:text-white cursor-pointer' : 'text-white/20 cursor-not-allowed'"
+                :title="prevChapter ? ('Chapter Sebelumnya (Ch. ' + prevChapter.chapter + ')') : 'Tidak ada chapter sebelumnya'">
+            <span class="material-symbols-rounded text-lg">chevron_left</span>
+        </button>
 
         <!-- Chapter Display -->
         <div class="px-2 select-none text-center">
             <span class="text-xs sm:text-sm font-bold text-white tracking-wide" style="font-family: 'Space Grotesk', sans-serif;">
-                Ch. {{ $currentChapter['chapter'] }}
+                Ch. <span x-text="currentChapter.chapter"></span>
             </span>
-            @php
-                $latestChapNum = !empty($sameLangChapters[0]['chapter']) ? $sameLangChapters[0]['chapter'] : count($sameLangChapters);
-            @endphp
             <span class="text-xs sm:text-sm text-white/40 font-medium">
-                / {{ $latestChapNum }}
+                / <span x-text="latestChapNum"></span>
             </span>
         </div>
 
         <!-- Next Chapter Button -->
-        @if($nextChapter && empty($nextChapter['externalUrl']))
-            <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $nextChapter['id'], 'source' => $nextChapter['provider'] ?? 'MangaDex', 'ch' => $nextChapter['chapter'] ?? '0']) }}"
-               @click.stop
-               class="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 text-white/80 hover:bg-white/15 hover:text-white transition"
-               title="Chapter Selanjutnya">
-                <span class="material-symbols-rounded text-lg">chevron_right</span>
-            </a>
-        @else
-            <span class="flex h-8 w-8 items-center justify-center rounded-xl text-white/20 cursor-not-allowed">
-                <span class="material-symbols-rounded text-lg">chevron_right</span>
-            </span>
-        @endif
+        <button type="button"
+                @click.stop="goToNextChapter()"
+                :disabled="!nextChapter"
+                class="flex h-8 w-8 items-center justify-center rounded-xl transition"
+                :class="nextChapter ? 'bg-white/5 text-white/80 hover:bg-white/15 hover:text-white cursor-pointer' : 'text-white/20 cursor-not-allowed'"
+                :title="nextChapter ? ('Chapter Selanjutnya (Ch. ' + nextChapter.chapter + ')') : 'Tidak ada chapter selanjutnya'">
+            <span class="material-symbols-rounded text-lg">chevron_right</span>
+        </button>
 
     </div>
 
@@ -279,23 +385,14 @@
 
             <!-- Manga Panels Stack -->
             <div class="flex flex-col items-center">
-                @foreach($pages as $p)
+                <template x-for="(p, idx) in pages" :key="currentChapter.id + '_' + p.page">
                     <div class="relative w-full flex flex-col items-center bg-[#14171c] overflow-hidden min-h-[350px] sm:min-h-[500px]"
                          x-data="{
                             loaded: false,
                             failed: false,
                             showError: false,
-                            src: '{{ $p['proxyUrl'] ?? route('manga.proxy.image', ['url' => $p['directUrl'] ?? $p['url'] ?? '']) }}',
-                            fallbackSrc: '{{ $p['directUrl'] ?? $p['url'] ?? '' }}',
-                            saverSrc: '{{ $p['proxySaverUrl'] ?? $p['proxyUrl'] ?? route('manga.proxy.image', ['url' => $p['directUrl'] ?? $p['url'] ?? '']) }}',
-                            fallbackSaverSrc: '{{ $p['saverUrl'] ?? $p['directUrl'] ?? $p['url'] ?? '' }}',
-                            
-                            init() {
-                                if (localStorage.getItem('reader_quality') === 'saver') {
-                                    this.src = this.saverSrc;
-                                    this.fallbackSrc = this.fallbackSaverSrc;
-                                }
-                            },
+                            src: p.proxyUrl,
+                            fallbackSrc: p.directUrl,
                             handleError() {
                                 if (!this.failed) {
                                     this.failed = true;
@@ -316,12 +413,12 @@
                         <div x-show="!loaded"
                              class="absolute inset-0 flex flex-col items-center justify-center bg-[#171a1e] text-[#6b766f] space-y-2">
                             <div class="h-8 w-8 animate-spin rounded-full border-2 border-[#0f766e] border-t-transparent"></div>
-                            <span class="text-[11px] font-semibold text-white/40 tracking-wider">Halaman {{ $p['page'] }}</span>
+                            <span class="text-[11px] font-semibold text-white/40 tracking-wider">Halaman <span x-text="p.page"></span></span>
                         </div>
 
                         <!-- Panel Image -->
                         <img :src="src"
-                             alt="Halaman {{ $p['page'] }}"
+                             :alt="'Halaman ' + p.page"
                              loading="lazy"
                              referrerpolicy="no-referrer"
                              x-on:load="loaded = true"
@@ -333,7 +430,7 @@
                         <div x-show="showError && !loaded"
                              class="absolute inset-0 flex flex-col items-center justify-center p-6 bg-[#1a1315] text-center space-y-2">
                             <span class="material-symbols-rounded text-2xl text-amber-500">broken_image</span>
-                            <p class="text-xs text-white/80">Halaman {{ $p['page'] }} terhambat koneksi.</p>
+                            <p class="text-xs text-white/80">Halaman <span x-text="p.page"></span> terhambat koneksi.</p>
                             <button type="button" @click.stop="retry()"
                                     class="rounded-full bg-[#0f766e] px-4 py-1.5 text-xs font-bold text-white transition hover:bg-[#115e59]">
                                 Coba Muat Ulang
@@ -341,7 +438,7 @@
                         </div>
 
                     </div>
-                @endforeach
+                </template>
             </div>
 
         </div>
@@ -368,22 +465,15 @@
 
             <!-- The Pure Manga Image -->
             <div class="relative w-full flex items-center justify-center min-h-screen">
-                @foreach($pages as $p)
-                    <div x-show="currentPage === {{ $p['page'] }}"
-                         x-cloak
+                <template x-for="(p, idx) in pages" :key="currentChapter.id + '_' + p.page">
+                    <div x-show="currentPage === p.page"
                          class="relative flex items-center justify-center max-w-full"
                          x-data="{
                             pLoaded: false,
                             pFailed: false,
                             pShowError: false,
-                            pSrc: '{{ $p['proxyUrl'] ?? route('manga.proxy.image', ['url' => $p['directUrl'] ?? $p['url'] ?? '']) }}',
-                            pFallbackSrc: '{{ $p['directUrl'] ?? $p['url'] ?? '' }}',
-                            init() {
-                                if (localStorage.getItem('reader_quality') === 'saver') {
-                                    this.pSrc = '{{ $p['proxySaverUrl'] ?? $p['proxyUrl'] ?? route('manga.proxy.image', ['url' => $p['directUrl'] ?? $p['url'] ?? '']) }}';
-                                    this.pFallbackSrc = '{{ $p['saverUrl'] ?? $p['directUrl'] ?? $p['url'] ?? '' }}';
-                                }
-                            },
+                            pSrc: p.proxyUrl,
+                            pFallbackSrc: p.directUrl,
                             handleError() {
                                 if (!this.pFailed) {
                                     this.pFailed = true;
@@ -403,12 +493,12 @@
                         <!-- Skeleton loading -->
                         <div x-show="!pLoaded" class="min-h-[70vh] flex flex-col items-center justify-center text-white/40 space-y-3">
                             <div class="h-8 w-8 animate-spin rounded-full border-2 border-[#0f766e] border-t-transparent"></div>
-                            <span class="text-xs font-semibold text-white/50 tracking-wider">Halaman {{ $p['page'] }}</span>
+                            <span class="text-xs font-semibold text-white/50 tracking-wider">Halaman <span x-text="p.page"></span></span>
                         </div>
 
                         <!-- Pure Image -->
                         <img :src="pSrc"
-                             alt="Halaman {{ $p['page'] }}"
+                             :alt="'Halaman ' + p.page"
                              referrerpolicy="no-referrer"
                              x-on:load="pLoaded = true; pShowError = false"
                              x-on:error="handleError()"
@@ -419,14 +509,14 @@
                         <div x-show="pShowError && !pLoaded"
                              class="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-3 z-30">
                             <span class="material-symbols-rounded text-3xl text-amber-500">broken_image</span>
-                            <p class="text-xs text-white/80">Halaman {{ $p['page'] }} terhambat koneksi.</p>
+                            <p class="text-xs text-white/80">Halaman <span x-text="p.page"></span> terhambat koneksi.</p>
                             <button type="button" @click.stop="retry()"
                                     class="rounded-full bg-[#0f766e] px-4 py-1.5 text-xs font-bold text-white transition hover:bg-[#115e59]">
                                 Coba Muat Ulang
                             </button>
                         </div>
                     </div>
-                @endforeach
+                </template>
             </div>
         </div>
 

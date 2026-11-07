@@ -11,10 +11,10 @@ class MultiSourceProvider
         'weebcentral.com:443:104.21.32.126',
         'www.mangahere.cc:443:104.21.92.224',
         'mangahere.cc:443:104.21.92.224',
-        'api.comick.cc:443:157.90.33.73',
-        'westmanga.fun:443:162.4.84.215',
-        'bacakomik.one:443:212.92.104.118',
-        'shinigami03.com:443:23.82.16.56',
+        'bacakomik.my:443:104.21.32.127',
+        'bacakomik.my:443:172.67.151.249',
+        'westmanga.site:443:104.21.61.129',
+        'westmanga.site:443:172.67.210.136',
     ];
 
     /**
@@ -212,30 +212,30 @@ class MultiSourceProvider
 
             $chapters = [];
 
-            // 1. WestManga
+            // 1. Bacakomik (Primary Indonesian Scanlation Archive)
             foreach ($candidates as $cand) {
                 try {
-                    $url = "https://westmanga.fun/manga/{$cand}/";
+                    $url = "https://bacakomik.my/komik/{$cand}/";
                     $html = $this->request($url);
-                    if ($html && str_contains($html, 'chapter-list')) {
-                        preg_match_all('/<a[^>]+href="([^"]+\/chapter-[0-9\.]+[^"]*)"[^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER);
+                    if ($html && str_contains($html, 'chapter')) {
+                        preg_match_all('/<a[^>]+href="([^"]+chapter-[0-9\.]+[^"]*)"[^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER);
                         foreach ($matches as $m) {
                             $chapUrl = $m[1];
                             $text = trim(strip_tags($m[2]));
                             preg_match('/(?:Chapter|Ch\.)\s*([0-9\.]+)/i', $text, $num);
                             $chNum = !empty($num[1]) ? (string)$num[1] : '0';
 
-                            $cid = 'wm_' . md5($chapUrl);
-                            Cache::put("wm_url_{$cid}", $chapUrl, 86400);
+                            $cid = 'bk_' . md5($chapUrl);
+                            Cache::put("bk_url_{$cid}", $chapUrl, 86400);
 
                             $chapters[] = [
                                 'id' => $cid,
                                 'chapter' => $chNum,
                                 'title' => $text,
                                 'language' => 'id',
-                                'group' => 'WestManga',
-                                'provider' => 'WestManga',
-                                'publishAt' => 'WestManga Indo',
+                                'group' => 'Bacakomik',
+                                'provider' => 'Bacakomik',
+                                'publishAt' => 'Bacakomik Indo',
                                 'externalUrl' => null,
                                 'readPath' => $chapUrl,
                             ];
@@ -245,31 +245,31 @@ class MultiSourceProvider
                 } catch (\Throwable $e) {}
             }
 
-            // 2. Bacakomik
+            // 2. WestManga (Mirror)
             if (empty($chapters)) {
                 foreach ($candidates as $cand) {
                     try {
-                        $url = "https://bacakomik.one/komik/{$cand}/";
+                        $url = "https://westmanga.site/{$cand}/";
                         $html = $this->request($url);
-                        if ($html && (str_contains($html, 'chapter') || str_contains($html, 'daftar-chapter'))) {
-                            preg_match_all('/<a[^>]+href="([^"]+\/chapter-[0-9\.]+[^"]*)"[^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER);
+                        if ($html && str_contains($html, 'chapter')) {
+                            preg_match_all('/<a[^>]+href="([^"]+chapter-[0-9\.]+[^"]*)"[^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER);
                             foreach ($matches as $m) {
                                 $chapUrl = $m[1];
                                 $text = trim(strip_tags($m[2]));
                                 preg_match('/(?:Chapter|Ch\.)\s*([0-9\.]+)/i', $text, $num);
                                 $chNum = !empty($num[1]) ? (string)$num[1] : '0';
 
-                                $cid = 'bk_' . md5($chapUrl);
-                                Cache::put("bk_url_{$cid}", $chapUrl, 86400);
+                                $cid = 'wm_' . md5($chapUrl);
+                                Cache::put("wm_url_{$cid}", $chapUrl, 86400);
 
                                 $chapters[] = [
                                     'id' => $cid,
                                     'chapter' => $chNum,
                                     'title' => $text,
                                     'language' => 'id',
-                                    'group' => 'Bacakomik',
-                                    'provider' => 'Bacakomik',
-                                    'publishAt' => 'Bacakomik Indo',
+                                    'group' => 'WestManga',
+                                    'provider' => 'WestManga',
+                                    'publishAt' => 'WestManga Indo',
                                     'externalUrl' => null,
                                     'readPath' => $chapUrl,
                                 ];
@@ -360,7 +360,13 @@ class MultiSourceProvider
 
             $validImgs = [];
             foreach ($imgs[1] as $imgUrl) {
-                if (preg_match('/\.(jpg|jpeg|png|webp)/i', $imgUrl) && !str_contains($imgUrl, 'logo') && !str_contains($imgUrl, 'icon')) {
+                if (preg_match('/\.(jpg|jpeg|png|webp)/i', $imgUrl) && 
+                    !str_contains($imgUrl, 'logo') && 
+                    !str_contains($imgUrl, 'icon') && 
+                    !str_contains($imgUrl, 'Ikon') && 
+                    !str_contains($imgUrl, 'iklan') && 
+                    !str_contains($imgUrl, 'donate') && 
+                    !str_contains($imgUrl, 'promosi')) {
                     $validImgs[] = $imgUrl;
                 }
             }

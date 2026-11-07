@@ -193,6 +193,66 @@ class MangaController extends Controller
     }
 
     /**
+     * Fast JSON API endpoint for background prefetching and zero-delay chapter transitions.
+     */
+    public function chapterPagesJson(string $id, string $chapterId, Request $request): \Illuminate\Http\JsonResponse
+    {
+        $source = $request->query('source');
+        $chNum = $request->query('ch');
+
+        $chapterData = $this->mangaService->getChapterPages($chapterId, $source);
+        if (!$chapterData || empty($chapterData['pages'])) {
+            return response()->json(['error' => 'Chapter pages not found'], 404);
+        }
+
+        $currentChapter = [
+            'id' => $chapterId,
+            'chapter' => $chNum ?: '1',
+            'title' => '',
+            'language' => str_starts_with($chapterId, 'kmk_') || str_starts_with($chapterId, 'kmd_') || str_starts_with($chapterId, 'wm_') || str_starts_with($chapterId, 'bk_') || str_starts_with($chapterId, 'shn_') ? 'id' : 'en',
+            'provider' => $source ?: 'MangaDex',
+        ];
+
+        $currentLang = $currentChapter['language'];
+        $cachedChapters = \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_{$currentLang}")
+            ?: \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_all")
+            ?: \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_null")
+            ?: \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_")
+            ?: [];
+
+        $prevChapter = null;
+        $nextChapter = null;
+        if (!empty($cachedChapters)) {
+            foreach ($cachedChapters as $chap) {
+                if ($chap['id'] === $chapterId || (!empty($chNum) && (string)($chap['chapter'] ?? '') === (string)$chNum)) {
+                    $currentChapter = $chap;
+                    $currentLang = $chap['language'] ?? $currentLang;
+                    break;
+                }
+            }
+
+            $sameLangChapters = array_values(array_filter($cachedChapters, fn($c) => ($c['language'] ?? 'id') === $currentLang));
+            if (empty($sameLangChapters)) $sameLangChapters = $cachedChapters;
+
+            foreach ($sameLangChapters as $index => $chap) {
+                if ($chap['id'] === $currentChapter['id'] || (string)($chap['chapter'] ?? '') === (string)$currentChapter['chapter']) {
+                    $nextChapter = $sameLangChapters[$index - 1] ?? null;
+                    $prevChapter = $sameLangChapters[$index + 1] ?? null;
+                    break;
+                }
+            }
+        }
+
+        return response()->json([
+            'currentChapter' => $currentChapter,
+            'prevChapter' => $prevChapter,
+            'nextChapter' => $nextChapter,
+            'pages' => $chapterData['pages'],
+            'totalPages' => count($chapterData['pages']),
+        ]);
+    }
+
+    /**
      * Proxy image requests to bypass ISP censorship and edge restrictions.
      */
     public function proxyImage(Request $request): BinaryFileResponse|Response
