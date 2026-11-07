@@ -262,25 +262,6 @@
         </div>
     </div>
 
-    <!-- Footer -->
-    <footer class="mt-20 border-t border-[#e0d9c8] bg-white/70 py-10">
-        <div class="mx-auto w-full max-w-7xl px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
-            <div>
-                <p class="text-base font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
-                    BiblioManga — Open Manga Platform
-                </p>
-                <p class="mt-1 text-xs text-[#5f6b63]">
-                    Portal baca komik & manga online gratis. Terhubung langsung dengan MangaDex API untuk update chapter tercepat Bahasa Indonesia & Bahasa Inggris.
-                </p>
-            </div>
-            <div class="flex items-center gap-3 text-xs text-[#6b766f]">
-                <span class="rounded-full bg-[#0f766e]/10 px-3 py-1 font-semibold text-[#0f766e]">Tanpa Login</span>
-                <span class="rounded-full bg-[#f97316]/10 px-3 py-1 font-semibold text-[#ea580c]">Tanpa Iklan Pop-up</span>
-                <span class="rounded-full bg-[#115e59]/10 px-3 py-1 font-semibold text-[#115e59]">DNS Bypass Ready</span>
-            </div>
-        </div>
-    </footer>
-
 </body>
 </html>
 
