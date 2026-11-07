@@ -10,6 +10,7 @@ $directories = [
     '/tmp/storage/framework/cache/data',
     '/tmp/storage/framework/sessions',
     '/tmp/storage/logs',
+    '/tmp/storage/app/manga_cache',
     '/tmp/bootstrap/cache',
 ];
 

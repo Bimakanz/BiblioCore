@@ -38,7 +38,7 @@ class MangaDexProvider implements MangaProviderInterface
     ];
 
     /**
-     * Helper to perform cURL requests to MangaDex with DoH DNS resolve.
+     * Helper to perform cURL requests to MangaDex with DoH DNS resolve fallback.
      */
     protected function request(string $endpoint, array $params = [], int $timeout = 10): ?array
     {
@@ -50,28 +50,50 @@ class MangaDexProvider implements MangaProviderInterface
             $url .= (str_contains($url, '?') ? '&' : '?') . $query;
         }
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
-        curl_setopt($ch, CURLOPT_RESOLVE, $this->dnsResolves);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'BiblioManga-App/1.0 (contact@bibliocore.local)');
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Accept: application/json',
-        ]);
+        $execute = function (bool $useResolve) use ($url, $timeout): ?array {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+            if ($useResolve && !empty($this->dnsResolves)) {
+                curl_setopt($ch, CURLOPT_RESOLVE, $this->dnsResolves);
+            }
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Accept: application/json',
+                'Referer: https://mangadex.org/',
+            ]);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
 
-        if ($response === false || $httpCode >= 400) {
-            Log::warning("MangaDex request error ({$httpCode}) for URL: {$url}. Curl Error: {$error}");
+            if ($response !== false && $httpCode >= 200 && $httpCode < 400) {
+                return json_decode($response, true);
+            }
+
             return null;
+        };
+
+        $isVercel = isset($_ENV['VERCEL']) || isset($_SERVER['VERCEL']) || env('VERCEL');
+
+        // On Vercel / serverless: Vercel US datacenter has direct unpoisoned DNS. Try standard DNS first!
+        if ($isVercel) {
+            $data = $execute(false);
+            if ($data !== null) {
+                return $data;
+            }
+            return $execute(true);
         }
 
-        return json_decode($response, true);
+        // On local dev (e.g. Indonesia with ISP DNS block): try resolve first, fallback to standard
+        $data = $execute(true);
+        if ($data !== null) {
+            return $data;
+        }
+        return $execute(false);
     }
 
     /**
@@ -437,13 +459,17 @@ class MangaDexProvider implements MangaProviderInterface
             ];
         }
 
+        $isVercel = isset($_ENV['VERCEL']) || isset($_SERVER['VERCEL']) || env('VERCEL');
+
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 20);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
-        curl_setopt($ch, CURLOPT_RESOLVE, $this->dnsResolves);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        if (!$isVercel && !empty($this->dnsResolves)) {
+            curl_setopt($ch, CURLOPT_RESOLVE, $this->dnsResolves);
+        }
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
         
         $referer = 'https://mangadex.org/';
         if (str_contains($url, 'komiku')) {

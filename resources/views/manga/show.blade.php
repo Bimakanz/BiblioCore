@@ -80,11 +80,11 @@
                         <div class="flex flex-wrap gap-4 text-xs text-[#4c5b54] pt-1 border-t border-[#e0d9c8]">
                             <div>
                                 <span class="text-[#84948a] uppercase tracking-wider">Penulis:</span>
-                                <span class="font-semibold text-[#172a37]">{{ $manga['authors'] }}</span>
+                                <span class="font-semibold text-[#172a37]">{{ $manga['authors'] ?? '-' }}</span>
                             </div>
                             <div>
                                 <span class="text-[#84948a] uppercase tracking-wider">Ilustrator:</span>
-                                <span class="font-semibold text-[#172a37]">{{ $manga['artists'] }}</span>
+                                <span class="font-semibold text-[#172a37]">{{ $manga['artists'] ?? '-' }}</span>
                             </div>
                         </div>
 
