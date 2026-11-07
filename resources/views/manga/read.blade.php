@@ -40,8 +40,8 @@
         progress: 0,
         showMenu: false,
         isFullscreen: false,
-        nextChapterUrl: @js($nextChapter ? route('manga.read', ['id' => $manga['id'], 'chapterId' => $nextChapter['id']]) : null),
-        prevChapterUrl: @js($prevChapter ? route('manga.read', ['id' => $manga['id'], 'chapterId' => $prevChapter['id']]) : null),
+        nextChapterUrl: @js($nextChapter ? route('manga.read', ['id' => $manga['id'], 'chapterId' => $nextChapter['id'], 'source' => $nextChapter['provider'] ?? 'MangaDex', 'ch' => $nextChapter['chapter'] ?? '0']) : null),
+        prevChapterUrl: @js($prevChapter ? route('manga.read', ['id' => $manga['id'], 'chapterId' => $prevChapter['id'], 'source' => $prevChapter['provider'] ?? 'MangaDex', 'ch' => $prevChapter['chapter'] ?? '0']) : null),
         
         init() {
             try {
@@ -146,7 +146,7 @@
         
         <!-- Prev Chapter Button -->
         @if($prevChapter && empty($prevChapter['externalUrl']))
-            <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $prevChapter['id']]) }}"
+            <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $prevChapter['id'], 'source' => $prevChapter['provider'] ?? 'MangaDex', 'ch' => $prevChapter['chapter'] ?? '0']) }}"
                @click.stop
                class="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 text-white/80 hover:bg-white/15 hover:text-white transition"
                title="Chapter Sebelumnya">
@@ -173,7 +173,7 @@
 
         <!-- Next Chapter Button -->
         @if($nextChapter && empty($nextChapter['externalUrl']))
-            <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $nextChapter['id']]) }}"
+            <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $nextChapter['id'], 'source' => $nextChapter['provider'] ?? 'MangaDex', 'ch' => $nextChapter['chapter'] ?? '0']) }}"
                @click.stop
                class="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 text-white/80 hover:bg-white/15 hover:text-white transition"
                title="Chapter Selanjutnya">

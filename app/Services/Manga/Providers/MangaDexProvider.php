@@ -40,7 +40,7 @@ class MangaDexProvider implements MangaProviderInterface
     /**
      * Helper to perform cURL requests to MangaDex with DoH DNS resolve fallback.
      */
-    protected function request(string $endpoint, array $params = [], int $timeout = 5): ?array
+    protected function request(string $endpoint, array $params = [], float|int $timeout = 2.5): ?array
     {
         $url = $this->apiBase . $endpoint;
         if (!empty($params)) {
@@ -392,7 +392,7 @@ class MangaDexProvider implements MangaProviderInterface
     {
         $cacheKey = "mangadex_pages_{$chapterId}";
 
-        return Cache::remember($cacheKey, 1800, function () use ($chapterId) {
+        return Cache::remember($cacheKey, 600, function () use ($chapterId) {
             $raw = $this->request("/at-home/server/{$chapterId}");
             if (!$raw || empty($raw['baseUrl']) || empty($raw['chapter']['hash'])) {
                 return null;

@@ -331,24 +331,24 @@ class MangaService
     }
 
     /**
-     * Get chapter pages dynamically based on provider prefix.
+     * Get chapter pages dynamically based on provider prefix or direct source.
      */
-    public function getChapterPages(string $chapterId): ?array
+    public function getChapterPages(string $chapterId, ?string $source = null): ?array
     {
         try {
-            if (str_starts_with($chapterId, 'kmk_')) {
+            if ($source === 'Komiku' || str_starts_with($chapterId, 'kmk_')) {
                 return $this->komikuProvider->getChapterPages($chapterId);
             }
-            if (str_starts_with($chapterId, 'mp_')) {
+            if ($source === 'MangaPill' || str_starts_with($chapterId, 'mp_')) {
                 return $this->mangaPillProvider->getChapterPages($chapterId);
             }
-            if (str_starts_with($chapterId, 'nato_')) {
+            if ($source === 'MangaNato' || str_starts_with($chapterId, 'nato_')) {
                 return $this->mangaNatoProvider->getChapterPages($chapterId);
             }
-            if (str_starts_with($chapterId, 'kmd_')) {
+            if ($source === 'KomikIndo' || str_starts_with($chapterId, 'kmd_')) {
                 return $this->komikIndoProvider->getChapterPages($chapterId);
             }
-            if (preg_match('/^(wb_|mh_|wm_|bk_|shn_)/', $chapterId)) {
+            if (in_array($source, ['WeebCentral', 'MangaHere', 'WestManga', 'Bacakomik', 'Shinigami ID']) || preg_match('/^(wb_|mh_|wm_|bk_|shn_)/', $chapterId)) {
                 return $this->multiSourceProvider->getChapterPages($chapterId);
             }
 

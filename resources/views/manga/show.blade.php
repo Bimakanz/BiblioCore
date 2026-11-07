@@ -118,7 +118,7 @@
                     <!-- Quick CTA Start Reading -->
                     <div class="flex flex-wrap items-center gap-3 pt-6 border-t border-[#e0d9c8]">
                         @if($firstChapter)
-                            <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $firstChapter['id']]) }}"
+                            <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $firstChapter['id'], 'source' => $firstChapter['provider'] ?? 'MangaDex', 'ch' => $firstChapter['chapter'] ?? '0']) }}"
                                class="inline-flex items-center gap-2 rounded-full bg-[#0f766e] px-6 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider text-white shadow-lg shadow-[#0f766e]/25 transition hover:scale-105 hover:bg-[#115e59]">
                                 <span class="material-symbols-rounded text-base">play_arrow</span>
                                 Baca Chapter Pertama (Ch. {{ $firstChapter['chapter'] }})
@@ -126,7 +126,7 @@
                         @endif
 
                         @if($latestChapter && $latestChapter['id'] !== ($firstChapter['id'] ?? null))
-                            <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $latestChapter['id']]) }}"
+                            <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $latestChapter['id'], 'source' => $latestChapter['provider'] ?? 'MangaDex', 'ch' => $latestChapter['chapter'] ?? '0']) }}"
                                class="inline-flex items-center gap-2 rounded-full border border-[#dcd2bd] bg-white px-5 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider text-[#172a37] transition hover:border-[#0f766e] hover:text-[#0f766e]">
                                 <span class="material-symbols-rounded text-base">skip_next</span>
                                 Chapter Terbaru (Ch. {{ $latestChapter['chapter'] }})
@@ -183,7 +183,7 @@
                         $html = '';
                         foreach ($chapters as $chap) {
                             $isExt = !empty($chap['externalUrl']);
-                            $readUrl = $isExt ? $chap['externalUrl'] : route('manga.read', ['id' => $manga['id'], 'chapterId' => $chap['id']]);
+                            $readUrl = $isExt ? $chap['externalUrl'] : route('manga.read', ['id' => $manga['id'], 'chapterId' => $chap['id'], 'source' => $chap['provider'] ?? 'MangaDex', 'ch' => $chap['chapter'] ?? '0']);
                             $target = $isExt ? 'target="_blank"' : '';
                             $langFlag = $chap['language'] === 'id' ? 'Indo' : ($chap['language'] === 'en' ? 'Eng' : strtoupper($chap['language']));
 

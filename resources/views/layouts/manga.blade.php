@@ -22,10 +22,10 @@
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-        /* Uiverse animated delete button (Orange initially -> Red on hover) */
+        /* Uiverse animated delete button (Orange initially -> Red on hover/active) */
         .btn-delete-uiverse {
-            width: 38px;
-            height: 38px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
             background-color: #ea580c;
             border: none;
@@ -39,11 +39,12 @@
             overflow: hidden;
             position: relative;
             flex-shrink: 0;
+            outline: none;
         }
 
         .btn-delete-uiverse .delSvgIcon {
-            width: 13px;
-            height: 13px;
+            width: 14px;
+            height: auto;
             transition-duration: .3s;
         }
 
@@ -51,16 +52,20 @@
             fill: white;
         }
 
-        .btn-delete-uiverse:hover {
-            width: 85px;
+        .btn-delete-uiverse:hover,
+        .btn-delete-uiverse:focus,
+        .btn-delete-uiverse:active {
+            width: 140px;
             border-radius: 50px;
             transition-duration: .3s;
             background-color: rgb(255, 69, 69);
             align-items: center;
         }
 
-        .btn-delete-uiverse:hover .delSvgIcon {
-            width: 14px;
+        .btn-delete-uiverse:hover .delSvgIcon,
+        .btn-delete-uiverse:focus .delSvgIcon,
+        .btn-delete-uiverse:active .delSvgIcon {
+            width: 50px;
             transition-duration: .3s;
             transform: translateY(60%);
         }
@@ -75,10 +80,12 @@
             font-weight: 700;
         }
 
-        .btn-delete-uiverse:hover::before {
-            font-size: 11px;
+        .btn-delete-uiverse:hover::before,
+        .btn-delete-uiverse:focus::before,
+        .btn-delete-uiverse:active::before {
+            font-size: 13px;
             opacity: 1;
-            transform: translateY(28px);
+            transform: translateY(30px);
             transition-duration: .3s;
         }
     </style>

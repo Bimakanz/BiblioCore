@@ -104,52 +104,53 @@ class MangaController extends Controller
      */
     public function read(string $id, string $chapterId, Request $request): View
     {
-        $manga = $this->mangaService->getDetail($id);
-        if (!$manga) {
-            abort(404, 'Manga tidak ditemukan.');
-        }
+        $source = $request->query('source');
+        $chNum = $request->query('ch');
 
-        $chapterData = $this->mangaService->getChapterPages($chapterId);
+        // 1. Fetch image pages ONLY from the specific provider (fast, direct, single-provider)
+        $chapterData = $this->mangaService->getChapterPages($chapterId, $source);
         if (!$chapterData || empty($chapterData['pages'])) {
             abort(404, 'Halaman chapter tidak dapat dimuat atau chapter ini dialihkan ke web eksternal.');
         }
 
-        $allChapters = $this->mangaService->getChapters($id);
-
-        // Find current chapter info
-        $currentChapter = null;
-        foreach ($allChapters as $chap) {
-            if ($chap['id'] === $chapterId) {
-                $currentChapter = $chap;
-                break;
-            }
-        }
-
-        if (!$currentChapter) {
-            $currentChapter = [
-                'id' => $chapterId,
-                'chapter' => '1',
-                'title' => '',
-                'language' => str_starts_with($chapterId, 'kmk_') ? 'id' : 'en',
+        // 2. Fetch manga metadata quickly from cache without re-aggregating
+        $manga = \Illuminate\Support\Facades\Cache::get("manga_detail_{$id}");
+        if (!$manga) {
+            $manga = $this->mangaService->getDetail($id) ?? [
+                'id' => $id,
+                'title' => 'Manga Reader',
+                'coverUrl' => '',
             ];
         }
 
-        $currentLang = $currentChapter['language'] ?? 'id';
+        // 3. Current chapter metadata
+        $currentChapter = [
+            'id' => $chapterId,
+            'chapter' => $chNum ?: '1',
+            'title' => '',
+            'language' => str_starts_with($chapterId, 'kmk_') || str_starts_with($chapterId, 'kmd_') || str_starts_with($chapterId, 'wm_') || str_starts_with($chapterId, 'bk_') || str_starts_with($chapterId, 'shn_') ? 'id' : 'en',
+            'provider' => $source ?: 'MangaDex',
+        ];
 
-        // Filter chapters strictly by the same language to prevent cross-language jumps
-        $sameLangChapters = array_values(array_filter($allChapters, fn($c) => ($c['language'] ?? 'id') === $currentLang));
+        // 4. Retrieve cached chapters for prev/next without running scrapers
+        $currentLang = $currentChapter['language'];
+        $cachedChapters = \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_{$currentLang}")
+            ?: \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_null")
+            ?: [];
 
         $prevChapter = null;
         $nextChapter = null;
+        $sameLangChapters = [];
 
-        foreach ($sameLangChapters as $index => $chap) {
-            if ($chap['id'] === $chapterId) {
-                // Chapters are sorted descending (e.g. 500, 499, ..., 2, 1):
-                // Next in reading order is the chapter with a higher number (index - 1)
-                $nextChapter = $sameLangChapters[$index - 1] ?? null;
-                // Prev in reading order is index + 1
-                $prevChapter = $sameLangChapters[$index + 1] ?? null;
-                break;
+        if (!empty($cachedChapters)) {
+            $sameLangChapters = array_values(array_filter($cachedChapters, fn($c) => ($c['language'] ?? 'id') === $currentLang));
+            foreach ($sameLangChapters as $index => $chap) {
+                if ($chap['id'] === $chapterId || (string)($chap['chapter'] ?? '') === (string)$chNum) {
+                    $currentChapter = $chap;
+                    $nextChapter = $sameLangChapters[$index - 1] ?? null;
+                    $prevChapter = $sameLangChapters[$index + 1] ?? null;
+                    break;
+                }
             }
         }
 
@@ -158,7 +159,7 @@ class MangaController extends Controller
             'currentChapter' => $currentChapter,
             'prevChapter' => $prevChapter,
             'nextChapter' => $nextChapter,
-            'allChapters' => $allChapters,
+            'allChapters' => $cachedChapters,
             'sameLangChapters' => $sameLangChapters,
             'pages' => $chapterData['pages'],
             'totalPages' => count($chapterData['pages']),

@@ -20,7 +20,7 @@ class MultiSourceProvider
     /**
      * Resilient HTTP GET request with DoH resolution and fallback.
      */
-    protected function request(string $url, int $timeout = 4): ?string
+    protected function request(string $url, float|int $timeout = 2.5): ?string
     {
         $isVercel = isset($_ENV['VERCEL']) || isset($_SERVER['VERCEL']) || env('VERCEL');
 
@@ -324,7 +324,7 @@ class MultiSourceProvider
     {
         $cacheKey = 'multisrc_pages_' . md5($chapterId);
 
-        return Cache::remember($cacheKey, 7200, function () use ($chapterId) {
+        return Cache::remember($cacheKey, 600, function () use ($chapterId) {
             $prefix = explode('_', $chapterId)[0] ?? '';
             $url = null;
 
@@ -386,3 +386,4 @@ class MultiSourceProvider
         });
     }
 }
+

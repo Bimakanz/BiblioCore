@@ -23,7 +23,7 @@ class MangaPillProvider
         $execute = function (bool $useResolve) use ($url): ?string {
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 4);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 2.5);
             curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
             if ($useResolve && !empty($this->dnsResolves)) {
                 curl_setopt($ch, CURLOPT_RESOLVE, $this->dnsResolves);
@@ -167,7 +167,7 @@ class MangaPillProvider
     {
         $cacheKey = 'mangapill_pages_' . md5($chapterId);
 
-        return Cache::remember($cacheKey, 7200, function () use ($chapterId) {
+        return Cache::remember($cacheKey, 600, function () use ($chapterId) {
             $path = '/' . str_replace('__', '/', str_replace('mp_', '', $chapterId));
             $url = "{$this->baseUrl}{$path}";
 

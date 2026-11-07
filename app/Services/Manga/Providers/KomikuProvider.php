@@ -25,7 +25,7 @@ class KomikuProvider
         $execute = function (bool $useResolve) use ($url): ?string {
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 4);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 2.5);
             curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
             if ($useResolve && !empty($this->dnsResolves)) {
                 curl_setopt($ch, CURLOPT_RESOLVE, $this->dnsResolves);
@@ -152,7 +152,7 @@ class KomikuProvider
     {
         $cacheKey = 'komiku_pages_' . md5($chapterSlug);
 
-        return Cache::remember($cacheKey, 7200, function () use ($chapterSlug) {
+        return Cache::remember($cacheKey, 600, function () use ($chapterSlug) {
             $slug = str_replace('kmk_', '', $chapterSlug);
             $url = "{$this->baseUrl}/{$slug}/";
 
