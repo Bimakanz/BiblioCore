@@ -1,47 +1,37 @@
 <?php
 
-use App\Http\Controllers\Admin\BookController as AdminBookController;
-use App\Http\Controllers\Admin\BorrowingController as AdminBorrowingController;
-use App\Http\Controllers\Admin\CommentController as AdminCommentController;
-use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
-use App\Http\Controllers\BookCommentController;
-use App\Http\Controllers\BookFeedbackController;
-use App\Http\Controllers\BookLikeController;
-use App\Http\Controllers\LandingController;
+use App\Http\Controllers\MangaController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\Student\BookController as StudentBookController;
-use App\Http\Controllers\Student\BorrowingController as StudentBorrowingController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', LandingController::class)->name('landing');
-Route::get('/books/{book}', [LandingController::class, 'show'])->name('landing.books.show');
+/*
+|--------------------------------------------------------------------------
+| Web Routes - BiblioManga (Open Manga Reader)
+|--------------------------------------------------------------------------
+|
+| Akses publik tanpa batas untuk membaca manga dalam Bahasa Indonesia
+| dan Bahasa Inggris tanpa perlu registrasi, login, ataupun admin.
+|
+*/
 
+// Beranda & Katalog Manga Publik
+Route::get('/', [MangaController::class, 'index'])->name('manga.index');
+Route::get('/landing', [MangaController::class, 'index'])->name('landing');
+
+// Detail Manga & Daftar Chapter
+Route::get('/manga/{id}', [MangaController::class, 'show'])->name('manga.show');
+
+// Pembaca Manga (Manga Reader)
+Route::get('/manga/{id}/chapter/{chapterId}', [MangaController::class, 'read'])->name('manga.read');
+
+// Proxy Gambar untuk Bypass Blokir ISP / Sensor DNS
+Route::get('/manga/proxy/image', [MangaController::class, 'proxyImage'])->name('manga.proxy.image');
+
+// Optional User Profile & Auth routes (untuk kompatibilitas)
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
-
-Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/dashboard', AdminDashboardController::class)->name('dashboard');
-    Route::resource('books', AdminBookController::class);
-    Route::get('borrowings', [AdminBorrowingController::class, 'index'])->name('borrowings.index');
-    Route::patch('borrowings/{borrowing}', [AdminBorrowingController::class, 'update'])->name('borrowings.update');
-    Route::resource('comments', AdminCommentController::class)->only(['index', 'destroy']);
-});
-
-Route::post('/books/{book}/like', [BookLikeController::class, 'store'])->name('books.like');
-
-Route::post('/books/{book}/comment', [BookCommentController::class, 'store'])->name('books.comment');
-Route::post('/comments/{comment}/like', [BookCommentController::class, 'toggleLike'])->name('comments.like');
-
-
-
-Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')->group(function () {
-    Route::get('books', [StudentBookController::class, 'index'])->name('books.index');
-    Route::get('books/{book}', [StudentBookController::class, 'show'])->name('books.show');
-    Route::post('books/{book}/borrow', [StudentBorrowingController::class, 'store'])->name('books.borrow');
-    Route::get('borrowings', [StudentBorrowingController::class, 'index'])->name('borrowings.index');
 });
 
 require __DIR__.'/auth.php';
