@@ -421,7 +421,7 @@
 
                 <template x-for="item in readingHistory" :key="item.id">
                     <div class="flex items-center justify-between gap-3 p-3 rounded-2xl border border-[#eaddc2] bg-[#fbf9f4] hover:bg-[#f6ecda]/50 transition">
-                        <a :href="'/manga/' + item.id + '/chapter/' + item.chapterId" class="flex items-center gap-3 flex-1 min-w-0 group">
+                        <a :href="'/manga/' + item.id + '/chapter/' + item.chapterId + '?ch=' + encodeURIComponent(item.chapterNumber || '') + '&source=' + encodeURIComponent(item.source || 'MangaDex')" class="flex items-center gap-3 flex-1 min-w-0 group">
                             <img :src="item.coverUrl || 'https://via.placeholder.com/150x200?text=No+Cover'" class="w-12 h-16 rounded-xl object-cover shadow-sm flex-shrink-0" />
                             <div class="min-w-0">
                                 <h4 class="text-sm font-bold text-[#172a37] truncate group-hover:text-[#0f766e] transition-colors" x-text="item.title"></h4>
@@ -435,7 +435,7 @@
                             </div>
                         </a>
                         <div class="flex items-center gap-2 flex-shrink-0">
-                            <a :href="'/manga/' + item.id + '/chapter/' + item.chapterId"
+                            <a :href="'/manga/' + item.id + '/chapter/' + item.chapterId + '?ch=' + encodeURIComponent(item.chapterNumber || '') + '&source=' + encodeURIComponent(item.source || 'MangaDex')"
                                class="rounded-xl bg-[#0f766e] px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#115e59] shadow-sm">
                                 Lanjut
                             </a>

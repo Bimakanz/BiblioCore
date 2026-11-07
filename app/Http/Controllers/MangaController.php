@@ -136,7 +136,7 @@ class MangaController extends Controller
             'provider' => $source ?: 'MangaDex',
         ];
 
-        // 4. Retrieve cached chapters for prev/next without running scrapers
+        // 4. Retrieve cached chapters for prev/next (fallback to getChapters if cache is empty)
         $currentLang = $currentChapter['language'];
         $cachedChapters = \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_{$currentLang}")
             ?: \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_all")
@@ -144,16 +144,36 @@ class MangaController extends Controller
             ?: \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_")
             ?: [];
 
+        if (empty($cachedChapters)) {
+            $cachedChapters = $this->mangaService->getChapters($id);
+        }
+
         $prevChapter = null;
         $nextChapter = null;
         $sameLangChapters = [];
 
         if (!empty($cachedChapters)) {
-            $sameLangChapters = array_values(array_filter($cachedChapters, fn($c) => ($c['language'] ?? 'id') === $currentLang));
-            foreach ($sameLangChapters as $index => $chap) {
-                if ($chap['id'] === $chapterId || (string)($chap['chapter'] ?? '') === (string)$chNum) {
+            // First locate current chapter to resolve exact chapter number, language, and title
+            foreach ($cachedChapters as $chap) {
+                if ($chap['id'] === $chapterId || (!empty($chNum) && (string)($chap['chapter'] ?? '') === (string)$chNum)) {
                     $currentChapter = $chap;
+                    $currentLang = $chap['language'] ?? $currentLang;
+                    break;
+                }
+            }
+
+            // Filter strictly by the same language to prevent cross-language jumps
+            $sameLangChapters = array_values(array_filter($cachedChapters, fn($c) => ($c['language'] ?? 'id') === $currentLang));
+            if (empty($sameLangChapters)) {
+                $sameLangChapters = $cachedChapters;
+            }
+
+            foreach ($sameLangChapters as $index => $chap) {
+                if ($chap['id'] === $currentChapter['id'] || (string)($chap['chapter'] ?? '') === (string)$currentChapter['chapter']) {
+                    // Chapters are sorted descending (e.g. Ch. 232, 231, 230, ..., 1):
+                    // Next chapter to read (forward) has higher chapter number = lower index (index - 1)
                     $nextChapter = $sameLangChapters[$index - 1] ?? null;
+                    // Previous chapter (backward) has lower chapter number = higher index (index + 1)
                     $prevChapter = $sameLangChapters[$index + 1] ?? null;
                     break;
                 }
