@@ -593,7 +593,7 @@ class MangaController extends Controller
                         return;
                     }
                 }
-            } elseif ($prefix === 'mh') {
+            } elseif ($prefix === 'wb') {
                 $en = app(\App\Services\Manga\Providers\MultiSourceProvider::class)->getEnglishChapters($title, $altTitles);
                 foreach ($en as $chap) {
                     if ($chap['id'] === $chapterId && ! empty($chap['readPath'])) {
@@ -633,6 +633,16 @@ class MangaController extends Controller
         $ipToCheck = filter_var($host, FILTER_VALIDATE_IP) ? $host : $ip;
         if (! filter_var($ipToCheck, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
             abort(404, 'Access denied to private IP');
+        }
+
+        // If requested as a fallback because external CDN failed, fetch directly through our Referer-preserving proxy
+        if ($request->boolean('fallback')) {
+            $data = $this->mangaService->fetchImage($url);
+            if ($data && ! empty($data['content'])) {
+                return response($data['content'])
+                    ->header('Content-Type', $data['contentType'] ?? 'image/jpeg')
+                    ->header('Cache-Control', 'public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400, immutable');
+            }
         }
 
         return redirect('https://wsrv.nl/?url=' . urlencode($url) . '&n=-1', 301);

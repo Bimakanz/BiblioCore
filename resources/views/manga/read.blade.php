@@ -403,20 +403,24 @@
                             failed: false,
                             showError: false,
                             src: p.proxyUrl,
-                            fallbackSrc: p.directUrl,
+                            serverFallback: '/manga/proxy/image?url=' + encodeURIComponent(p.directUrl) + '&fallback=1',
+                            directSrc: p.directUrl,
+                            retriedServer: false,
                             handleError() {
-                                if (!this.failed) {
-                                    this.failed = true;
-                                    this.src = this.fallbackSrc;
+                                if (!this.retriedServer) {
+                                    this.retriedServer = true;
+                                    this.src = this.serverFallback;
+                                } else if (this.src !== this.directSrc) {
+                                    this.src = this.directSrc;
                                 } else {
                                     this.showError = true;
                                 }
                             },
                             retry() {
                                 this.loaded = false;
-                                this.failed = true;
                                 this.showError = false;
-                                this.src = this.fallbackSrc + (this.fallbackSrc.includes('?') ? '&' : '?') + 'retry=' + Date.now();
+                                this.retriedServer = false;
+                                this.src = this.serverFallback + '&retry=' + Date.now();
                             }
                          }">
                         
@@ -484,20 +488,24 @@
                             pFailed: false,
                             pShowError: false,
                             pSrc: p.proxyUrl,
-                            pFallbackSrc: p.directUrl,
+                            pServerFallback: '/manga/proxy/image?url=' + encodeURIComponent(p.directUrl) + '&fallback=1',
+                            pDirectSrc: p.directUrl,
+                            pRetriedServer: false,
                             handleError() {
-                                if (!this.pFailed) {
-                                    this.pFailed = true;
-                                    this.pSrc = this.pFallbackSrc;
+                                if (!this.pRetriedServer) {
+                                    this.pRetriedServer = true;
+                                    this.pSrc = this.pServerFallback;
+                                } else if (this.pSrc !== this.pDirectSrc) {
+                                    this.pSrc = this.pDirectSrc;
                                 } else {
                                     this.pShowError = true;
                                 }
                             },
                             retry() {
                                 this.pLoaded = false;
-                                this.pFailed = true;
                                 this.pShowError = false;
-                                this.pSrc = this.pFallbackSrc + (this.pFallbackSrc.includes('?') ? '&' : '?') + 'retry=' + Date.now();
+                                this.pRetriedServer = false;
+                                this.pSrc = this.pServerFallback + '&retry=' + Date.now();
                             }
                          }">
                         

@@ -251,12 +251,12 @@ class MangaService
                 }
             }
 
-            // Count what MangaDex already delivered. When it has a healthy
-            // archive we skip the slower scrapers entirely: this is the single
-            // biggest cold-start win and avoids hammering external sites.
-            $dexIndoCount = count(array_filter($dexChapters, fn ($c) => ($c['language'] ?? '') === 'id'));
-            $dexEnCount = count(array_filter($dexChapters, fn ($c) => ($c['language'] ?? '') === 'en'));
-            $enoughChapters = 40;
+            // Count what MangaDex already delivered with directly readable pages.
+            // External links (e.g. MangaPlus without direct images) don't count
+            // as complete coverage so readers get working panels from our archive providers.
+            $dexIndoCount = count(array_filter($dexChapters, fn ($c) => ($c['language'] ?? '') === 'id' && empty($c['externalUrl'])));
+            $dexEnCount = count(array_filter($dexChapters, fn ($c) => ($c['language'] ?? '') === 'en' && empty($c['externalUrl'])));
+            $enoughChapters = 35;
 
             // 2. Indonesian Sources (Komiku + KomikIndo + WestManga + Bacakomik + Shinigami ID)
             $indoChapters = [];
@@ -339,8 +339,11 @@ class MangaService
                 if (!isset($uniqueMap[$key])) {
                     $uniqueMap[$key] = $chap;
                 } else {
-                    // If current item is from MangaDex or Komiku, it has high-res images
-                    if (empty($uniqueMap[$key]['title']) && !empty($chap['title'])) {
+                    // If existing item is an external redirect (e.g. MangaPlus without direct images)
+                    // and the incoming chapter has direct readable pages, replace it!
+                    if (!empty($uniqueMap[$key]['externalUrl']) && empty($chap['externalUrl'])) {
+                        $uniqueMap[$key] = $chap;
+                    } elseif (empty($uniqueMap[$key]['title']) && !empty($chap['title'])) {
                         $uniqueMap[$key]['title'] = $chap['title'];
                     }
                 }

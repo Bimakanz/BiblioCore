@@ -58,7 +58,7 @@ class MultiSourceProvider
     }
 
     /**
-     * Get English chapters from WeebCentral & MangaHere.
+     * Get English chapters from WeebCentral.
      */
     public function getEnglishChapters(string $title, array $altTitles = []): array
     {
@@ -71,18 +71,14 @@ class MultiSourceProvider
             $chapters = [];
 
             try {
-                // Wave 1 — search both sites concurrently.
                 $weebSearchUrl = 'https://weebcentral.com/search/data?text='.urlencode($title);
-                $slug = strtolower(trim(preg_replace('/[^a-zA-Z0-9\s]/', '', $title)));
-                $hereSearchUrl = 'https://www.mangahere.cc/search?title='.urlencode($slug);
 
                 $searchResponses = \App\Services\Manga\Support\HttpFetcher::getMany(
-                    [$weebSearchUrl, $hereSearchUrl],
-                    ['resolve' => $this->dnsResolves]
+                    [$weebSearchUrl],
+                    ['resolve' => $this->dnsResolves, 'timeout' => 3, 'connect_timeout' => 2]
                 );
 
                 $weebHtml = $searchResponses[$weebSearchUrl] ?? null;
-                $hereHtml = $searchResponses[$hereSearchUrl] ?? null;
 
                 $bestSeriesId = null;
                 $weebScore = 0;
@@ -107,89 +103,36 @@ class MultiSourceProvider
                     }
                 }
 
-                $bestPath = null;
-                $hereScore = 0;
-                if ($hereHtml) {
-                    preg_match_all('/<a[^>]+href="(\/manga\/([^"\/]+)\/)"[^>]*title="([^"]+)"/is', $hereHtml, $hMatches, PREG_SET_ORDER);
-                    foreach ($hMatches as $hm) {
-                        $hNorm = $normalize(trim($hm[3]));
-                        foreach ($targetNorms as $tNorm) {
-                            if ($tNorm === $hNorm) {
-                                $bestPath = $hm[1];
-                                $hereScore = 100;
-                                break 2;
-                            }
-                            similar_text($tNorm, $hNorm, $pct);
-                            if ($pct > $hereScore) {
-                                $hereScore = $pct;
-                                $bestPath = $hm[1];
-                            }
-                        }
-                    }
-                }
+                if ($bestSeriesId && $weebScore >= 65) {
+                    $weebListUrl = "https://weebcentral.com/series/{$bestSeriesId}/full-chapter-list";
+                    $detailResponses = \App\Services\Manga\Support\HttpFetcher::getMany(
+                        [$weebListUrl],
+                        ['resolve' => $this->dnsResolves, 'timeout' => 3, 'connect_timeout' => 2]
+                    );
 
-                // Wave 2 — detail pages concurrently.
-                $weebListUrl = ($bestSeriesId && $weebScore >= 70)
-                    ? "https://weebcentral.com/series/{$bestSeriesId}/full-chapter-list"
-                    : null;
-                $hereDetailUrl = ($bestPath && $hereScore >= 70)
-                    ? "https://www.mangahere.cc{$bestPath}"
-                    : null;
-
-                $detailResponses = \App\Services\Manga\Support\HttpFetcher::getMany(
-                    array_values(array_filter([$weebListUrl, $hereDetailUrl])),
-                    ['resolve' => $this->dnsResolves]
-                );
-
-                $listHtml = $weebListUrl ? ($detailResponses[$weebListUrl] ?? null) : null;
-                if ($listHtml) {
-                    preg_match_all('/<a[^>]+href="(https:\/\/weebcentral\.com\/chapters\/([A-Z0-9]+))"[^>]*>(.*?)<\/a>/is', $listHtml, $chapMatches, PREG_SET_ORDER);
-                    foreach ($chapMatches as $cm) {
-                        $chapUrl = $cm[1];
-                        $cId = $cm[2];
-                        $cText = trim(strip_tags($cm[3]));
-                        preg_match('/(?:Chapter|Ch\.)\s*([0-9\.]+)/i', $cText, $num);
-                        $chNum = ! empty($num[1]) ? (string) $num[1] : '0';
-
-                        Cache::put("weeb_url_{$cId}", $chapUrl, 604800);
-
-                        $chapters[] = [
-                            'id' => 'wb_'.$cId,
-                            'chapter' => $chNum,
-                            'title' => $cText !== "Chapter {$chNum}" ? $cText : '',
-                            'language' => 'en',
-                            'group' => 'WeebCentral',
-                            'provider' => 'WeebCentral',
-                            'publishAt' => 'WeebCentral Archive',
-                            'externalUrl' => null,
-                            'readPath' => $chapUrl,
-                        ];
-                    }
-                }
-
-                if (count($chapters) < 5 && $hereDetailUrl) {
-                    $detailHtml = $detailResponses[$hereDetailUrl] ?? null;
-                    if ($detailHtml) {
-                        preg_match_all('/<a[^>]+href="(\/manga\/[^"]+\.html)"[^>]*title="([^"]+)"/is', $detailHtml, $chapMatches, PREG_SET_ORDER);
+                    $listHtml = $detailResponses[$weebListUrl] ?? null;
+                    if ($listHtml) {
+                        // Matches both relative (/chapters/...) and absolute URLs
+                        preg_match_all('/<a[^>]+href="(?:\/|https:\/\/weebcentral\.com\/)chapters\/([A-Z0-9]+)"[^>]*>(.*?)<\/a>/is', $listHtml, $chapMatches, PREG_SET_ORDER);
                         foreach ($chapMatches as $cm) {
-                            $cUrl = 'https://www.mangahere.cc'.$cm[1];
-                            $cTitle = trim($cm[2]);
-                            preg_match('/(?:Chapter|Ch\.)\s*([0-9\.]+)/i', $cTitle, $num);
+                            $cId = $cm[1];
+                            $chapUrl = "https://weebcentral.com/chapters/{$cId}";
+                            $cText = trim(preg_replace('/\s+/', ' ', strip_tags($cm[2])));
+                            preg_match('/(?:Chapter|Ch\.)\s*([0-9\.]+)/i', $cText, $num);
                             $chNum = ! empty($num[1]) ? (string) $num[1] : '0';
 
-                            $cid = 'mh_'.md5($cUrl);
-                            Cache::put("mh_url_{$cid}", $cUrl, 604800);
+                            Cache::put("weeb_url_{$cId}", $chapUrl, 604800);
 
                             $chapters[] = [
-                                'id' => $cid,
+                                'id' => 'wb_'.$cId,
                                 'chapter' => $chNum,
-                                'title' => $cTitle,
+                                'title' => $cText !== "Chapter {$chNum}" ? $cText : '',
                                 'language' => 'en',
-                                'group' => 'MangaHere',
-                                'provider' => 'MangaHere',
-                                'publishAt' => 'MangaHere Archive',
+                                'group' => 'WeebCentral',
+                                'provider' => 'WeebCentral',
+                                'publishAt' => 'WeebCentral Archive',
                                 'externalUrl' => null,
-                                'readPath' => $cUrl,
+                                'readPath' => $chapUrl,
                             ];
                         }
                     }
@@ -307,7 +250,7 @@ class MultiSourceProvider
     }
 
     /**
-     * Get chapter pages for WeebCentral, MangaHere, WestManga, Bacakomik, Shinigami ID.
+     * Get chapter pages for WeebCentral, WestManga, Bacakomik, Shinigami ID.
      */
     public function getChapterPages(string $chapterId): ?array
     {
@@ -315,26 +258,40 @@ class MultiSourceProvider
 
         return Cache::remember($cacheKey, 604800, function () use ($chapterId) {
             $prefix = explode('_', $chapterId)[0] ?? '';
-            $url = null;
 
             if ($prefix === 'wb') {
                 $subId = str_replace('wb_', '', $chapterId);
-                $url = Cache::get("weeb_url_{$subId}") ?: "https://weebcentral.com/chapters/{$subId}";
-            } elseif ($prefix === 'mh') {
-                $url = Cache::get("mh_url_{$chapterId}");
-            } elseif ($prefix === 'wm') {
-                $url = Cache::get("wm_url_{$chapterId}");
-            } elseif ($prefix === 'bk') {
-                $url = Cache::get("bk_url_{$chapterId}");
-            } elseif ($prefix === 'shn') {
-                $url = Cache::get("shn_url_{$chapterId}");
+                $url = "https://weebcentral.com/chapters/{$subId}/images?reading_style=long_strip";
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 4);
+                curl_setopt($ch, CURLOPT_NOSIGNAL, 1);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'HX-Request: true',
+                    'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                    'Referer: https://weebcentral.com/chapters/' . $subId,
+                ]);
+                $html = curl_exec($ch);
+                curl_close($ch);
+            } else {
+                $url = null;
+                if ($prefix === 'wm') {
+                    $url = Cache::get("wm_url_{$chapterId}");
+                } elseif ($prefix === 'bk') {
+                    $url = Cache::get("bk_url_{$chapterId}");
+                } elseif ($prefix === 'shn') {
+                    $url = Cache::get("shn_url_{$chapterId}");
+                }
+
+                if (!$url) {
+                    return null;
+                }
+
+                $html = $this->request($url);
             }
 
-            if (!$url) {
-                return null;
-            }
-
-            $html = $this->request($url);
             if (!$html) {
                 return null;
             }
