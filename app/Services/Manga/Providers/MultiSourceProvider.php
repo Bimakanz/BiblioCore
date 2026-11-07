@@ -20,7 +20,7 @@ class MultiSourceProvider
     /**
      * Resilient HTTP GET request with DoH resolution and fallback.
      */
-    protected function request(string $url, int $timeout = 4): ?string
+    protected function request(string $url, int $timeout = 2): ?string
     {
         $isVercel = isset($_ENV['VERCEL']) || isset($_SERVER['VERCEL']) || env('VERCEL');
 

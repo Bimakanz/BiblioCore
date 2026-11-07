@@ -187,7 +187,7 @@
                             $target = $isExt ? 'target="_blank"' : '';
                             $langFlag = $chap['language'] === 'id' ? 'Indo' : ($chap['language'] === 'en' ? 'Eng' : strtoupper($chap['language']));
 
-                            $html .= '<div class="group flex items-center justify-between gap-4 rounded-2xl border border-[#eaddc2] bg-[#fbf9f4] p-3.5 transition hover:border-[#0f766e] hover:bg-white hover:shadow-sm">
+                            $html .= '<div onmouseenter="window.prefetchRead && window.prefetchRead(\'' . $readUrl . '\')" ontouchstart="window.prefetchRead && window.prefetchRead(\'' . $readUrl . '\')" class="group flex items-center justify-between gap-4 rounded-2xl border border-[#eaddc2] bg-[#fbf9f4] p-3.5 transition hover:border-[#0f766e] hover:bg-white hover:shadow-sm">
                                 <div class="min-w-0">
                                     <div class="flex items-center gap-2">
                                         <span class="font-bold text-sm text-[#172a37] group-hover:text-[#0f766e] transition-colors">
@@ -213,21 +213,28 @@
                 @endphp
 
                 <!-- Indonesian Tab Content -->
-                <div x-show="activeTab === 'id'" class="space-y-2">
+                <div x-show="activeTab === 'id' || activeTab === 'all'" class="space-y-2">
                     {!! $renderChapters($indoChapters) !!}
                 </div>
 
                 <!-- English Tab Content -->
-                <div x-show="activeTab === 'en'" class="space-y-2">
+                <div x-show="activeTab === 'en' || (activeTab === 'all' && {{ empty($indoChapters) ? 'true' : 'false' }})" class="space-y-2">
                     {!! $renderChapters($enChapters) !!}
-                </div>
-
-                <!-- All Tab Content -->
-                <div x-show="activeTab === 'all'" class="space-y-2">
-                    {!! $renderChapters($allChapters) !!}
                 </div>
             </div>
         </section>
 
     </div>
+
+    <script>
+    window.prefetchRead = function(url) {
+        if (!url || window.__prefetchedReads?.[url]) return;
+        window.__prefetchedReads = window.__prefetchedReads || {};
+        window.__prefetchedReads[url] = true;
+        const link = document.createElement('link');
+        link.rel = 'prefetch';
+        link.href = url;
+        document.head.appendChild(link);
+    };
+    </script>
 </x-manga-layout>

@@ -167,6 +167,8 @@
                 <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 sm:gap-6">
                     @foreach($mangas as $item)
                         <a href="{{ route('manga.show', $item['id']) }}"
+                           @mouseenter.once="prefetchShow('{{ route('manga.show', $item['id']) }}')"
+                           @touchstart.passive.once="prefetchShow('{{ route('manga.show', $item['id']) }}')"
                            class="group relative flex flex-col overflow-hidden rounded-[1.75rem] border border-[#dcd2bd] bg-white/90 p-3 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:border-[#0f766e] cursor-pointer">
                             
                             <!-- Cover Thumbnail -->
@@ -258,4 +260,16 @@
         </section>
 
     </div>
+
+    <script>
+    window.prefetchShow = function(url) {
+        if (!url || window.__prefetchedUrls?.[url]) return;
+        window.__prefetchedUrls = window.__prefetchedUrls || {};
+        window.__prefetchedUrls[url] = true;
+        const link = document.createElement('link');
+        link.rel = 'prefetch';
+        link.href = url;
+        document.head.appendChild(link);
+    };
+    </script>
 </x-manga-layout>
