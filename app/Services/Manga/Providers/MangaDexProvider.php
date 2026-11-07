@@ -40,7 +40,7 @@ class MangaDexProvider implements MangaProviderInterface
     /**
      * Helper to perform cURL requests to MangaDex with DoH DNS resolve fallback.
      */
-    protected function request(string $endpoint, array $params = [], float $timeout = 2.5): ?array
+    protected function request(string $endpoint, array $params = [], int $timeout = 4): ?array
     {
         $url = $this->apiBase . $endpoint;
         if (!empty($params)) {
@@ -410,9 +410,9 @@ class MangaDexProvider implements MangaProviderInterface
                 $directUrl = "{$baseUrl}/data/{$hash}/{$file}";
                 $saverUrl = !empty($filesSaver[$index]) ? "{$baseUrl}/data-saver/{$hash}/{$filesSaver[$index]}" : $directUrl;
 
-                // External CDN image proxy (wsrv.nl) to offload Vercel Serverless Functions
-                $proxyUrl = "https://wsrv.nl/?url=" . urlencode($directUrl) . "&n=-1";
-                $proxySaverUrl = "https://wsrv.nl/?url=" . urlencode($saverUrl) . "&n=-1";
+                // Relative proxy URLs to avoid port mismatch issues
+                $proxyUrl = "/manga/proxy/image?url=" . urlencode($directUrl);
+                $proxySaverUrl = "/manga/proxy/image?url=" . urlencode($saverUrl);
 
                 $pages[] = [
                     'page' => $index + 1,
@@ -600,7 +600,7 @@ class MangaDexProvider implements MangaProviderInterface
 
             if ($coverFileName) {
                 $directCover = "https://uploads.mangadex.org/covers/{$id}/{$coverFileName}.512.jpg";
-                $coverUrl = "https://wsrv.nl/?url=" . urlencode($directCover) . "&n=-1";
+                $coverUrl = "/manga/proxy/image?url=" . urlencode($directCover);
             }
         }
 

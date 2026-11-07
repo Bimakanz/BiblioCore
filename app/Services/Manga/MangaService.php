@@ -226,10 +226,10 @@ class MangaService
                 Log::warning("MangaDex chapter fetch failed for {$id}: " . $e->getMessage());
             }
 
-            // 2. Fast Indonesian Sources (MangaDex ID [already in #1] + Komiku)
+            // 2. Indonesian Sources (Komiku + KomikIndo + WestManga + Bacakomik + Shinigami ID)
             $indoChapters = [];
             if (!$language || $language === 'id') {
-                // Indonesian Fast Source: Komiku
+                // Indonesian Source 1: Komiku
                 try {
                     $komiku = $this->komikuProvider->getChapters($title, $altTitles);
                     $indoChapters = array_merge($indoChapters, $komiku);
@@ -237,19 +237,31 @@ class MangaService
                     Log::warning("Komiku chapter fetch failed: " . $e->getMessage());
                 }
 
-                // Fallback only if no chapters found anywhere yet
-                if (empty($indoChapters) && empty(array_filter($dexChapters, fn($c) => ($c['language'] ?? '') === 'id'))) {
-                    try {
+                // Indonesian Source 2: KomikIndo
+                try {
+                    if (count($indoChapters) < 40) {
+                        $komikindo = $this->komikIndoProvider->getChapters($title, $altTitles);
+                        $indoChapters = array_merge($indoChapters, $komikindo);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("KomikIndo chapter fetch failed: " . $e->getMessage());
+                }
+
+                // Indonesian Source 3: MultiSource (Bacakomik, WestManga)
+                try {
+                    if (count($indoChapters) < 40) {
                         $multiId = $this->multiSourceProvider->getIndoChapters($title, $altTitles);
                         $indoChapters = array_merge($indoChapters, $multiId);
-                    } catch (\Throwable $e) {}
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("MultiSource Indo chapter fetch failed: " . $e->getMessage());
                 }
             }
 
-            // 3. Fast English Sources (MangaDex EN [already in #1] + MangaPill)
+            // 3. English Sources (MangaPill + MangaNato + WeebCentral + MangaHere)
             $enChapters = [];
             if (!$language || $language === 'en') {
-                // English Fast Source: MangaPill
+                // English Source 1: MangaPill (comprehensive English archive)
                 try {
                     $mp = $this->mangaPillProvider->getChapters($title, $altTitles);
                     $enChapters = array_merge($enChapters, $mp);
@@ -257,12 +269,24 @@ class MangaService
                     Log::warning("MangaPill chapter fetch failed: " . $e->getMessage());
                 }
 
-                // Fallback only if no English chapters found anywhere yet
-                if (empty($enChapters) && empty(array_filter($dexChapters, fn($c) => ($c['language'] ?? '') === 'en'))) {
-                    try {
+                // English Source 2: WeebCentral & MangaHere
+                try {
+                    if (count($enChapters) < 10) {
                         $multiEn = $this->multiSourceProvider->getEnglishChapters($title, $altTitles);
                         $enChapters = array_merge($enChapters, $multiEn);
-                    } catch (\Throwable $e) {}
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("MultiSource EN chapter fetch failed: " . $e->getMessage());
+                }
+
+                // English Source 3: MangaNato (fallback)
+                try {
+                    if (count($enChapters) < 10) {
+                        $nato = $this->mangaNatoProvider->getChapters($title, $altTitles);
+                        $enChapters = array_merge($enChapters, $nato);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("MangaNato chapter fetch failed: " . $e->getMessage());
                 }
             }
 

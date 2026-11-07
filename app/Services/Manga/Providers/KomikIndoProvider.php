@@ -141,7 +141,7 @@ class KomikIndoProvider
             $pages = [];
             foreach ($imgs[1] as $idx => $directUrl) {
                 if (str_contains($directUrl, 'logo') || str_contains($directUrl, 'iklan')) continue;
-                $proxyUrl = "https://wsrv.nl/?url=" . urlencode($directUrl) . "&n=-1";
+                $proxyUrl = "/manga/proxy/image?url=" . urlencode($directUrl);
                 $pages[] = [
                     'page' => $idx + 1,
                     'directUrl' => $directUrl,

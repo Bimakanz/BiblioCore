@@ -174,12 +174,7 @@
                             <!-- Cover Thumbnail -->
                             <div class="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-[#eaddc2]">
                                 @if($item['coverUrl'])
-                                    @php
-                                        $coverSrc = str_starts_with($item['coverUrl'] ?? '', 'https://wsrv.nl/') 
-                                            ? $item['coverUrl'] 
-                                            : 'https://wsrv.nl/?url=' . urlencode($item['coverUrl']) . '&n=-1';
-                                    @endphp
-                                    <img src="{{ $coverSrc }}" alt="{{ $item['title'] }}"
+                                    <img src="{{ $item['coverUrl'] }}" alt="{{ $item['title'] }}"
                                          loading="lazy"
                                          referrerpolicy="no-referrer"
                                          class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"

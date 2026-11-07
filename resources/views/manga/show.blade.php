@@ -23,13 +23,7 @@
                 <div class="space-y-4">
                     <div class="relative aspect-[3/4] w-full overflow-hidden rounded-[2rem] bg-[#eaddc2] shadow-lg border border-[#eaddc2]">
                         @if($manga['coverUrl'])
-                            @php
-                                $coverSrc = str_starts_with($manga['coverUrl'] ?? '', 'https://wsrv.nl/') 
-                                    ? $manga['coverUrl'] 
-                                    : 'https://wsrv.nl/?url=' . urlencode($manga['coverUrl']) . '&n=-1';
-                            @endphp
-                            <img src="{{ $coverSrc }}" alt="{{ $manga['title'] }}"
-                                 loading="lazy"
+                            <img src="{{ $manga['coverUrl'] }}" alt="{{ $manga['title'] }}"
                                  referrerpolicy="no-referrer"
                                  class="h-full w-full object-cover"
                                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />

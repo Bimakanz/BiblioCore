@@ -40,6 +40,8 @@
         progress: 0,
         showMenu: false,
         isFullscreen: false,
+        toastOpen: false,
+        toastMsg: '',
         
         init() {
             this.totalPages = this.pages.length;
@@ -75,9 +77,16 @@
             return '/manga/' + this.mangaId + '/chapter/' + chap.id + '?ch=' + encodeURIComponent(chap.chapter || '0') + '&source=' + encodeURIComponent(chap.provider || 'MangaDex');
         },
 
+        showToast(msg) {
+            this.toastMsg = msg;
+            this.toastOpen = true;
+            setTimeout(() => { this.toastOpen = false; }, 2400);
+        },
+
         toggleHandMode() {
             this.handMode = (this.handMode === 'right') ? 'left' : 'right';
             localStorage.setItem('reader_hand_mode', this.handMode);
+            this.showToast(this.handMode === 'left' ? 'Mode Tangan Kiri Aktif: Ketuk kiri untuk lanjut' : 'Mode Tangan Kanan: Ketuk kanan untuk lanjut');
         },
 
         toggleMode() {
@@ -166,6 +175,7 @@
 
             this.saveHistory();
             window.scrollTo({ top: 0, behavior: 'instant' });
+            this.showToast('Chapter ' + this.currentChapter.chapter);
 
             // Preload next chapter and pages for ongoing zero-delay
             this.preloadUpcomingPages();
@@ -176,6 +186,7 @@
 
         async goToNextChapter() {
             if (!this.nextChapter) {
+                this.showToast('Ini adalah chapter terakhir yang tersedia.');
                 return;
             }
 
@@ -186,6 +197,7 @@
             }
 
             // In-place fast fetch
+            this.showToast('Memuat Chapter ' + this.nextChapter.chapter + '...');
             try {
                 const url = '/manga/' + this.mangaId + '/chapter/' + this.nextChapter.id + '/pages-json?ch=' + encodeURIComponent(this.nextChapter.chapter || '0') + '&source=' + encodeURIComponent(this.nextChapter.provider || 'MangaDex');
                 const res = await fetch(url);
@@ -201,8 +213,10 @@
 
         async goToPrevChapter() {
             if (!this.prevChapter) {
+                this.showToast('Ini adalah chapter pertama.');
                 return;
             }
+            this.showToast('Memuat Chapter ' + this.prevChapter.chapter + '...');
             try {
                 const url = '/manga/' + this.mangaId + '/chapter/' + this.prevChapter.id + '/pages-json?ch=' + encodeURIComponent(this.prevChapter.chapter || '0') + '&source=' + encodeURIComponent(this.prevChapter.provider || 'MangaDex');
                 const res = await fetch(url);
@@ -223,6 +237,8 @@
                 this.preloadUpcomingPages();
             } else if (this.nextChapter) {
                 this.goToNextChapter();
+            } else {
+                this.showToast('Ini adalah chapter terakhir yang tersedia.');
             }
         },
 
@@ -483,7 +499,6 @@
                         <!-- Pure Image -->
                         <img :src="pSrc"
                              :alt="'Halaman ' + p.page"
-                             loading="lazy"
                              referrerpolicy="no-referrer"
                              x-on:load="pLoaded = true; pShowError = false"
                              x-on:error="handleError()"
@@ -515,6 +530,19 @@
             title="Kembali ke Atas">
         <span class="material-symbols-rounded text-xl">arrow_upward</span>
     </button>
+
+    <!-- Floating Toast Notification (e.g. Mode Tangan Kiri / Memuat Chapter) -->
+    <div x-cloak x-show="toastOpen"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 translate-y-4"
+         class="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-2xl bg-[#14171d]/95 backdrop-blur-md border border-white/20 px-5 py-2.5 shadow-2xl text-xs sm:text-sm font-semibold text-white pointer-events-none">
+        <span class="material-symbols-rounded text-amber-400 text-lg">info</span>
+        <span x-text="toastMsg"></span>
+    </div>
 
 </body>
 </html>

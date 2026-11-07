@@ -3,12 +3,10 @@
   "framework": null,
   "buildCommand": "npm run build",
   "outputDirectory": "public",
-  "regions": ["sin1"],
   "functions": {
     "api/index.php": {
       "runtime": "vercel-php@0.7.4",
-      "maxDuration": 30,
-      "memory": 1024
+      "maxDuration": 30
     }
   },
   "routes": [
@@ -39,7 +37,6 @@
     "APP_PACKAGES_CACHE": "/tmp/packages.php",
     "APP_ROUTES_CACHE": "/tmp/routes.php",
     "APP_SERVICES_CACHE": "/tmp/services.php",
-    "APP_VIEW_CACHE": "/tmp/views",
     "VIEW_COMPILED_PATH": "/tmp/storage/framework/views",
     "CACHE_STORE": "array",
     "SESSION_DRIVER": "cookie",
