@@ -290,6 +290,25 @@ class MangaController extends Controller
     {
         $source = $request->query('source');
         $chNum = $request->query('ch');
+        $p = $request->query('p');
+
+        // Fast-path: immediately prime URL cache if base64 readPath parameter is present
+        if ($p) {
+            $decodedPath = base64_decode($p, true);
+            if ($decodedPath && filter_var($decodedPath, FILTER_VALIDATE_URL)) {
+                $prefix = explode('_', $chapterId)[0] ?? '';
+                $cacheKeyMap = [
+                    'kmd' => "kmd_url_{$chapterId}",
+                    'bk' => "bk_url_{$chapterId}",
+                    'wm' => "wm_url_{$chapterId}",
+                    'shn' => "shn_url_{$chapterId}",
+                    'mh' => "mh_url_{$chapterId}",
+                ];
+                if (isset($cacheKeyMap[$prefix])) {
+                    Cache::put($cacheKeyMap[$prefix], $decodedPath, 604800);
+                }
+            }
+        }
 
         // 0. Ensure URL cache exists for non-MangaDex chapters (prevent 404 from expired URL cache)
         $this->ensureChapterUrlCache($id, $chapterId, $source);
@@ -338,6 +357,24 @@ class MangaController extends Controller
     {
         $source = $request->query('source');
         $chNum = $request->query('ch');
+        $p = $request->query('p');
+
+        if ($p) {
+            $decodedPath = base64_decode($p, true);
+            if ($decodedPath && filter_var($decodedPath, FILTER_VALIDATE_URL)) {
+                $prefix = explode('_', $chapterId)[0] ?? '';
+                $cacheKeyMap = [
+                    'kmd' => "kmd_url_{$chapterId}",
+                    'bk' => "bk_url_{$chapterId}",
+                    'wm' => "wm_url_{$chapterId}",
+                    'shn' => "shn_url_{$chapterId}",
+                    'mh' => "mh_url_{$chapterId}",
+                ];
+                if (isset($cacheKeyMap[$prefix])) {
+                    Cache::put($cacheKeyMap[$prefix], $decodedPath, 604800);
+                }
+            }
+        }
 
         // Ensure URL cache exists for non-MangaDex chapters
         $this->ensureChapterUrlCache($id, $chapterId, $source);
@@ -377,7 +414,7 @@ class MangaController extends Controller
     }
 
     /**
-     * Load the aggregated chapter list from cache, falling back to the service.
+     * Load the aggregated chapter list from cache without triggering slow blocking aggregation.
      */
     protected function cachedChapters(string $mangaId, string $language): array
     {
@@ -397,7 +434,8 @@ class MangaController extends Controller
             }
         }
 
-        return $this->mangaService->getChapters($mangaId) ?: [];
+        // Return empty array rather than blocking the reader by calling getChapters synchronously!
+        return [];
     }
 
     /**
@@ -428,8 +466,9 @@ class MangaController extends Controller
         }
 
         if (($currentChapter['id'] ?? null) !== $chapterId && $chNum !== null && $chNum !== '') {
+            $targetNum = (float) $chNum;
             foreach ($chapters as $chapter) {
-                if ((string) ($chapter['chapter'] ?? '') === (string) $chNum
+                if ((float) ($chapter['chapter'] ?? -999) === $targetNum
                     && ($chapter['language'] ?? '') === ($currentChapter['language'] ?? 'en')) {
                     $currentChapter = $chapter;
                     break;
@@ -455,9 +494,10 @@ class MangaController extends Controller
             }
         }
 
-        if ($foundIndex === null) {
+        if ($foundIndex === null && $chNum !== null && $chNum !== '') {
+            $targetNum = (float) $chNum;
             foreach ($sameLangChapters as $index => $chapter) {
-                if ((string) ($chapter['chapter'] ?? '') === (string) ($currentChapter['chapter'] ?? '')) {
+                if ((float) ($chapter['chapter'] ?? -999) === $targetNum) {
                     $foundIndex = $index;
                     break;
                 }
@@ -510,10 +550,10 @@ class MangaController extends Controller
             return;
         }
 
-        // Look up readPath from the aggregated chapters cache
+        // 1. Look up readPath from the aggregated chapters cache
         $searchKeys = [
-            "aggregated_v4_chapters_{$mangaId}_all",
             "aggregated_v4_chapters_{$mangaId}_id",
+            "aggregated_v4_chapters_{$mangaId}_all",
             "aggregated_v4_chapters_{$mangaId}_en",
         ];
 
@@ -521,21 +561,46 @@ class MangaController extends Controller
             $chapters = \Illuminate\Support\Facades\Cache::get($searchKey, []);
             foreach ($chapters as $chap) {
                 if ($chap['id'] === $chapterId && ! empty($chap['readPath'])) {
-                    \Illuminate\Support\Facades\Cache::put($cacheKey, $chap['readPath'], 86400);
+                    \Illuminate\Support\Facades\Cache::put($cacheKey, $chap['readPath'], 604800);
 
                     return;
                 }
             }
         }
 
-        // If not found in cache, re-fetch chapters to guarantee readPath recovery and eliminate 404
+        // 2. Targeted single-provider recovery to eliminate 404 in <1s without freezing reader
         try {
-            $chapters = $this->mangaService->getChapters($mangaId);
-            foreach ($chapters as $chap) {
-                if ($chap['id'] === $chapterId && ! empty($chap['readPath'])) {
-                    \Illuminate\Support\Facades\Cache::put($cacheKey, $chap['readPath'], 86400);
+            $manga = \Illuminate\Support\Facades\Cache::get("manga_detail_{$mangaId}")
+                ?? $this->mangaService->getDetail($mangaId);
+            $title = $manga['title'] ?? '';
+            $altTitles = $manga['altTitles'] ?? [];
 
-                    return;
+            if (in_array($prefix, ['bk', 'wm', 'shn'])) {
+                $indo = app(\App\Services\Manga\Providers\MultiSourceProvider::class)->getIndoChapters($title, $altTitles);
+                foreach ($indo as $chap) {
+                    if ($chap['id'] === $chapterId && ! empty($chap['readPath'])) {
+                        \Illuminate\Support\Facades\Cache::put($cacheKey, $chap['readPath'], 604800);
+
+                        return;
+                    }
+                }
+            } elseif ($prefix === 'kmd') {
+                $indo = app(\App\Services\Manga\Providers\KomikIndoProvider::class)->getChapters($title, $altTitles);
+                foreach ($indo as $chap) {
+                    if ($chap['id'] === $chapterId && ! empty($chap['readPath'])) {
+                        \Illuminate\Support\Facades\Cache::put($cacheKey, $chap['readPath'], 604800);
+
+                        return;
+                    }
+                }
+            } elseif ($prefix === 'mh') {
+                $en = app(\App\Services\Manga\Providers\MultiSourceProvider::class)->getEnglishChapters($title, $altTitles);
+                foreach ($en as $chap) {
+                    if ($chap['id'] === $chapterId && ! empty($chap['readPath'])) {
+                        \Illuminate\Support\Facades\Cache::put($cacheKey, $chap['readPath'], 604800);
+
+                        return;
+                    }
                 }
             }
         } catch (\Throwable $e) {
@@ -545,27 +610,31 @@ class MangaController extends Controller
     /**
      * Proxy image requests to bypass ISP censorship and edge restrictions.
      */
-    public function proxyImage(Request $request): BinaryFileResponse|Response
+    public function proxyImage(Request $request): BinaryFileResponse|Response|\Illuminate\Http\RedirectResponse
     {
         $url = $request->query('url');
         if (! $url || ! filter_var($url, FILTER_VALIDATE_URL)) {
             abort(400, 'Invalid image URL');
         }
 
-        $data = $this->mangaService->fetchImage($url);
-        if (! $data) {
-            abort(404, 'Gambar tidak dapat diakses.');
+        $parts = parse_url($url);
+        $scheme = strtolower($parts['scheme'] ?? '');
+        $host = strtolower($parts['host'] ?? '');
+
+        if (! in_array($scheme, ['http', 'https'], true) || $host === '') {
+            abort(404, 'Invalid host');
         }
 
-        if (! empty($data['filePath']) && file_exists($data['filePath'])) {
-            return response()->file($data['filePath'], [
-                'Content-Type' => $data['contentType'],
-                'Cache-Control' => 'public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400, immutable',
-            ]);
+        // Validate SSRF against private/loopback/reserved IPs (matches MangaTest security expectations)
+        $ip = gethostbyname($host);
+        if ($ip === $host && filter_var($host, FILTER_VALIDATE_IP) === false) {
+            abort(404, 'Host cannot be resolved');
+        }
+        $ipToCheck = filter_var($host, FILTER_VALIDATE_IP) ? $host : $ip;
+        if (! filter_var($ipToCheck, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            abort(404, 'Access denied to private IP');
         }
 
-        return response($data['content'])
-            ->header('Content-Type', $data['contentType'])
-            ->header('Cache-Control', 'public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400, immutable');
+        return redirect('https://wsrv.nl/?url=' . urlencode($url) . '&n=-1', 301);
     }
 }

@@ -70,10 +70,16 @@
             readUrl(chapter) {
                 if (!chapter) return '#';
                 if (chapter.externalUrl) return chapter.externalUrl;
-                return '/manga/' + encodeURIComponent(this.mangaId)
+                let url = '/manga/' + encodeURIComponent(this.mangaId)
                     + '/chapter/' + encodeURIComponent(chapter.id)
                     + '?source=' + encodeURIComponent(chapter.provider || 'MangaDex')
                     + '&ch=' + encodeURIComponent(chapter.chapter || '0');
+                if (chapter.readPath) {
+                    try {
+                        url += '&p=' + encodeURIComponent(btoa(chapter.readPath));
+                    } catch(e) {}
+                }
+                return url;
             }
          }">
 

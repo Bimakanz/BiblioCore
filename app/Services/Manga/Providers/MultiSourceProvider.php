@@ -27,7 +27,9 @@ class MultiSourceProvider
         $execute = function (bool $useResolve) use ($url, $timeout): ?string {
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
             curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
+            curl_setopt($ch, CURLOPT_NOSIGNAL, 1);
             curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
@@ -362,7 +364,7 @@ class MultiSourceProvider
 
             $pages = [];
             foreach ($validImgs as $idx => $directUrl) {
-                $proxyUrl = "/manga/proxy/image?url=" . urlencode($directUrl);
+                $proxyUrl = 'https://wsrv.nl/?url=' . urlencode($directUrl) . '&n=-1';
                 $pages[] = [
                     'page' => $idx + 1,
                     'directUrl' => $directUrl,

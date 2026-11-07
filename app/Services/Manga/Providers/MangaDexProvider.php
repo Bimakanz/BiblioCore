@@ -415,9 +415,9 @@ class MangaDexProvider implements MangaProviderInterface
                 $directUrl = "{$baseUrl}/data/{$hash}/{$file}";
                 $saverUrl = ! empty($filesSaver[$index]) ? "{$baseUrl}/data-saver/{$hash}/{$filesSaver[$index]}" : $directUrl;
 
-                // Relative proxy URLs to avoid port mismatch issues
-                $proxyUrl = '/manga/proxy/image?url='.urlencode($directUrl);
-                $proxySaverUrl = '/manga/proxy/image?url='.urlencode($saverUrl);
+                // External CDN image proxy to prevent Vercel Serverless concurrency saturation
+                $proxyUrl = 'https://wsrv.nl/?url=' . urlencode($directUrl) . '&n=-1';
+                $proxySaverUrl = 'https://wsrv.nl/?url=' . urlencode($saverUrl) . '&n=-1';
 
                 $pages[] = [
                     'page' => $index + 1,
