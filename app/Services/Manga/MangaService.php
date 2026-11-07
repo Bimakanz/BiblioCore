@@ -9,6 +9,7 @@ use App\Services\Manga\Providers\KomikuProvider;
 use App\Services\Manga\Providers\KomikIndoProvider;
 use App\Services\Manga\Providers\MangaPillProvider;
 use App\Services\Manga\Providers\MangaNatoProvider;
+use App\Services\Manga\Providers\MultiSourceProvider;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -20,6 +21,7 @@ class MangaService
     protected KomikIndoProvider $komikIndoProvider;
     protected MangaPillProvider $mangaPillProvider;
     protected MangaNatoProvider $mangaNatoProvider;
+    protected MultiSourceProvider $multiSourceProvider;
 
     public function __construct(
         ?AniListProvider $aniList = null,
@@ -27,7 +29,8 @@ class MangaService
         ?KomikuProvider $komiku = null,
         ?KomikIndoProvider $komikIndo = null,
         ?MangaPillProvider $mangaPill = null,
-        ?MangaNatoProvider $mangaNato = null
+        ?MangaNatoProvider $mangaNato = null,
+        ?MultiSourceProvider $multiSource = null
     ) {
         $this->aniListProvider = $aniList ?? new AniListProvider();
         $this->mangaDexProvider = $mangaDex ?? new MangaDexProvider();
@@ -35,6 +38,7 @@ class MangaService
         $this->komikIndoProvider = $komikIndo ?? new KomikIndoProvider();
         $this->mangaPillProvider = $mangaPill ?? new MangaPillProvider();
         $this->mangaNatoProvider = $mangaNato ?? new MangaNatoProvider();
+        $this->multiSourceProvider = $multiSource ?? new MultiSourceProvider();
     }
 
     /**
@@ -93,15 +97,19 @@ class MangaService
         }
 
         if (!empty($result['data'])) {
-            // Deduplicate cards by normalized title across sources
+            // Deduplicate cards by normalized title AND format across sources
+            // (If both Manga and Novel exist: keep 2 results; duplicate sources are merged into 1)
             $deduped = [];
-            $seenTitles = [];
+            $seenKeys = [];
             foreach ($result['data'] as $item) {
-                $norm = strtolower(preg_replace('/[^a-z0-9]/', '', $item['title'] ?? ''));
-                if (!empty($norm) && !isset($seenTitles[$norm])) {
-                    $seenTitles[$norm] = true;
+                $normTitle = strtolower(preg_replace('/[^a-z0-9]/', '', $item['title'] ?? ''));
+                $formatKey = strtolower($item['format'] ?? 'manga');
+                $key = "{$normTitle}_{$formatKey}";
+
+                if (!empty($normTitle) && !isset($seenKeys[$key])) {
+                    $seenKeys[$key] = true;
                     $deduped[] = $item;
-                } elseif (empty($norm)) {
+                } elseif (empty($normTitle)) {
                     $deduped[] = $item;
                 }
             }
@@ -123,49 +131,54 @@ class MangaService
      */
     public function getDetail(string $id): ?array
     {
-        if (str_starts_with($id, 'al_') || is_numeric($id)) {
+        $cacheKey = "manga_detail_{$id}";
+
+        return Cache::remember($cacheKey, 3600, function () use ($id) {
+            if (str_starts_with($id, 'al_') || is_numeric($id)) {
+                try {
+                    $manga = $this->aniListProvider->getDetail($id);
+                    if ($manga) {
+                        return $manga;
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("AniList getDetail failed for {$id}: " . $e->getMessage());
+                }
+            }
+
             try {
-                $manga = $this->aniListProvider->getDetail($id);
-                if ($manga) {
+                $manga = $this->mangaDexProvider->getDetail($id);
+                if ($manga && !empty($manga['title'])) {
                     return $manga;
                 }
             } catch (\Throwable $e) {
-                Log::warning("AniList getDetail failed for {$id}: " . $e->getMessage());
+                Log::warning("MangaDex getDetail failed for {$id}: " . $e->getMessage());
             }
-        }
 
-        try {
-            $manga = $this->mangaDexProvider->getDetail($id);
-            if ($manga && !empty($manga['title'])) {
-                return $manga;
+            // Fallback detail from catalog to prevent 404
+            foreach ($this->getFallbackCatalog(1, 50)['data'] as $item) {
+                if ($item['id'] === $id) {
+                    return [
+                        'id' => $item['id'],
+                        'title' => $item['title'],
+                        'format' => $item['format'] ?? 'MANGA',
+                        'altTitles' => [$item['title']],
+                        'description' => $item['description'],
+                        'coverUrl' => $item['coverUrl'],
+                        'status' => $item['status'],
+                        'year' => $item['year'],
+                        'contentRating' => $item['contentRating'],
+                        'tags' => $item['tags'],
+                        'authors' => 'Official Creator',
+                        'artists' => 'Official Creator',
+                        'hasIndo' => true,
+                        'hasEnglish' => true,
+                        'externalLinks' => [],
+                    ];
+                }
             }
-        } catch (\Throwable $e) {
-            Log::warning("MangaDex getDetail failed for {$id}: " . $e->getMessage());
-        }
 
-        // Fallback detail from catalog to prevent 404
-        foreach ($this->getFallbackCatalog(1, 50)['data'] as $item) {
-            if ($item['id'] === $id) {
-                return [
-                    'id' => $item['id'],
-                    'title' => $item['title'],
-                    'altTitles' => [$item['title']],
-                    'description' => $item['description'],
-                    'coverUrl' => $item['coverUrl'],
-                    'status' => $item['status'],
-                    'year' => $item['year'],
-                    'contentRating' => $item['contentRating'],
-                    'tags' => $item['tags'],
-                    'authors' => 'Official Creator',
-                    'artists' => 'Official Creator',
-                    'hasIndo' => true,
-                    'hasEnglish' => true,
-                    'externalLinks' => [],
-                ];
-            }
-        }
-
-        return null;
+            return null;
+        });
     }
 
     /**
@@ -212,7 +225,7 @@ class MangaService
                 Log::warning("MangaDex chapter fetch failed for {$id}: " . $e->getMessage());
             }
 
-            // 2. Indonesian Sources (Komiku + KomikIndo)
+            // 2. Indonesian Sources (Komiku + KomikIndo + WestManga + Bacakomik + Shinigami ID)
             $indoChapters = [];
             if (!$language || $language === 'id') {
                 // Indonesian Source 1: Komiku
@@ -232,9 +245,19 @@ class MangaService
                 } catch (\Throwable $e) {
                     Log::warning("KomikIndo chapter fetch failed: " . $e->getMessage());
                 }
+
+                // Indonesian Source 3: MultiSource (WestManga, Bacakomik, Shinigami ID)
+                try {
+                    if (count($indoChapters) < 10) {
+                        $multiId = $this->multiSourceProvider->getIndoChapters($title, $altTitles);
+                        $indoChapters = array_merge($indoChapters, $multiId);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("MultiSource Indo chapter fetch failed: " . $e->getMessage());
+                }
             }
 
-            // 3. English Sources (MangaPill + MangaNato)
+            // 3. English Sources (MangaPill + MangaNato + WeebCentral + MangaHere)
             $enChapters = [];
             if (!$language || $language === 'en') {
                 // English Source 1: MangaPill (comprehensive English archive)
@@ -245,7 +268,17 @@ class MangaService
                     Log::warning("MangaPill chapter fetch failed: " . $e->getMessage());
                 }
 
-                // English Source 2: MangaNato (fallback)
+                // English Source 2: WeebCentral & MangaHere
+                try {
+                    if (count($enChapters) < 10) {
+                        $multiEn = $this->multiSourceProvider->getEnglishChapters($title, $altTitles);
+                        $enChapters = array_merge($enChapters, $multiEn);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("MultiSource EN chapter fetch failed: " . $e->getMessage());
+                }
+
+                // English Source 3: MangaNato (fallback)
                 try {
                     if (count($enChapters) < 10) {
                         $nato = $this->mangaNatoProvider->getChapters($title, $altTitles);
@@ -314,6 +347,9 @@ class MangaService
             }
             if (str_starts_with($chapterId, 'kmd_')) {
                 return $this->komikIndoProvider->getChapterPages($chapterId);
+            }
+            if (preg_match('/^(wb_|mh_|wm_|bk_|shn_)/', $chapterId)) {
+                return $this->multiSourceProvider->getChapterPages($chapterId);
             }
 
             return $this->mangaDexProvider->getChapterPages($chapterId);

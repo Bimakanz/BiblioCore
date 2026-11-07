@@ -21,6 +21,66 @@
         .custom-scroll::-webkit-scrollbar-thumb { background: #0f766e; border-radius: 9999px; }
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+        /* Uiverse animated delete button (Orange initially -> Red on hover) */
+        .btn-delete-uiverse {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background-color: #ea580c;
+            border: none;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0px 2px 10px rgba(234, 88, 12, 0.25);
+            cursor: pointer;
+            transition-duration: .3s;
+            overflow: hidden;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .btn-delete-uiverse .delSvgIcon {
+            width: 13px;
+            height: 13px;
+            transition-duration: .3s;
+        }
+
+        .btn-delete-uiverse .delSvgIcon path {
+            fill: white;
+        }
+
+        .btn-delete-uiverse:hover {
+            width: 85px;
+            border-radius: 50px;
+            transition-duration: .3s;
+            background-color: rgb(255, 69, 69);
+            align-items: center;
+        }
+
+        .btn-delete-uiverse:hover .delSvgIcon {
+            width: 14px;
+            transition-duration: .3s;
+            transform: translateY(60%);
+        }
+
+        .btn-delete-uiverse::before {
+            position: absolute;
+            top: -20px;
+            content: "Delete";
+            color: white;
+            transition-duration: .3s;
+            font-size: 2px;
+            font-weight: 700;
+        }
+
+        .btn-delete-uiverse:hover::before {
+            font-size: 11px;
+            opacity: 1;
+            transform: translateY(28px);
+            transition-duration: .3s;
+        }
     </style>
 </head>
 <body class="relative min-h-screen bg-[#f6f1e8] text-[#24323f] antialiased selection:bg-[#0f766e] selection:text-white"
@@ -81,22 +141,91 @@
                         Free
                     </span>
                 </div>
-                <p class="text-[11px] uppercase tracking-[0.25em] text-[#5f6b63]">
-                    No Login • Unlimited Read
-                </p>
             </a>
 
-            <!-- Search Bar Inline -->
-            <form action="{{ route('manga.index') }}" method="GET" class="hidden md:flex flex-1 max-w-md mx-4">
-                @if(request('category'))
-                    <input type="hidden" name="category" value="{{ request('category') }}">
-                @endif
-                <div class="relative w-full">
-                    <span class="material-symbols-rounded absolute left-3.5 top-1/2 -translate-y-1/2 text-lg text-[#84948a]">search</span>
-                    <input type="text" name="q" value="{{ request('q') }}" placeholder="Cari judul manga, manhwa, manhua..."
-                           class="w-full rounded-full border border-[#dcd2bd] bg-[#fbf9f4] py-2 pl-10 pr-4 text-xs sm:text-sm text-[#172a37] placeholder:text-[#9aa29a] focus:border-[#0f766e] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0f766e]/20 transition" />
+            <!-- Search Bar Inline (Desktop Debounced Live Search) -->
+            <div class="hidden md:block flex-1 max-w-md mx-4 relative"
+                 x-data="{
+                    query: '{{ request('q', '') }}',
+                    results: [],
+                    loading: false,
+                    open: false,
+                    async search() {
+                        const q = this.query.trim();
+                        if (q.length < 2) {
+                            this.results = [];
+                            this.open = false;
+                            return;
+                        }
+                        this.loading = true;
+                        try {
+                            const res = await fetch('/manga/api/live-search?q=' + encodeURIComponent(q));
+                            const data = await res.json();
+                            this.results = data.data || [];
+                            this.open = this.results.length > 0;
+                        } catch(e) {
+                            this.results = [];
+                        } finally {
+                            this.loading = false;
+                        }
+                    }
+                 }"
+                 @click.away="open = false">
+                <form action="{{ route('manga.index') }}" method="GET" class="w-full">
+                    @if(request('category'))
+                        <input type="hidden" name="category" value="{{ request('category') }}">
+                    @endif
+                    <div class="relative w-full">
+                        <span class="material-symbols-rounded absolute left-3.5 top-1/2 -translate-y-1/2 text-lg text-[#84948a]">search</span>
+                        <input type="text" name="q" x-model="query"
+                               @input.debounce.300ms="search()"
+                               @focus="if(results.length > 0) open = true"
+                               @keydown.escape="open = false"
+                               placeholder="Cari judul manga, manhwa, manhua..."
+                               autocomplete="off"
+                               class="w-full rounded-full border border-[#dcd2bd] bg-[#fbf9f4] py-2 pl-10 pr-9 text-xs sm:text-sm text-[#172a37] placeholder:text-[#9aa29a] focus:border-[#0f766e] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0f766e]/20 transition" />
+                        
+                        <div x-show="loading" x-cloak class="absolute right-3.5 top-1/2 -translate-y-1/2">
+                            <div class="h-4 w-4 animate-spin rounded-full border-2 border-[#0f766e] border-t-transparent"></div>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Floating Live Search Results Panel -->
+                <div x-show="open && results.length > 0"
+                     x-cloak
+                     x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+                     x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                     x-transition:leave="transition ease-in duration-100"
+                     x-transition:leave-start="opacity-100"
+                     x-transition:leave-end="opacity-0"
+                     class="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl border border-[#dcd2bd] bg-white/95 backdrop-blur-xl p-2 shadow-2xl space-y-1 max-h-[400px] overflow-y-auto custom-scroll">
+                    
+                    <template x-for="item in results" :key="item.id">
+                        <a :href="'/manga/' + item.id"
+                           class="flex items-center gap-3 p-2 rounded-xl transition hover:bg-[#f6ecda]/60 group">
+                            <img :src="item.coverUrl || 'https://via.placeholder.com/60x80?text=No+Cover'"
+                                 class="w-10 h-14 object-cover rounded-lg shadow-sm flex-shrink-0" />
+                            <div class="min-w-0 flex-1">
+                                <h4 class="text-xs sm:text-sm font-bold text-[#172a37] truncate group-hover:text-[#0f766e] transition-colors" x-text="item.title"></h4>
+                                <div class="flex items-center gap-1.5 mt-1">
+                                    <span class="rounded bg-[#0f766e]/10 px-1.5 py-0.5 text-[9px] font-bold text-[#0f766e] uppercase" x-text="item.status || 'Ongoing'"></span>
+                                    <span x-show="item.format && item.format.toLowerCase() === 'novel'"
+                                          class="rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 uppercase">Novel</span>
+                                    <span x-show="item.year" class="text-[10px] text-[#84948a]" x-text="item.year"></span>
+                                </div>
+                            </div>
+                            <span class="material-symbols-rounded text-base text-[#84948a] group-hover:text-[#0f766e] transition">chevron_right</span>
+                        </a>
+                    </template>
+
+                    <a :href="'/manga?q=' + encodeURIComponent(query)"
+                       class="block w-full text-center py-2 text-xs font-bold text-[#0f766e] hover:bg-[#0f766e]/10 rounded-xl transition border-t border-[#e0d9c8] mt-1">
+                        Lihat semua hasil pencarian &rarr;
+                    </a>
                 </div>
-            </form>
+            </div>
 
             <!-- Quick Navigation & Favorites -->
             <div class="flex items-center gap-2 sm:gap-3">
@@ -118,18 +247,83 @@
             </div>
         </div>
 
-        <!-- Mobile search row -->
-        <div class="px-4 pb-3 md:hidden">
+        <!-- Mobile search row (Debounced Live Search) -->
+        <div class="px-4 pb-3 md:hidden relative"
+             x-data="{
+                query: '{{ request('q', '') }}',
+                results: [],
+                loading: false,
+                open: false,
+                async search() {
+                    const q = this.query.trim();
+                    if (q.length < 2) {
+                        this.results = [];
+                        this.open = false;
+                        return;
+                    }
+                    this.loading = true;
+                    try {
+                        const res = await fetch('/manga/api/live-search?q=' + encodeURIComponent(q));
+                        const data = await res.json();
+                        this.results = data.data || [];
+                        this.open = this.results.length > 0;
+                    } catch(e) {
+                        this.results = [];
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+             }"
+             @click.away="open = false">
             <form action="{{ route('manga.index') }}" method="GET" class="w-full">
                 @if(request('category'))
                     <input type="hidden" name="category" value="{{ request('category') }}">
                 @endif
                 <div class="relative w-full">
                     <span class="material-symbols-rounded absolute left-3 top-1/2 -translate-y-1/2 text-lg text-[#84948a]">search</span>
-                    <input type="text" name="q" value="{{ request('q') }}" placeholder="Cari judul manga..."
-                           class="w-full rounded-full border border-[#dcd2bd] bg-[#fbf9f4] py-1.5 pl-9 pr-3 text-xs text-[#172a37] placeholder:text-[#9aa29a] focus:border-[#0f766e] focus:bg-white focus:outline-none" />
+                    <input type="text" name="q" x-model="query"
+                           @input.debounce.300ms="search()"
+                           @focus="if(results.length > 0) open = true"
+                           placeholder="Cari judul manga..."
+                           autocomplete="off"
+                           class="w-full rounded-full border border-[#dcd2bd] bg-[#fbf9f4] py-1.5 pl-9 pr-8 text-xs text-[#172a37] placeholder:text-[#9aa29a] focus:border-[#0f766e] focus:bg-white focus:outline-none" />
+                    
+                    <div x-show="loading" x-cloak class="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#0f766e] border-t-transparent"></div>
+                    </div>
                 </div>
             </form>
+
+            <!-- Floating Mobile Live Search Panel -->
+            <div x-show="open && results.length > 0"
+                 x-cloak
+                 x-transition:enter="transition ease-out duration-150"
+                 x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+                 x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                 x-transition:leave="transition ease-in duration-100"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"
+                 class="absolute left-4 right-4 top-full mt-1 z-50 rounded-2xl border border-[#dcd2bd] bg-white/95 backdrop-blur-xl p-2 shadow-2xl space-y-1 max-h-[350px] overflow-y-auto custom-scroll">
+                <template x-for="item in results" :key="item.id">
+                    <a :href="'/manga/' + item.id"
+                       class="flex items-center gap-2.5 p-1.5 rounded-xl transition hover:bg-[#f6ecda]/60">
+                        <img :src="item.coverUrl || 'https://via.placeholder.com/60x80?text=No+Cover'"
+                             class="w-8 h-12 object-cover rounded-md shadow-sm flex-shrink-0" />
+                        <div class="min-w-0 flex-1">
+                            <h4 class="text-xs font-bold text-[#172a37] truncate" x-text="item.title"></h4>
+                            <div class="flex items-center gap-1.5 mt-0.5">
+                                <span class="rounded bg-[#0f766e]/10 px-1 py-0.2 text-[8px] font-bold text-[#0f766e] uppercase" x-text="item.status || 'Ongoing'"></span>
+                                <span x-show="item.format && item.format.toLowerCase() === 'novel'"
+                                      class="rounded bg-amber-500/10 px-1 py-0.2 text-[8px] font-bold text-amber-700 uppercase">Novel</span>
+                            </div>
+                        </div>
+                    </a>
+                </template>
+                <a :href="'/manga?q=' + encodeURIComponent(query)"
+                   class="block w-full text-center py-1.5 text-xs font-bold text-[#0f766e] hover:bg-[#0f766e]/10 rounded-xl transition border-t border-[#e0d9c8] mt-1">
+                    Lihat semua hasil &rarr;
+                </a>
+            </div>
         </div>
     </header>
 
@@ -177,16 +371,13 @@
                                 <span class="inline-block mt-1 text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-[#0f766e]/10 text-[#0f766e]" x-text="item.status"></span>
                             </div>
                         </a>
-                        <button type="button" @click="toggleFav(item)" class="p-2 text-red-500 hover:bg-red-50 rounded-xl transition" title="Hapus">
-                            <span class="material-symbols-rounded text-base">delete</span>
+                        <button type="button" @click="toggleFav(item)" class="btn-delete-uiverse" title="Hapus dari favorit">
+                            <svg viewBox="0 0 448 512" class="delSvgIcon">
+                                <path d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64S14.3 96 32 96H416c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 296.3 0 284.2 0H163.8c-12.1 0-23.2 6.8-28.6 17.7zM416 128H32L53.2 467c1.6 25.3 22.6 45 47.9 45H346.9c25.3 0 46.3-19.7 47.9-45L416 128z"/>
+                            </svg>
                         </button>
                     </div>
                 </template>
-            </div>
-
-            <div class="pt-3 border-t border-[#e0d9c8] flex justify-between items-center text-xs text-[#6b766f]">
-                <span>Tersimpan di browser lokalmu (tanpa perlu akun).</span>
-                <button type="button" @click="favModalOpen = false" class="px-4 py-2 rounded-full bg-[#0f766e] text-white font-semibold">Tutup</button>
             </div>
         </div>
     </div>
@@ -206,15 +397,9 @@
                     <span class="material-symbols-rounded text-[#0f766e]">history</span>
                     <h3 class="text-lg font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Riwayat Membaca</h3>
                 </div>
-                <div class="flex items-center gap-3">
-                    <button type="button" @click="clearHistory()" x-show="readingHistory.length > 0"
-                            class="text-xs font-bold text-red-500 hover:text-red-700 transition hover:underline">
-                        Hapus Semua
-                    </button>
-                    <button type="button" @click="historyModalOpen = false" class="text-gray-400 hover:text-gray-600">
-                        <span class="material-symbols-rounded">close</span>
-                    </button>
-                </div>
+                <button type="button" @click="historyModalOpen = false" class="text-gray-400 hover:text-gray-600 transition">
+                    <span class="material-symbols-rounded">close</span>
+                </button>
             </div>
 
             <!-- List history -->
@@ -242,22 +427,19 @@
                                 </div>
                             </div>
                         </a>
-                        <div class="flex items-center gap-1.5 flex-shrink-0">
+                        <div class="flex items-center gap-2 flex-shrink-0">
                             <a :href="'/manga/' + item.id + '/chapter/' + item.chapterId"
-                               class="rounded-xl bg-[#0f766e] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#115e59] shadow-sm">
+                               class="rounded-xl bg-[#0f766e] px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#115e59] shadow-sm">
                                 Lanjut
                             </a>
-                            <button type="button" @click="removeHistory(item.id)" class="p-1.5 text-red-500 hover:bg-red-50 rounded-xl transition" title="Hapus dari riwayat">
-                                <span class="material-symbols-rounded text-base">delete</span>
+                            <button type="button" @click="removeHistory(item.id)" class="btn-delete-uiverse" title="Hapus dari riwayat">
+                                <svg viewBox="0 0 448 512" class="delSvgIcon">
+                                    <path d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64S14.3 96 32 96H416c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 296.3 0 284.2 0H163.8c-12.1 0-23.2 6.8-28.6 17.7zM416 128H32L53.2 467c1.6 25.3 22.6 45 47.9 45H346.9c25.3 0 46.3-19.7 47.9-45L416 128z"/>
+                                </svg>
                             </button>
                         </div>
                     </div>
                 </template>
-            </div>
-
-            <div class="pt-3 border-t border-[#e0d9c8] flex justify-between items-center text-xs text-[#6b766f]">
-                <span>Tersimpan di browser lokalmu (tanpa perlu akun).</span>
-                <button type="button" @click="historyModalOpen = false" class="px-4 py-2 rounded-full bg-[#0f766e] text-white font-semibold">Tutup</button>
             </div>
         </div>
     </div>

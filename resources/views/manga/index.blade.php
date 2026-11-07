@@ -166,7 +166,8 @@
             @else
                 <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 sm:gap-6">
                     @foreach($mangas as $item)
-                        <div class="group relative flex flex-col overflow-hidden rounded-[1.75rem] border border-[#dcd2bd] bg-white/90 p-3 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-[#0f766e]/50">
+                        <a href="{{ route('manga.show', $item['id']) }}"
+                           class="group relative flex flex-col overflow-hidden rounded-[1.75rem] border border-[#dcd2bd] bg-white/90 p-3 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:border-[#0f766e] cursor-pointer">
                             
                             <!-- Cover Thumbnail -->
                             <div class="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-[#eaddc2]">
@@ -187,22 +188,29 @@
                                     </div>
                                 @endif
 
-                                <!-- Status Badge -->
-                                <div class="absolute top-2 left-2 inline-flex items-center rounded-full bg-black/60 backdrop-blur-sm px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
-                                    {{ $item['status'] }}
+                                <!-- Status & Format Badges -->
+                                <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                                    <span class="inline-flex items-center rounded-full bg-black/60 backdrop-blur-sm px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+                                        {{ $item['status'] }}
+                                    </span>
+                                    @if(!empty($item['format']) && strtoupper($item['format']) === 'NOVEL')
+                                        <span class="inline-flex items-center rounded-full bg-amber-500/90 backdrop-blur-sm px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+                                            Novel
+                                        </span>
+                                    @endif
                                 </div>
 
                                 <!-- Bookmark icon toggle -->
                                 <button type="button"
-                                        @click.prevent="toggleFav({ id: '{{ $item['id'] }}', title: '{{ addslashes($item['title']) }}', coverUrl: '{{ $item['coverUrl'] }}', status: '{{ $item['status'] }}' })"
-                                        class="absolute top-2 right-2 rounded-full p-1.5 backdrop-blur-md transition"
+                                        @click.prevent.stop="toggleFav({ id: '{{ $item['id'] }}', title: '{{ addslashes($item['title']) }}', coverUrl: '{{ $item['coverUrl'] }}', status: '{{ $item['status'] }}' })"
+                                        class="absolute top-2 right-2 rounded-full p-1.5 backdrop-blur-md transition z-10"
                                         :class="isFav('{{ $item['id'] }}') ? 'bg-[#f97316] text-white shadow-md' : 'bg-black/40 text-white/80 hover:bg-black/60'">
                                     <span class="material-symbols-rounded text-sm block">bookmark</span>
                                 </button>
                             </div>
 
                             <!-- Manga Info -->
-                            <div class="mt-3 flex flex-1 flex-col justify-between space-y-2">
+                            <div class="mt-3 flex flex-1 flex-col justify-between space-y-1">
                                 <div>
                                     <h3 class="line-clamp-2 text-xs sm:text-sm font-bold text-[#172a37] group-hover:text-[#0f766e] transition-colors" title="{{ $item['title'] }}">
                                         {{ $item['title'] }}
@@ -218,13 +226,9 @@
                                         </div>
                                     @endif
                                 </div>
-
-                                <a href="{{ route('manga.show', $item['id']) }}" class="mt-2 block w-full rounded-xl bg-[#0f766e]/10 py-2 text-center text-[11px] font-bold uppercase tracking-wider text-[#0f766e] transition hover:bg-[#0f766e] hover:text-white">
-                                    Baca Manga
-                                </a>
                             </div>
 
-                        </div>
+                        </a>
                     @endforeach
                 </div>
 

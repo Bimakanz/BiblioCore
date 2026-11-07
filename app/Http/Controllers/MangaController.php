@@ -18,6 +18,25 @@ class MangaController extends Controller
     }
 
     /**
+     * Instant live search API with caching for debounced search bar.
+     */
+    public function liveSearch(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $query = trim((string) $request->input('q', ''));
+        if (strlen($query) < 2) {
+            return response()->json(['data' => []]);
+        }
+
+        $cacheKey = 'live_search_' . md5(strtolower($query));
+        $results = \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($query) {
+            $res = $this->mangaService->search($query, 1, 8);
+            return $res['data'] ?? [];
+        });
+
+        return response()->json(['data' => array_slice($results, 0, 8)]);
+    }
+
+    /**
      * Display the public manga catalogue / explore page.
      */
     public function index(Request $request): View

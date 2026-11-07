@@ -86,6 +86,7 @@ class AniListProvider
                 }
                 media(type: $type, sort: $sort, status: $status, genre: $genre, isAdult: false) {
                   id
+                  format
                   title {
                     romaji
                     english
@@ -130,15 +131,18 @@ class AniListProvider
 
             $list = array_map([$this, 'formatMangaCard'], $pageData['media']);
             
-            // Deduplicate by normalized title to prevent identical cards (e.g. Manga vs Novel format of same title)
+            // Deduplicate by normalized title AND format (Manga vs Novel results preserved, duplicates merged)
             $deduped = [];
-            $seenTitles = [];
+            $seenKeys = [];
             foreach ($list as $item) {
-                $norm = strtolower(preg_replace('/[^a-z0-9]/', '', $item['title'] ?? ''));
-                if (!empty($norm) && !isset($seenTitles[$norm])) {
-                    $seenTitles[$norm] = true;
+                $normTitle = strtolower(preg_replace('/[^a-z0-9]/', '', $item['title'] ?? ''));
+                $formatKey = strtolower($item['format'] ?? 'manga');
+                $key = "{$normTitle}_{$formatKey}";
+
+                if (!empty($normTitle) && !isset($seenKeys[$key])) {
+                    $seenKeys[$key] = true;
                     $deduped[] = $item;
-                } elseif (empty($norm)) {
+                } elseif (empty($normTitle)) {
                     $deduped[] = $item;
                 }
             }
@@ -186,6 +190,7 @@ class AniListProvider
                 }
                 media(type: $type, search: $search, sort: $sort, genre: $genre, isAdult: false) {
                   id
+                  format
                   title {
                     romaji
                     english
@@ -229,15 +234,18 @@ class AniListProvider
 
             $list = array_map([$this, 'formatMangaCard'], $pageData['media']);
             
-            // Deduplicate by normalized title to prevent identical cards (e.g. Manga vs Novel format of same title)
+            // Deduplicate by normalized title AND format (Manga vs Novel results preserved, duplicates merged)
             $deduped = [];
-            $seenTitles = [];
+            $seenKeys = [];
             foreach ($list as $item) {
-                $norm = strtolower(preg_replace('/[^a-z0-9]/', '', $item['title'] ?? ''));
-                if (!empty($norm) && !isset($seenTitles[$norm])) {
-                    $seenTitles[$norm] = true;
+                $normTitle = strtolower(preg_replace('/[^a-z0-9]/', '', $item['title'] ?? ''));
+                $formatKey = strtolower($item['format'] ?? 'manga');
+                $key = "{$normTitle}_{$formatKey}";
+
+                if (!empty($normTitle) && !isset($seenKeys[$key])) {
+                    $seenKeys[$key] = true;
                     $deduped[] = $item;
-                } elseif (empty($norm)) {
+                } elseif (empty($normTitle)) {
                     $deduped[] = $item;
                 }
             }
@@ -361,9 +369,13 @@ class AniListProvider
         }
         $authorStr = !empty($staffNames) ? implode(', ', $staffNames) : 'Official Creator';
 
+        $rawFormat = strtoupper($m['format'] ?? 'MANGA');
+        $format = str_contains($rawFormat, 'NOVEL') ? 'NOVEL' : 'MANGA';
+
         return [
             'id' => $id,
             'anilistId' => $m['id'],
+            'format' => $format,
             'title' => $title,
             'altTitles' => $altTitles,
             'description' => $cleanDesc,

@@ -142,16 +142,11 @@
         <section class="rounded-[2.5rem] border border-[#dcd2bd] bg-white p-6 sm:p-8 shadow-sm space-y-6">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#e0d9c8] pb-4">
                 <div>
-                    <div class="flex items-center gap-2">
-                        <h2 class="text-xl sm:text-2xl font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
-                            Daftar Chapter
-                        </h2>
-                        <span class="rounded-full bg-[#0f766e]/10 px-2.5 py-0.5 text-[10px] font-bold text-[#0f766e] uppercase tracking-wider">
-                            Multi-Source Hybrid
-                        </span>
-                    </div>
+                    <h2 class="text-xl sm:text-2xl font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
+                        Daftar Chapter
+                    </h2>
                     <p class="text-xs text-[#6f7e75] mt-1">
-                        Menggabungkan chapter dari MangaDex, Komiku, MangaPill, KomikIndo & MangaNato secara otomatis
+                        Pilih chapter yang ingin dibaca dalam Bahasa Indonesia atau English
                     </p>
                 </div>
 
@@ -201,14 +196,9 @@
                                         <span class="rounded-md bg-[#0f766e]/10 px-1.5 py-0.5 text-[10px] font-bold text-[#0f766e]">
                                             ' . $langFlag . '
                                         </span>
-                                        <span class="rounded-md bg-[#f97316]/10 px-1.5 py-0.5 text-[10px] font-bold text-[#ea580c]">
-                                            ' . e($chap['provider'] ?? 'MangaDex') . '
-                                        </span>
                                         ' . ($chap['title'] ? '<span class="text-xs text-[#6f7e75] truncate max-w-xs font-medium">' . e($chap['title']) . '</span>' : '') . '
                                     </div>
                                     <div class="mt-1 flex items-center gap-3 text-[11px] text-[#84948a]">
-                                        <span>' . e($chap['group']) . '</span>
-                                        <span>•</span>
                                         <span>' . e($chap['publishAt']) . '</span>
                                     </div>
                                 </div>

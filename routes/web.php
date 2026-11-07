@@ -18,6 +18,9 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [MangaController::class, 'index'])->name('manga.index');
 Route::get('/landing', [MangaController::class, 'index'])->name('landing');
 
+// API Live Search Debounce
+Route::get('/manga/api/live-search', [MangaController::class, 'liveSearch'])->name('manga.api.live-search');
+
 // Detail Manga & Daftar Chapter
 Route::get('/manga/{id}', [MangaController::class, 'show'])->name('manga.show');
 
