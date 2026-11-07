@@ -82,7 +82,7 @@ test('manga detail page renders without waiting for chapter aggregation', functi
 test('chapters json endpoint aggregates and returns the chapter list', function () {
     $this->mock(MangaService::class, function ($mock) {
         $mock->shouldReceive('getChapters')->once()
-            ->with('a77742b1-befd-49a4-bff5-1ad4e6b0ef7b', null)
+            ->with('a77742b1-befd-49a4-bff5-1ad4e6b0ef7b', null, \Mockery::any())
             ->andReturn([
                 fakeChapter('chapter-2', '2', 'en'),
                 fakeChapter('chapter-1', '1', 'en'),
