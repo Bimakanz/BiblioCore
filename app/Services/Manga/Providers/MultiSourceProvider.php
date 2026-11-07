@@ -285,33 +285,49 @@ class MultiSourceProvider
                     $url = Cache::get("shn_url_{$chapterId}");
                 }
 
-                if (!$url) {
+                if (! $url && request()->has('p')) {
+                    $decoded = base64_decode(request()->query('p'), true);
+                    if ($decoded && filter_var($decoded, FILTER_VALIDATE_URL)) {
+                        $url = $decoded;
+                        Cache::put("{$prefix}_url_{$chapterId}", $url, 604800);
+                    }
+                }
+
+                if (! $url) {
                     return null;
                 }
 
                 $html = $this->request($url);
             }
 
-            if (!$html) {
+            if (! $html) {
                 return null;
             }
 
-            // Extract all image sources
-            preg_match_all('/<img[^>]+(?:data-src|src)="([^"]+)"/is', $html, $imgs);
-            if (empty($imgs[1])) {
-                return null;
-            }
-
+            // Extract all image sources (supporting data-src, data-lazy-src, data-original, and src)
+            preg_match_all('/<img[^>]+>/is', $html, $imgTags);
             $validImgs = [];
-            foreach ($imgs[1] as $imgUrl) {
-                if (preg_match('/\.(jpg|jpeg|png|webp)/i', $imgUrl) && 
-                    !str_contains($imgUrl, 'logo') && 
-                    !str_contains($imgUrl, 'icon') && 
-                    !str_contains($imgUrl, 'Ikon') && 
-                    !str_contains($imgUrl, 'iklan') && 
-                    !str_contains($imgUrl, 'donate') && 
-                    !str_contains($imgUrl, 'promosi')) {
-                    $validImgs[] = $imgUrl;
+            foreach ($imgTags[0] ?? [] as $tag) {
+                $imgUrl = '';
+                if (preg_match('/data-src=["\']([^"\']+)["\']/i', $tag, $m)) {
+                    $imgUrl = $m[1];
+                } elseif (preg_match('/data-lazy-src=["\']([^"\']+)["\']/i', $tag, $m)) {
+                    $imgUrl = $m[1];
+                } elseif (preg_match('/data-original=["\']([^"\']+)["\']/i', $tag, $m)) {
+                    $imgUrl = $m[1];
+                } elseif (preg_match('/src=["\']([^"\']+)["\']/i', $tag, $m)) {
+                    $imgUrl = $m[1];
+                }
+                $imgUrl = trim($imgUrl);
+                if ($imgUrl && ! str_starts_with($imgUrl, 'data:') && preg_match('/\.(jpg|jpeg|png|webp)/i', $imgUrl)) {
+                    if (! str_contains($imgUrl, 'logo') &&
+                        ! str_contains($imgUrl, 'icon') &&
+                        ! str_contains($imgUrl, 'Ikon') &&
+                        ! str_contains($imgUrl, 'iklan') &&
+                        ! str_contains($imgUrl, 'donate') &&
+                        ! str_contains($imgUrl, 'promosi')) {
+                        $validImgs[] = $imgUrl;
+                    }
                 }
             }
 

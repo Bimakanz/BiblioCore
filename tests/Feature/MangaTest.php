@@ -96,7 +96,7 @@ test('chapters json endpoint aggregates and returns the chapter list', function 
         ->assertJsonPath('counts.en', 2)
         ->assertJsonPath('first.chapter', '1')
         ->assertJsonPath('latest.chapter', '2')
-        ->assertHeader('Cache-Control', 'max-age=300, public, s-maxage=43200, stale-while-revalidate=86400');
+        ->assertHeader('Cache-Control', 'max-age=60, public, s-maxage=600, stale-while-revalidate=86400');
 });
 
 test('image proxy rejects local and non-http urls', function () {

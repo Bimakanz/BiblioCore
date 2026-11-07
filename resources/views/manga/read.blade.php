@@ -172,6 +172,9 @@
             this.currentChapter = data.currentChapter;
             this.nextChapter = data.nextChapter;
             this.prevChapter = data.prevChapter;
+            if (data.latestChapNum) {
+                this.latestChapNum = data.latestChapNum;
+            }
             this.prefetchedNextChapter = null;
 
             // Push state URL

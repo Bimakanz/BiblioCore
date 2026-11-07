@@ -10,6 +10,8 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class MangaController extends Controller
 {
+    private const CHAPTERS_CACHE_VERSION = 'v7';
+
     protected MangaService $mangaService;
 
     public function __construct(MangaService $mangaService)
@@ -100,7 +102,7 @@ class MangaController extends Controller
                 'manga' => $manga,
                 'chapterPayload' => $payload,
                 'chaptersPreloaded' => ! empty($cachedChapters),
-                'chaptersUrl' => route('manga.chapters.json', ['id' => $id]),
+                'chaptersUrl' => route('manga.chapters.json', ['id' => $id]) . '?v=' . self::CHAPTERS_CACHE_VERSION,
                 'activeTab' => $payload['counts']['id'] > 0 ? 'id' : ($payload['counts']['en'] > 0 ? 'en' : 'all'),
             ])
             ->header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400');
@@ -137,7 +139,7 @@ class MangaController extends Controller
         } elseif ($partial) {
             $cacheControl = 'public, max-age=10, s-maxage=30, stale-while-revalidate=30';
         } else {
-            $cacheControl = 'public, max-age=300, s-maxage=43200, stale-while-revalidate=86400';
+            $cacheControl = 'public, max-age=60, s-maxage=600, stale-while-revalidate=86400';
         }
 
         return response()
@@ -203,14 +205,15 @@ class MangaController extends Controller
      */
     protected function preloadChapters(string $id): array
     {
-        $all = Cache::get("aggregated_v5_chapters_{$id}_all");
+        $v = self::CHAPTERS_CACHE_VERSION;
+        $all = Cache::get("aggregated_{$v}_chapters_{$id}_all");
         if (is_array($all) && ! empty($all)) {
             return $all;
         }
 
         $merged = [];
         foreach (['id', 'en'] as $language) {
-            $cached = Cache::get("aggregated_v5_chapters_{$id}_{$language}");
+            $cached = Cache::get("aggregated_{$v}_chapters_{$id}_{$language}");
             if (is_array($cached) && ! empty($cached)) {
                 $merged = array_merge($merged, $cached);
             }
@@ -280,6 +283,7 @@ class MangaController extends Controller
             'provider' => (string) ($chapter['provider'] ?? 'MangaDex'),
             'publishAt' => (string) ($chapter['publishAt'] ?? ''),
             'externalUrl' => $chapter['externalUrl'] ?? null,
+            'readPath' => $chapter['readPath'] ?? null,
         ];
     }
 
@@ -394,6 +398,7 @@ class MangaController extends Controller
                 'nextChapter' => $navigation['nextChapter'],
                 'pages' => $chapterData['pages'],
                 'totalPages' => count($chapterData['pages']),
+                'latestChapNum' => ! empty($navigation['sameLangChapters'][0]['chapter']) ? (int) $navigation['sameLangChapters'][0]['chapter'] : null,
             ])
             ->header('Cache-Control', 'public, max-age=300, s-maxage=7200, stale-while-revalidate=86400');
     }
@@ -404,11 +409,16 @@ class MangaController extends Controller
      */
     protected function buildCurrentChapter(string $chapterId, ?string $chNum, ?string $source): array
     {
+        $lang = request()->query('lang');
+        if (! in_array($lang, ['id', 'en'], true)) {
+            $lang = preg_match('/^(kmk_|kmd_|wm_|bk_|shn_)/', $chapterId) ? 'id' : 'en';
+        }
+
         return [
             'id' => $chapterId,
             'chapter' => $chNum ?: '1',
             'title' => '',
-            'language' => preg_match('/^(kmk_|kmd_|wm_|bk_|shn_)/', $chapterId) ? 'id' : 'en',
+            'language' => $lang,
             'provider' => $source ?: 'MangaDex',
         ];
     }
@@ -418,13 +428,20 @@ class MangaController extends Controller
      */
     protected function cachedChapters(string $mangaId, string $language): array
     {
+        $v = self::CHAPTERS_CACHE_VERSION;
         $keys = [
+            "aggregated_{$v}_chapters_{$mangaId}_{$language}",
+            "aggregated_{$v}_chapters_{$mangaId}_all",
+            "aggregated_{$v}_chapters_{$mangaId}_id",
+            "aggregated_{$v}_chapters_{$mangaId}_en",
+            "aggregated_v6_chapters_{$mangaId}_{$language}",
+            "aggregated_v6_chapters_{$mangaId}_all",
+            "aggregated_v6_chapters_{$mangaId}_id",
+            "aggregated_v6_chapters_{$mangaId}_en",
             "aggregated_v5_chapters_{$mangaId}_{$language}",
             "aggregated_v5_chapters_{$mangaId}_all",
             "aggregated_v5_chapters_{$mangaId}_id",
             "aggregated_v5_chapters_{$mangaId}_en",
-            "aggregated_v5_chapters_{$mangaId}_null",
-            "aggregated_v5_chapters_{$mangaId}_",
         ];
 
         foreach ($keys as $key) {
@@ -445,7 +462,8 @@ class MangaController extends Controller
      */
     protected function resolveChapterNavigation(string $mangaId, string $chapterId, ?string $chNum, array $currentChapter): array
     {
-        $chapters = $this->cachedChapters($mangaId, $currentChapter['language'] ?? 'en');
+        $allChapters = $this->cachedChapters($mangaId, 'all');
+        $chapters = ! empty($allChapters) ? $allChapters : $this->cachedChapters($mangaId, $currentChapter['language'] ?? 'en');
 
         if (empty($chapters)) {
             return [
@@ -460,7 +478,7 @@ class MangaController extends Controller
         // Prefer an exact ID match, then fall back to the chapter number.
         foreach ($chapters as $chapter) {
             if (($chapter['id'] ?? null) === $chapterId) {
-                $currentChapter = $chapter;
+                $currentChapter = array_merge($currentChapter, $chapter);
                 break;
             }
         }
@@ -470,7 +488,7 @@ class MangaController extends Controller
             foreach ($chapters as $chapter) {
                 if ((float) ($chapter['chapter'] ?? -999) === $targetNum
                     && ($chapter['language'] ?? '') === ($currentChapter['language'] ?? 'en')) {
-                    $currentChapter = $chapter;
+                    $currentChapter = array_merge($currentChapter, $chapter);
                     break;
                 }
             }
@@ -550,8 +568,24 @@ class MangaController extends Controller
             return;
         }
 
+        // Fast recovery 0: Check query parameter p
+        if (request()->has('p')) {
+            $decoded = base64_decode(request()->query('p'), true);
+            if ($decoded && filter_var($decoded, FILTER_VALIDATE_URL)) {
+                \Illuminate\Support\Facades\Cache::put($cacheKey, $decoded, 604800);
+                return;
+            }
+        }
+
         // 1. Look up readPath from the aggregated chapters cache
+        $v = self::CHAPTERS_CACHE_VERSION;
         $searchKeys = [
+            "aggregated_{$v}_chapters_{$mangaId}_id",
+            "aggregated_{$v}_chapters_{$mangaId}_all",
+            "aggregated_{$v}_chapters_{$mangaId}_en",
+            "aggregated_v6_chapters_{$mangaId}_id",
+            "aggregated_v6_chapters_{$mangaId}_all",
+            "aggregated_v6_chapters_{$mangaId}_en",
             "aggregated_v5_chapters_{$mangaId}_id",
             "aggregated_v5_chapters_{$mangaId}_all",
             "aggregated_v5_chapters_{$mangaId}_en",
