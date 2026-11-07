@@ -191,7 +191,7 @@ class MangaService
     {
         $partial = false;
         $langKey = $language ?: 'all';
-        $cacheKey = "aggregated_v7_chapters_{$id}_{$langKey}";
+        $cacheKey = "aggregated_v8_chapters_{$id}_{$langKey}";
 
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && ! empty($cached)) {
@@ -328,6 +328,8 @@ class MangaService
 
             // 4. Merge all sources together and deduplicate
             $all = array_merge($dexChapters, $indoChapters, $enChapters);
+            // Explicitly filter out any legacy MangaHere / foreign chapters
+            $all = array_values(array_filter($all, fn ($c) => ($c['provider'] ?? '') !== 'MangaHere' && ! str_starts_with($c['id'] ?? '', 'mh_')));
 
             // Deduplicate by language + chapter number
             $uniqueMap = [];
@@ -367,8 +369,8 @@ class MangaService
             if (! $language) {
                 $indoCh = array_values(array_filter($merged, fn ($c) => ($c['language'] ?? '') === 'id'));
                 $enCh = array_values(array_filter($merged, fn ($c) => ($c['language'] ?? '') === 'en'));
-                Cache::put("aggregated_v7_chapters_{$id}_id", $indoCh, $ttl);
-                Cache::put("aggregated_v7_chapters_{$id}_en", $enCh, $ttl);
+                Cache::put("aggregated_v8_chapters_{$id}_id", $indoCh, $ttl);
+                Cache::put("aggregated_v8_chapters_{$id}_en", $enCh, $ttl);
             }
 
             // Filter by requested language if specified
