@@ -203,14 +203,14 @@ class MangaController extends Controller
      */
     protected function preloadChapters(string $id): array
     {
-        $all = Cache::get("aggregated_v4_chapters_{$id}_all");
+        $all = Cache::get("aggregated_v5_chapters_{$id}_all");
         if (is_array($all) && ! empty($all)) {
             return $all;
         }
 
         $merged = [];
         foreach (['id', 'en'] as $language) {
-            $cached = Cache::get("aggregated_v4_chapters_{$id}_{$language}");
+            $cached = Cache::get("aggregated_v5_chapters_{$id}_{$language}");
             if (is_array($cached) && ! empty($cached)) {
                 $merged = array_merge($merged, $cached);
             }
@@ -419,12 +419,12 @@ class MangaController extends Controller
     protected function cachedChapters(string $mangaId, string $language): array
     {
         $keys = [
-            "aggregated_v4_chapters_{$mangaId}_{$language}",
-            "aggregated_v4_chapters_{$mangaId}_all",
-            "aggregated_v4_chapters_{$mangaId}_id",
-            "aggregated_v4_chapters_{$mangaId}_en",
-            "aggregated_v4_chapters_{$mangaId}_null",
-            "aggregated_v4_chapters_{$mangaId}_",
+            "aggregated_v5_chapters_{$mangaId}_{$language}",
+            "aggregated_v5_chapters_{$mangaId}_all",
+            "aggregated_v5_chapters_{$mangaId}_id",
+            "aggregated_v5_chapters_{$mangaId}_en",
+            "aggregated_v5_chapters_{$mangaId}_null",
+            "aggregated_v5_chapters_{$mangaId}_",
         ];
 
         foreach ($keys as $key) {
@@ -552,9 +552,9 @@ class MangaController extends Controller
 
         // 1. Look up readPath from the aggregated chapters cache
         $searchKeys = [
-            "aggregated_v4_chapters_{$mangaId}_id",
-            "aggregated_v4_chapters_{$mangaId}_all",
-            "aggregated_v4_chapters_{$mangaId}_en",
+            "aggregated_v5_chapters_{$mangaId}_id",
+            "aggregated_v5_chapters_{$mangaId}_all",
+            "aggregated_v5_chapters_{$mangaId}_en",
         ];
 
         foreach ($searchKeys as $searchKey) {
