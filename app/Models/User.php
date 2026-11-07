@@ -3,10 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use App\Models\Borrowing;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -49,37 +46,5 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
-    }
-
-    /**
-     * Determine if the authenticated user is an administrator.
-     */
-    public function isAdmin(): bool
-    {
-        return $this->role === 'admin';
-    }
-
-    /**
-     * Determine if the authenticated user is a student.
-     */
-    public function isStudent(): bool
-    {
-        return $this->role === 'student';
-    }
-
-    /**
-     * Borrowing records made by the user.
-     */
-    public function borrowings(): HasMany
-    {
-        return $this->hasMany(Borrowing::class);
-    }
-
-    /**
-     * Books liked by the user.
-     */
-    public function likedBooks(): BelongsToMany
-    {
-        return $this->belongsToMany(Book::class, 'user_book_likes', 'user_id', 'book_id');
     }
 }

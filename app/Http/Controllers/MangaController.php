@@ -4,9 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Services\Manga\MangaService;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class MangaController extends Controller
 {
@@ -27,9 +28,10 @@ class MangaController extends Controller
             return response()->json(['data' => []]);
         }
 
-        $cacheKey = 'live_search_' . md5(strtolower($query));
+        $cacheKey = 'live_search_'.md5(strtolower($query));
         $results = \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($query) {
             $res = $this->mangaService->search($query, 1, 8);
+
             return $res['data'] ?? [];
         });
 
@@ -81,7 +83,7 @@ class MangaController extends Controller
 
         // Fetch manga detail (this is itself cached)
         $manga = $this->mangaService->getDetail($id);
-        if (!$manga) {
+        if (! $manga) {
             abort(404, 'Manga tidak ditemukan.');
         }
 
@@ -93,15 +95,15 @@ class MangaController extends Controller
 
         // Re-sync URL caches for all non-MangaDex chapters to prevent 404 on reader
         foreach ($allChapters as $chap) {
-            if (!empty($chap['readPath'])) {
+            if (! empty($chap['readPath'])) {
                 $chapId = $chap['id'];
                 $prefix = explode('_', $chapId)[0] ?? '';
-                $cacheKey = match($prefix) {
+                $cacheKey = match ($prefix) {
                     'kmd' => "kmd_url_{$chapId}",
-                    'bk'  => "bk_url_{$chapId}",
-                    'wm'  => "wm_url_{$chapId}",
+                    'bk' => "bk_url_{$chapId}",
+                    'wm' => "wm_url_{$chapId}",
                     'shn' => "shn_url_{$chapId}",
-                    'mh'  => "mh_url_{$chapId}",
+                    'mh' => "mh_url_{$chapId}",
                     default => null,
                 };
                 if ($cacheKey) {
@@ -110,12 +112,12 @@ class MangaController extends Controller
             }
         }
 
-        $indoChapters = array_values(array_filter($allChapters, fn($c) => $c['language'] === 'id'));
-        $enChapters = array_values(array_filter($allChapters, fn($c) => $c['language'] === 'en'));
+        $indoChapters = array_values(array_filter($allChapters, fn ($c) => $c['language'] === 'id'));
+        $enChapters = array_values(array_filter($allChapters, fn ($c) => $c['language'] === 'en'));
 
         // Determine first and latest chapter for quick CTA buttons
-        $firstChapter = !empty($allChapters) ? end($allChapters) : null;
-        $latestChapter = !empty($allChapters) ? reset($allChapters) : null;
+        $firstChapter = ! empty($allChapters) ? end($allChapters) : null;
+        $latestChapter = ! empty($allChapters) ? reset($allChapters) : null;
 
         return view('manga.show', [
             'manga' => $manga,
@@ -140,111 +142,34 @@ class MangaController extends Controller
 
         // 1. Fetch image pages ONLY from the specific provider (fast, direct, single-provider)
         $chapterData = $this->mangaService->getChapterPages($chapterId, $source);
-        if (!$chapterData || empty($chapterData['pages'])) {
+        if (! $chapterData || empty($chapterData['pages'])) {
             abort(404, 'Halaman chapter tidak dapat dimuat atau chapter ini dialihkan ke web eksternal.');
         }
 
         // 2. Fetch manga metadata quickly from cache without re-aggregating
-        $manga = \Illuminate\Support\Facades\Cache::get("manga_detail_{$id}");
-        if (!$manga) {
+        $manga = Cache::get("manga_detail_{$id}");
+        if (! $manga) {
             $manga = $this->mangaService->getDetail($id) ?? [
                 'id' => $id,
                 'title' => 'Manga Reader',
                 'coverUrl' => '',
             ];
-            \Illuminate\Support\Facades\Cache::put("manga_detail_{$id}", $manga, 7200);
+            Cache::put("manga_detail_{$id}", $manga, 7200);
         }
 
-        // 3. Current chapter metadata
-        $currentChapter = [
-            'id' => $chapterId,
-            'chapter' => $chNum ?: '1',
-            'title' => '',
-            'language' => str_starts_with($chapterId, 'kmk_') || str_starts_with($chapterId, 'kmd_') || str_starts_with($chapterId, 'wm_') || str_starts_with($chapterId, 'bk_') || str_starts_with($chapterId, 'shn_') ? 'id' : 'en',
-            'provider' => $source ?: 'MangaDex',
-        ];
+        // 3. Current chapter metadata (refined below from the cached chapter list)
+        $currentChapter = $this->buildCurrentChapter($chapterId, $chNum, $source);
 
-        // 4. Retrieve cached chapters for prev/next (fallback to getChapters if cache is empty)
-        $currentLang = $currentChapter['language'];
-        $cachedChapters = \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_{$currentLang}")
-            ?: \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_all")
-            ?: \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_null")
-            ?: \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_")
-            ?: [];
-
-        if (empty($cachedChapters)) {
-            $cachedChapters = $this->mangaService->getChapters($id);
-        }
-
-        if (empty($cachedChapters)) {
-            $cachedChapters = $this->mangaService->getChapters($id);
-        }
-
-        $prevChapter = null;
-        $nextChapter = null;
-        $sameLangChapters = [];
-
-        if (!empty($cachedChapters)) {
-            // First locate current chapter — prioritize exact ID match
-            $foundById = false;
-            foreach ($cachedChapters as $chap) {
-                if ($chap['id'] === $chapterId) {
-                    $currentChapter = $chap;
-                    $currentLang = $chap['language'] ?? $currentLang;
-                    $foundById = true;
-                    break;
-                }
-            }
-            // Fallback: match by chapter number if ID not found
-            if (!$foundById && !empty($chNum)) {
-                foreach ($cachedChapters as $chap) {
-                    if ((string)($chap['chapter'] ?? '') === (string)$chNum && ($chap['language'] ?? '') === $currentLang) {
-                        $currentChapter = $chap;
-                        break;
-                    }
-                }
-            }
-
-            // Filter strictly by the same language to prevent cross-language jumps
-            $sameLangChapters = array_values(array_filter($cachedChapters, fn($c) => ($c['language'] ?? 'id') === $currentLang));
-            if (empty($sameLangChapters)) {
-                $sameLangChapters = $cachedChapters;
-            }
-
-            // Find prev/next by exact ID match within the same-language sorted list
-            $foundIndex = null;
-            foreach ($sameLangChapters as $index => $chap) {
-                if ($chap['id'] === $currentChapter['id']) {
-                    $foundIndex = $index;
-                    break;
-                }
-            }
-            // Fallback: match by chapter number
-            if ($foundIndex === null) {
-                foreach ($sameLangChapters as $index => $chap) {
-                    if ((string)($chap['chapter'] ?? '') === (string)$currentChapter['chapter']) {
-                        $foundIndex = $index;
-                        break;
-                    }
-                }
-            }
-
-            if ($foundIndex !== null) {
-                // Chapters are sorted descending (e.g. Ch. 232, 231, 230, ..., 1):
-                // Next chapter to read (forward) has higher chapter number = lower index (index - 1)
-                $nextChapter = ($foundIndex > 0) ? $sameLangChapters[$foundIndex - 1] : null;
-                // Previous chapter (backward) has lower chapter number = higher index (index + 1)
-                $prevChapter = $sameLangChapters[$foundIndex + 1] ?? null;
-            }
-        }
+        // 4. Resolve prev/next within the same language from the cached chapter list
+        $navigation = $this->resolveChapterNavigation($id, $chapterId, $chNum, $currentChapter);
 
         return view('manga.read', [
             'manga' => $manga,
-            'currentChapter' => $currentChapter,
-            'prevChapter' => $prevChapter,
-            'nextChapter' => $nextChapter,
-            'allChapters' => $cachedChapters,
-            'sameLangChapters' => $sameLangChapters,
+            'currentChapter' => $navigation['currentChapter'],
+            'prevChapter' => $navigation['prevChapter'],
+            'nextChapter' => $navigation['nextChapter'],
+            'allChapters' => $navigation['chapters'],
+            'sameLangChapters' => $navigation['sameLangChapters'],
             'pages' => $chapterData['pages'],
             'totalPages' => count($chapterData['pages']),
         ]);
@@ -262,84 +187,140 @@ class MangaController extends Controller
         $this->ensureChapterUrlCache($id, $chapterId, $source);
 
         $chapterData = $this->mangaService->getChapterPages($chapterId, $source);
-        if (!$chapterData || empty($chapterData['pages'])) {
+        if (! $chapterData || empty($chapterData['pages'])) {
             return response()->json(['error' => 'Chapter pages not found'], 404);
         }
 
-        $currentChapter = [
+        $currentChapter = $this->buildCurrentChapter($chapterId, $chNum, $source);
+        $navigation = $this->resolveChapterNavigation($id, $chapterId, $chNum, $currentChapter);
+
+        return response()->json([
+            'currentChapter' => $navigation['currentChapter'],
+            'prevChapter' => $navigation['prevChapter'],
+            'nextChapter' => $navigation['nextChapter'],
+            'pages' => $chapterData['pages'],
+            'totalPages' => count($chapterData['pages']),
+        ]);
+    }
+
+    /**
+     * Build a provisional chapter record from the request data.
+     * It is replaced by the cached record when one can be matched.
+     */
+    protected function buildCurrentChapter(string $chapterId, ?string $chNum, ?string $source): array
+    {
+        return [
             'id' => $chapterId,
             'chapter' => $chNum ?: '1',
             'title' => '',
-            'language' => str_starts_with($chapterId, 'kmk_') || str_starts_with($chapterId, 'kmd_') || str_starts_with($chapterId, 'wm_') || str_starts_with($chapterId, 'bk_') || str_starts_with($chapterId, 'shn_') ? 'id' : 'en',
+            'language' => preg_match('/^(kmk_|kmd_|wm_|bk_|shn_)/', $chapterId) ? 'id' : 'en',
             'provider' => $source ?: 'MangaDex',
         ];
+    }
 
-        $currentLang = $currentChapter['language'];
-        $cachedChapters = \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_{$currentLang}")
-            ?: \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_all")
-            ?: \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_null")
-            ?: \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_")
-            ?: [];
+    /**
+     * Load the aggregated chapter list from cache, falling back to the service.
+     */
+    protected function cachedChapters(string $mangaId, string $language): array
+    {
+        $keys = [
+            "aggregated_v4_chapters_{$mangaId}_{$language}",
+            "aggregated_v4_chapters_{$mangaId}_all",
+            "aggregated_v4_chapters_{$mangaId}_null",
+            "aggregated_v4_chapters_{$mangaId}_",
+        ];
 
-        if (empty($cachedChapters)) {
-            $cachedChapters = $this->mangaService->getChapters($id);
+        foreach ($keys as $key) {
+            $cached = Cache::get($key);
+            if (! empty($cached)) {
+                return $cached;
+            }
         }
 
-        $prevChapter = null;
-        $nextChapter = null;
-        if (!empty($cachedChapters)) {
-            // Locate current chapter — prioritize exact ID match
-            $foundById = false;
-            foreach ($cachedChapters as $chap) {
-                if ($chap['id'] === $chapterId) {
-                    $currentChapter = $chap;
-                    $currentLang = $chap['language'] ?? $currentLang;
-                    $foundById = true;
+        return $this->mangaService->getChapters($mangaId) ?: [];
+    }
+
+    /**
+     * Locate the current chapter and its same-language neighbours.
+     *
+     * @return array{currentChapter: array, prevChapter: ?array, nextChapter: ?array, sameLangChapters: array, chapters: array}
+     */
+    protected function resolveChapterNavigation(string $mangaId, string $chapterId, ?string $chNum, array $currentChapter): array
+    {
+        $chapters = $this->cachedChapters($mangaId, $currentChapter['language'] ?? 'en');
+
+        if (empty($chapters)) {
+            return [
+                'currentChapter' => $currentChapter,
+                'prevChapter' => null,
+                'nextChapter' => null,
+                'sameLangChapters' => [],
+                'chapters' => [],
+            ];
+        }
+
+        // Prefer an exact ID match, then fall back to the chapter number.
+        foreach ($chapters as $chapter) {
+            if (($chapter['id'] ?? null) === $chapterId) {
+                $currentChapter = $chapter;
+                break;
+            }
+        }
+
+        if (($currentChapter['id'] ?? null) !== $chapterId && $chNum !== null && $chNum !== '') {
+            foreach ($chapters as $chapter) {
+                if ((string) ($chapter['chapter'] ?? '') === (string) $chNum
+                    && ($chapter['language'] ?? '') === ($currentChapter['language'] ?? 'en')) {
+                    $currentChapter = $chapter;
                     break;
                 }
             }
-            if (!$foundById && !empty($chNum)) {
-                foreach ($cachedChapters as $chap) {
-                    if ((string)($chap['chapter'] ?? '') === (string)$chNum && ($chap['language'] ?? '') === $currentLang) {
-                        $currentChapter = $chap;
-                        break;
-                    }
-                }
+        }
+
+        $currentLang = $currentChapter['language'] ?? 'en';
+        $sameLangChapters = array_values(array_filter(
+            $chapters,
+            fn ($chapter) => ($chapter['language'] ?? 'id') === $currentLang
+        ));
+
+        if (empty($sameLangChapters)) {
+            $sameLangChapters = $chapters;
+        }
+
+        $foundIndex = null;
+        foreach ($sameLangChapters as $index => $chapter) {
+            if (($chapter['id'] ?? null) === ($currentChapter['id'] ?? null)) {
+                $foundIndex = $index;
+                break;
             }
+        }
 
-            $sameLangChapters = array_values(array_filter($cachedChapters, fn($c) => ($c['language'] ?? 'id') === $currentLang));
-            if (empty($sameLangChapters)) $sameLangChapters = $cachedChapters;
-
-            // Find position by exact ID first
-            $foundIndex = null;
-            foreach ($sameLangChapters as $index => $chap) {
-                if ($chap['id'] === $currentChapter['id']) {
+        if ($foundIndex === null) {
+            foreach ($sameLangChapters as $index => $chapter) {
+                if ((string) ($chapter['chapter'] ?? '') === (string) ($currentChapter['chapter'] ?? '')) {
                     $foundIndex = $index;
                     break;
                 }
             }
-            if ($foundIndex === null) {
-                foreach ($sameLangChapters as $index => $chap) {
-                    if ((string)($chap['chapter'] ?? '') === (string)$currentChapter['chapter']) {
-                        $foundIndex = $index;
-                        break;
-                    }
-                }
-            }
-
-            if ($foundIndex !== null) {
-                $nextChapter = ($foundIndex > 0) ? $sameLangChapters[$foundIndex - 1] : null;
-                $prevChapter = $sameLangChapters[$foundIndex + 1] ?? null;
-            }
         }
 
-        return response()->json([
+        $prevChapter = null;
+        $nextChapter = null;
+
+        if ($foundIndex !== null) {
+            // Chapters are sorted descending (Ch. 232, 231, ... 1):
+            // forward = higher number = lower index; backward = higher index.
+            $nextChapter = $foundIndex > 0 ? $sameLangChapters[$foundIndex - 1] : null;
+            $prevChapter = $sameLangChapters[$foundIndex + 1] ?? null;
+        }
+
+        return [
             'currentChapter' => $currentChapter,
             'prevChapter' => $prevChapter,
             'nextChapter' => $nextChapter,
-            'pages' => $chapterData['pages'],
-            'totalPages' => count($chapterData['pages']),
-        ]);
+            'sameLangChapters' => $sameLangChapters,
+            'chapters' => $chapters,
+        ];
     }
 
     /**
@@ -352,13 +333,13 @@ class MangaController extends Controller
         $prefix = explode('_', $chapterId)[0] ?? '';
         $cacheKeyMap = [
             'kmd' => "kmd_url_{$chapterId}",
-            'bk'  => "bk_url_{$chapterId}",
-            'wm'  => "wm_url_{$chapterId}",
+            'bk' => "bk_url_{$chapterId}",
+            'wm' => "wm_url_{$chapterId}",
             'shn' => "shn_url_{$chapterId}",
-            'mh'  => "mh_url_{$chapterId}",
+            'mh' => "mh_url_{$chapterId}",
         ];
 
-        if (!isset($cacheKeyMap[$prefix])) {
+        if (! isset($cacheKeyMap[$prefix])) {
             return; // MangaDex or Komiku (kmk_) — no URL cache needed
         }
 
@@ -379,8 +360,9 @@ class MangaController extends Controller
         foreach ($searchKeys as $searchKey) {
             $chapters = \Illuminate\Support\Facades\Cache::get($searchKey, []);
             foreach ($chapters as $chap) {
-                if ($chap['id'] === $chapterId && !empty($chap['readPath'])) {
+                if ($chap['id'] === $chapterId && ! empty($chap['readPath'])) {
                     \Illuminate\Support\Facades\Cache::put($cacheKey, $chap['readPath'], 86400);
+
                     return;
                 }
             }
@@ -390,12 +372,14 @@ class MangaController extends Controller
         try {
             $chapters = $this->mangaService->getChapters($mangaId);
             foreach ($chapters as $chap) {
-                if ($chap['id'] === $chapterId && !empty($chap['readPath'])) {
+                if ($chap['id'] === $chapterId && ! empty($chap['readPath'])) {
                     \Illuminate\Support\Facades\Cache::put($cacheKey, $chap['readPath'], 86400);
+
                     return;
                 }
             }
-        } catch (\Throwable $e) {}
+        } catch (\Throwable $e) {
+        }
     }
 
     /**
@@ -404,16 +388,16 @@ class MangaController extends Controller
     public function proxyImage(Request $request): BinaryFileResponse|Response
     {
         $url = $request->query('url');
-        if (!$url || !filter_var($url, FILTER_VALIDATE_URL)) {
+        if (! $url || ! filter_var($url, FILTER_VALIDATE_URL)) {
             abort(400, 'Invalid image URL');
         }
 
         $data = $this->mangaService->fetchImage($url);
-        if (!$data) {
+        if (! $data) {
             abort(404, 'Gambar tidak dapat diakses.');
         }
 
-        if (!empty($data['filePath']) && file_exists($data['filePath'])) {
+        if (! empty($data['filePath']) && file_exists($data['filePath'])) {
             return response()->file($data['filePath'], [
                 'Content-Type' => $data['contentType'],
                 'Cache-Control' => 'public, max-age=604800, immutable',

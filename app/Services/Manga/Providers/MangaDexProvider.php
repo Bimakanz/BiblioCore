@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 class MangaDexProvider implements MangaProviderInterface
 {
     protected string $apiBase = 'https://api.mangadex.org';
+
     protected array $dnsResolves = [
         'api.mangadex.org:443:45.129.229.2',
         'uploads.mangadex.org:443:45.129.229.2',
@@ -42,12 +43,12 @@ class MangaDexProvider implements MangaProviderInterface
      */
     protected function request(string $endpoint, array $params = [], int $timeout = 4): ?array
     {
-        $url = $this->apiBase . $endpoint;
-        if (!empty($params)) {
+        $url = $this->apiBase.$endpoint;
+        if (! empty($params)) {
             $query = http_build_query($params);
             // Replace numeric array indices like arr%5B0%5D with arr%5B%5D
             $query = preg_replace('/%5B[0-9]+%5D/', '%5B%5D', $query);
-            $url .= (str_contains($url, '?') ? '&' : '?') . $query;
+            $url .= (str_contains($url, '?') ? '&' : '?').$query;
         }
 
         $execute = function (bool $useResolve) use ($url, $timeout): ?array {
@@ -58,7 +59,7 @@ class MangaDexProvider implements MangaProviderInterface
             curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            if ($useResolve && !empty($this->dnsResolves)) {
+            if ($useResolve && ! empty($this->dnsResolves)) {
                 curl_setopt($ch, CURLOPT_RESOLVE, $this->dnsResolves);
             }
             curl_setopt($ch, CURLOPT_USERAGENT, 'BiblioManga/1.0.0 (https://github.com/Bimakanz/BiblioCore; contact@bibliomanga.app)');
@@ -86,6 +87,7 @@ class MangaDexProvider implements MangaProviderInterface
             if ($data !== null) {
                 return $data;
             }
+
             return $execute(true);
         }
 
@@ -94,6 +96,7 @@ class MangaDexProvider implements MangaProviderInterface
         if ($data !== null) {
             return $data;
         }
+
         return $execute(false);
     }
 
@@ -107,7 +110,8 @@ class MangaDexProvider implements MangaProviderInterface
             return [];
         }
 
-        $cacheKey = 'al_covers_batch_' . md5(implode(',', $alIds));
+        $cacheKey = 'al_covers_batch_'.md5(implode(',', $alIds));
+
         return Cache::remember($cacheKey, 86400, function () use ($alIds) {
             $query = '
             query ($ids: [Int]) {
@@ -135,7 +139,7 @@ class MangaDexProvider implements MangaProviderInterface
             foreach ($data['data']['Page']['media'] ?? [] as $m) {
                 $cover = $m['coverImage']['extraLarge'] ?? $m['coverImage']['large'] ?? $m['coverImage']['medium'] ?? null;
                 if ($cover) {
-                    $map[(int)$m['id']] = $cover;
+                    $map[(int) $m['id']] = $cover;
                 }
             }
 
@@ -173,12 +177,12 @@ class MangaDexProvider implements MangaProviderInterface
                 $params['order'] = ['followedCount' => 'desc'];
             }
 
-            if ($genre && !empty($this->tagMap[$genre])) {
+            if ($genre && ! empty($this->tagMap[$genre])) {
                 $params['includedTags'] = [$this->tagMap[$genre]];
             }
 
             $raw = $this->request('/manga', $params);
-            if (!$raw || empty($raw['data'])) {
+            if (! $raw || empty($raw['data'])) {
                 return [
                     'data' => [],
                     'total' => 0,
@@ -191,13 +195,13 @@ class MangaDexProvider implements MangaProviderInterface
             // Extract AniList IDs for fast, 100% reliable cover images
             $alIds = [];
             foreach ($raw['data'] as $item) {
-                if (!empty($item['attributes']['links']['al'])) {
+                if (! empty($item['attributes']['links']['al'])) {
                     $alIds[] = (int) $item['attributes']['links']['al'];
                 }
             }
             $alCovers = $this->getAniListCovers($alIds);
 
-            $list = array_map(fn($item) => $this->formatMangaCard($item, $alCovers), $raw['data']);
+            $list = array_map(fn ($item) => $this->formatMangaCard($item, $alCovers), $raw['data']);
             $total = $raw['total'] ?? count($list);
 
             return [
@@ -216,7 +220,7 @@ class MangaDexProvider implements MangaProviderInterface
     public function search(string $query, int $page = 1, int $limit = 24, ?string $category = null, ?string $genre = null): array
     {
         $offset = ($page - 1) * $limit;
-        $cacheKey = "mangadex_search_" . md5("{$query}_{$page}_{$limit}_{$category}_{$genre}");
+        $cacheKey = 'mangadex_search_'.md5("{$query}_{$page}_{$limit}_{$category}_{$genre}");
 
         return Cache::remember($cacheKey, 900, function () use ($query, $offset, $limit, $category, $genre, $page) {
             $params = [
@@ -237,12 +241,12 @@ class MangaDexProvider implements MangaProviderInterface
                 $params['status'] = ['completed'];
             }
 
-            if ($genre && !empty($this->tagMap[$genre])) {
+            if ($genre && ! empty($this->tagMap[$genre])) {
                 $params['includedTags'] = [$this->tagMap[$genre]];
             }
 
             $raw = $this->request('/manga', $params);
-            if (!$raw || empty($raw['data'])) {
+            if (! $raw || empty($raw['data'])) {
                 return [
                     'data' => [],
                     'total' => 0,
@@ -254,13 +258,13 @@ class MangaDexProvider implements MangaProviderInterface
 
             $alIds = [];
             foreach ($raw['data'] as $item) {
-                if (!empty($item['attributes']['links']['al'])) {
+                if (! empty($item['attributes']['links']['al'])) {
                     $alIds[] = (int) $item['attributes']['links']['al'];
                 }
             }
             $alCovers = $this->getAniListCovers($alIds);
 
-            $list = array_map(fn($item) => $this->formatMangaCard($item, $alCovers), $raw['data']);
+            $list = array_map(fn ($item) => $this->formatMangaCard($item, $alCovers), $raw['data']);
             $total = $raw['total'] ?? count($list);
 
             return [
@@ -285,14 +289,14 @@ class MangaDexProvider implements MangaProviderInterface
                 'includes' => ['cover_art', 'author', 'artist'],
             ]);
 
-            if (!$raw || empty($raw['data'])) {
+            if (! $raw || empty($raw['data'])) {
                 return null;
             }
 
             $manga = $raw['data'];
             $alCovers = [];
-            if (!empty($manga['attributes']['links']['al'])) {
-                $alCovers = $this->getAniListCovers([(int)$manga['attributes']['links']['al']]);
+            if (! empty($manga['attributes']['links']['al'])) {
+                $alCovers = $this->getAniListCovers([(int) $manga['attributes']['links']['al']]);
             }
 
             $card = $this->formatMangaCard($manga, $alCovers);
@@ -301,17 +305,17 @@ class MangaDexProvider implements MangaProviderInterface
             $authors = [];
             $artists = [];
             foreach ($manga['relationships'] ?? [] as $rel) {
-                if ($rel['type'] === 'author' && !empty($rel['attributes']['name'])) {
+                if ($rel['type'] === 'author' && ! empty($rel['attributes']['name'])) {
                     $authors[] = $rel['attributes']['name'];
                 }
-                if ($rel['type'] === 'artist' && !empty($rel['attributes']['name'])) {
+                if ($rel['type'] === 'artist' && ! empty($rel['attributes']['name'])) {
                     $artists[] = $rel['attributes']['name'];
                 }
             }
 
-            $card['authors'] = !empty($authors) ? implode(', ', $authors) : 'Unknown';
-            $card['artists'] = !empty($artists) ? implode(', ', $artists) : $card['authors'];
-            $card['altTitles'] = array_map(fn($t) => reset($t), $manga['attributes']['altTitles'] ?? []);
+            $card['authors'] = ! empty($authors) ? implode(', ', $authors) : 'Unknown';
+            $card['artists'] = ! empty($artists) ? implode(', ', $artists) : $card['authors'];
+            $card['altTitles'] = array_map(fn ($t) => reset($t), $manga['attributes']['altTitles'] ?? []);
 
             return $card;
         });
@@ -339,18 +343,18 @@ class MangaDexProvider implements MangaProviderInterface
             }
 
             $raw = $this->request("/manga/{$id}/feed", $params);
-            if (!$raw || empty($raw['data'])) {
+            if (! $raw || empty($raw['data'])) {
                 return [];
             }
 
             $chapters = [];
             foreach ($raw['data'] as $item) {
                 $attr = $item['attributes'] ?? [];
-                
+
                 // Scanlation group
                 $group = 'Official / Fan Scan';
                 foreach ($item['relationships'] ?? [] as $rel) {
-                    if ($rel['type'] === 'scanlation_group' && !empty($rel['attributes']['name'])) {
+                    if ($rel['type'] === 'scanlation_group' && ! empty($rel['attributes']['name'])) {
                         $group = $rel['attributes']['name'];
                         break;
                     }
@@ -378,8 +382,9 @@ class MangaDexProvider implements MangaProviderInterface
 
             // Natural sort by chapter descending
             usort($chapters, function ($a, $b) {
-                $cA = is_numeric($a['chapter']) ? (float)$a['chapter'] : 0;
-                $cB = is_numeric($b['chapter']) ? (float)$b['chapter'] : 0;
+                $cA = is_numeric($a['chapter']) ? (float) $a['chapter'] : 0;
+                $cB = is_numeric($b['chapter']) ? (float) $b['chapter'] : 0;
+
                 return $cB <=> $cA;
             });
 
@@ -396,7 +401,7 @@ class MangaDexProvider implements MangaProviderInterface
 
         return Cache::remember($cacheKey, 7200, function () use ($chapterId) {
             $raw = $this->request("/at-home/server/{$chapterId}");
-            if (!$raw || empty($raw['baseUrl']) || empty($raw['chapter']['hash'])) {
+            if (! $raw || empty($raw['baseUrl']) || empty($raw['chapter']['hash'])) {
                 return null;
             }
 
@@ -408,11 +413,11 @@ class MangaDexProvider implements MangaProviderInterface
             $pages = [];
             foreach ($files as $index => $file) {
                 $directUrl = "{$baseUrl}/data/{$hash}/{$file}";
-                $saverUrl = !empty($filesSaver[$index]) ? "{$baseUrl}/data-saver/{$hash}/{$filesSaver[$index]}" : $directUrl;
+                $saverUrl = ! empty($filesSaver[$index]) ? "{$baseUrl}/data-saver/{$hash}/{$filesSaver[$index]}" : $directUrl;
 
                 // Relative proxy URLs to avoid port mismatch issues
-                $proxyUrl = "/manga/proxy/image?url=" . urlencode($directUrl);
-                $proxySaverUrl = "/manga/proxy/image?url=" . urlencode($saverUrl);
+                $proxyUrl = '/manga/proxy/image?url='.urlencode($directUrl);
+                $proxySaverUrl = '/manga/proxy/image?url='.urlencode($saverUrl);
 
                 $pages[] = [
                     'page' => $index + 1,
@@ -436,14 +441,13 @@ class MangaDexProvider implements MangaProviderInterface
      */
     public function fetchImage(string $url): ?array
     {
-        $host = parse_url($url, PHP_URL_HOST);
-        if (!$host || !filter_var($url, FILTER_VALIDATE_URL)) {
+        if (! filter_var($url, FILTER_VALIDATE_URL)) {
             return null;
         }
 
         // Cache on local disk
         $cacheDir = storage_path('app/manga_cache');
-        if (!File::isDirectory($cacheDir)) {
+        if (! File::isDirectory($cacheDir)) {
             File::makeDirectory($cacheDir, 0755, true);
         }
 
@@ -453,6 +457,7 @@ class MangaDexProvider implements MangaProviderInterface
 
         if (File::exists($cachedFile) && File::exists($metaFile)) {
             $mime = trim(File::get($metaFile));
+
             return [
                 'content' => File::get($cachedFile),
                 'contentType' => $mime ?: 'image/jpeg',
@@ -460,55 +465,91 @@ class MangaDexProvider implements MangaProviderInterface
             ];
         }
 
-        $isVercel = isset($_ENV['VERCEL']) || isset($_SERVER['VERCEL']) || env('VERCEL');
+        $maxBytes = 20 * 1024 * 1024;
+        $currentUrl = $url;
+        $content = null;
+        $contentType = null;
+        $httpCode = 0;
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 12);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
-        if (!$isVercel && !empty($this->dnsResolves)) {
-            curl_setopt($ch, CURLOPT_RESOLVE, $this->dnsResolves);
+        // Follow redirects manually so every hop can be validated against SSRF.
+        for ($hop = 0; $hop <= 3; $hop++) {
+            $parts = parse_url($currentUrl);
+            $scheme = strtolower($parts['scheme'] ?? '');
+            $host = strtolower($parts['host'] ?? '');
+
+            if (! in_array($scheme, ['http', 'https'], true) || $host === '') {
+                return null;
+            }
+
+            $ip = $this->resolvePublicIp($host);
+            if ($ip === null) {
+                Log::warning("Proxy blocked non-public image host: {$host}");
+
+                return null;
+            }
+
+            $port = $parts['port'] ?? ($scheme === 'https' ? 443 : 80);
+
+            $ch = curl_init($currentUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 12);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 6);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+            curl_setopt($ch, CURLOPT_MAXREDIRS, 0);
+            curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+            curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+            curl_setopt($ch, CURLOPT_MAXFILESIZE, $maxBytes);
+
+            // Pin the request to the already validated IP to avoid DNS rebinding.
+            if (filter_var($host, FILTER_VALIDATE_IP) === false) {
+                curl_setopt($ch, CURLOPT_RESOLVE, ["{$host}:{$port}:{$ip}"]);
+            }
+
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
+            curl_setopt($ch, CURLOPT_REFERER, $this->refererFor($host, $currentUrl));
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+            ]);
+
+            $body = curl_exec($ch);
+            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $redirectUrl = curl_getinfo($ch, CURLINFO_REDIRECT_URL);
+            curl_close($ch);
+
+            if (in_array($httpCode, [301, 302, 303, 307, 308], true) && is_string($redirectUrl) && $redirectUrl !== '') {
+                $currentUrl = $redirectUrl;
+
+                continue;
+            }
+
+            if ($body !== false) {
+                $content = $body;
+            }
+
+            break;
         }
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
-        
-        $referer = 'https://mangadex.org/';
-        if (str_contains($url, 'komiku') || str_contains($host, 'komiku')) {
-            $referer = 'https://komiku.org/';
-        } elseif (str_contains($url, 'mangapill') || str_contains($url, 'readdetectiveconan') || str_contains($host, 'readdetectiveconan')) {
-            $referer = 'https://mangapill.com/';
-        } elseif (str_contains($url, 'manganato') || str_contains($host, 'manganato')) {
-            $referer = 'https://readmanganato.com/';
-        } elseif (str_contains($url, 'komikindo') || str_contains($host, 'komikindo')) {
-            $referer = 'https://komikindo.tv/';
-        } elseif (str_contains($url, 'bacakomik') || str_contains($host, 'bacakomik')) {
-            $referer = 'https://bacakomik.my/';
-        } elseif (str_contains($url, 'westmanga') || str_contains($host, 'westmanga')) {
-            $referer = 'https://westmanga.site/';
+
+        if ($content === null || $httpCode >= 400 || strlen($content) < 500) {
+            return null;
         }
-        curl_setopt($ch, CURLOPT_REFERER, $referer);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        ]);
 
-        $content = curl_exec($ch);
-        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        if (strlen($content) > $maxBytes) {
+            Log::warning("Proxy rejected oversized image for URL: {$url}");
 
-        if ($content === false || $httpCode >= 400 || strlen($content) < 500) {
             return null;
         }
 
         // Validate that response is actually an image and not HTML / bot challenge
         $headerSnippet = strtolower(substr($content, 0, 300));
-        if (str_contains($headerSnippet, '<!doctype') || 
-            str_contains($headerSnippet, '<html') || 
+        if (str_contains($headerSnippet, '<!doctype') ||
+            str_contains($headerSnippet, '<html') ||
             str_contains($headerSnippet, '<?xml') ||
             str_contains($headerSnippet, 'browser verification')) {
             Log::warning("Proxy received non-image/HTML response for URL: {$url}");
+
             return null;
         }
 
@@ -524,6 +565,70 @@ class MangaDexProvider implements MangaProviderInterface
     }
 
     /**
+     * Resolve a hostname to a public IP, rejecting private, loopback and
+     * link-local address ranges so the image proxy cannot reach the
+     * internal network (SSRF protection).
+     */
+    protected function resolvePublicIp(string $host): ?string
+    {
+        $host = strtolower(trim($host));
+
+        if ($host === '' || $host === 'localhost'
+            || str_ends_with($host, '.localhost')
+            || str_ends_with($host, '.local')
+            || str_ends_with($host, '.internal')) {
+            return null;
+        }
+
+        $candidates = [];
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            $candidates[] = $host;
+        } else {
+            // Honour the pinned DNS map used to bypass ISP-level DNS blocking.
+            foreach ($this->dnsResolves as $entry) {
+                $parts = explode(':', $entry, 3);
+                if (count($parts) === 3 && strcasecmp($parts[0], $host) === 0) {
+                    $candidates[] = $parts[2];
+                }
+            }
+
+            if (empty($candidates)) {
+                $candidates = gethostbynamel($host) ?: [];
+
+                if (empty($candidates)) {
+                    $records = @dns_get_record($host, DNS_AAAA) ?: [];
+                    $candidates = array_column($records, 'ipv6');
+                }
+            }
+        }
+
+        foreach ($candidates as $ip) {
+            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                return $ip;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Pick the referer header that matches the image host.
+     */
+    protected function refererFor(string $host, string $url): string
+    {
+        return match (true) {
+            str_contains($url, 'komiku') || str_contains($host, 'komiku') => 'https://komiku.org/',
+            str_contains($url, 'mangapill') || str_contains($url, 'readdetectiveconan') || str_contains($host, 'readdetectiveconan') => 'https://mangapill.com/',
+            str_contains($url, 'manganato') || str_contains($host, 'manganato') => 'https://readmanganato.com/',
+            str_contains($url, 'komikindo') || str_contains($host, 'komikindo') => 'https://komikindo.tv/',
+            str_contains($url, 'bacakomik') || str_contains($host, 'bacakomik') => 'https://bacakomik.my/',
+            str_contains($url, 'westmanga') || str_contains($host, 'westmanga') => 'https://westmanga.site/',
+            default => 'https://mangadex.org/',
+        };
+    }
+
+    /**
      * Fetch cover image by title from Kitsu API (cached for 24 hours).
      */
     public function getCoverByTitle(string $title): ?string
@@ -533,10 +638,11 @@ class MangaDexProvider implements MangaProviderInterface
             return null;
         }
 
-        $cacheKey = 'cover_by_title_' . md5($cleanTitle);
+        $cacheKey = 'cover_by_title_'.md5($cleanTitle);
+
         return Cache::remember($cacheKey, 86400, function () use ($cleanTitle) {
             try {
-                $ch = curl_init('https://kitsu.io/api/edge/manga?filter%5Btext%5D=' . urlencode($cleanTitle) . '&page%5Blimit%5D=1');
+                $ch = curl_init('https://kitsu.io/api/edge/manga?filter%5Btext%5D='.urlencode($cleanTitle).'&page%5Blimit%5D=1');
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($ch, CURLOPT_TIMEOUT, 4);
                 curl_setopt($ch, CURLOPT_USERAGENT, 'BiblioManga/1.0');
@@ -544,12 +650,13 @@ class MangaDexProvider implements MangaProviderInterface
                 curl_close($ch);
                 if ($res) {
                     $json = json_decode($res, true);
+
                     return $json['data'][0]['attributes']['posterImage']['large']
                         ?? $json['data'][0]['attributes']['posterImage']['medium']
                         ?? null;
                 }
             } catch (\Throwable $e) {
-                Log::debug("Kitsu cover lookup failed for {$cleanTitle}: " . $e->getMessage());
+                Log::debug("Kitsu cover lookup failed for {$cleanTitle}: ".$e->getMessage());
             }
 
             return null;
@@ -565,34 +672,34 @@ class MangaDexProvider implements MangaProviderInterface
         $attr = $manga['attributes'] ?? [];
 
         // Title resolution
-        $title = $attr['title']['en'] 
-            ?? $attr['title']['ja-ro'] 
+        $title = $attr['title']['en']
+            ?? $attr['title']['ja-ro']
             ?? (is_array($attr['title'] ?? null) ? reset($attr['title']) : 'Untitled');
 
         // Description resolution
-        $desc = $attr['description']['id'] 
-            ?? $attr['description']['en'] 
+        $desc = $attr['description']['id']
+            ?? $attr['description']['en']
             ?? (is_array($attr['description'] ?? null) ? reset($attr['description']) : 'Tidak ada sinopsis.');
 
         $desc = strip_tags(preg_replace('/\[(.*?)\]\(.*?\)/', '$1', (string) $desc));
 
         // 1. First priority: AniList high-resolution unblocked cover image
         $coverUrl = null;
-        $alId = !empty($attr['links']['al']) ? (int) $attr['links']['al'] : null;
-        if ($alId && !empty($alCovers[$alId])) {
+        $alId = ! empty($attr['links']['al']) ? (int) $attr['links']['al'] : null;
+        if ($alId && ! empty($alCovers[$alId])) {
             $coverUrl = $alCovers[$alId];
         }
 
         // 2. Second priority: Kitsu CDN poster by title
-        if (!$coverUrl && !empty($title)) {
+        if (! $coverUrl && ! empty($title)) {
             $coverUrl = $this->getCoverByTitle($title);
         }
 
         // 3. Third priority: MangaDex cover via relative proxy
-        if (!$coverUrl) {
+        if (! $coverUrl) {
             $coverFileName = null;
             foreach ($manga['relationships'] ?? [] as $rel) {
-                if ($rel['type'] === 'cover_art' && !empty($rel['attributes']['fileName'])) {
+                if ($rel['type'] === 'cover_art' && ! empty($rel['attributes']['fileName'])) {
                     $coverFileName = $rel['attributes']['fileName'];
                     break;
                 }
@@ -600,7 +707,7 @@ class MangaDexProvider implements MangaProviderInterface
 
             if ($coverFileName) {
                 $directCover = "https://uploads.mangadex.org/covers/{$id}/{$coverFileName}.512.jpg";
-                $coverUrl = "/manga/proxy/image?url=" . urlencode($directCover);
+                $coverUrl = '/manga/proxy/image?url='.urlencode($directCover);
             }
         }
 

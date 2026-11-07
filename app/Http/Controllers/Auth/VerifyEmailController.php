@@ -15,9 +15,7 @@ class VerifyEmailController extends Controller
     public function __invoke(EmailVerificationRequest $request): RedirectResponse
     {
         $user = $request->user();
-        $redirectTo = $user->isAdmin()
-            ? route('admin.dashboard')
-            : route('student.books.index');
+        $redirectTo = route('manga.index');
 
         if ($request->user()->hasVerifiedEmail()) {
             return redirect()->intended($redirectTo.'?verified=1');

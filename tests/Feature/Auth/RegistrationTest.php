@@ -16,5 +16,5 @@ test('new users can register', function () {
     ]);
 
     $this->assertAuthenticated();
-    $response->assertRedirect(route('student.books.index'));
+    $response->assertRedirect(route('manga.index'));
 });

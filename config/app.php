@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'BiblioCore'),
+    'name' => env('APP_NAME', 'BiblioManga'),
 
     /*
     |--------------------------------------------------------------------------

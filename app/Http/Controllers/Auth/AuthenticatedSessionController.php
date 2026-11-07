@@ -28,13 +28,7 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        $user = $request->user();
-
-        $redirectTo = $user && $user->isAdmin()
-            ? route('admin.dashboard')
-            : route('student.books.index');
-
-        return redirect()->intended($redirectTo);
+        return redirect()->intended(route('manga.index'));
     }
 
     /**

@@ -48,6 +48,6 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return redirect()->route('student.books.index');
+        return redirect()->route('manga.index');
     }
 }

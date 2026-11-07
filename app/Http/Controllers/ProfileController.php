@@ -16,15 +16,8 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): View
     {
-        // Get the authenticated user
-        $user = $request->user();
-        
-        // Get books liked by the user
-        $likedBooks = $user->likedBooks()->with('comments')->get();
-        
         return view('profile.edit', [
-            'user' => $user,
-            'likedBooks' => $likedBooks,
+            'user' => $request->user(),
         ]);
     }
 

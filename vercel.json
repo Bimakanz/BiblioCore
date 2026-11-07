@@ -30,7 +30,6 @@
     "APP_NAME": "BiblioManga",
     "APP_ENV": "production",
     "APP_DEBUG": "false",
-    "APP_KEY": "base64:6N67PnVD8KnMBGBEW/l5f3Lia2EHutS0KoUoKnSLr/8=",
     "VERCEL": "1",
     "APP_CONFIG_CACHE": "/tmp/config.php",
     "APP_EVENTS_CACHE": "/tmp/events.php",

@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ $title ?? 'Masuk | BiblioCore' }}</title>
+    <title>{{ $title ?? 'Masuk | BiblioManga' }}</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,29 +29,29 @@
                 <div class="space-y-6">
                     <span class="inline-flex items-center gap-2 rounded-full border border-[#f4bb7a] bg-white/80 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-[#b95d23]">
                         <span class="material-symbols-rounded text-sm">auto_stories</span>
-                        BiblioCore
+                        BiblioManga
                     </span>
                     <h1 class="text-4xl font-semibold leading-tight text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
-                        Sistem perpustakaan sekolah yang dirancang ulang untuk kolaborasi dan kurasi.
+                        Baca manga, manhwa, dan manhua favoritmu tanpa batas.
                     </h1>
                     <p class="text-sm leading-relaxed text-[#4c5b54]">
-                        Kelola arsip buku, pantau peminjaman, dan hadirkan rekomendasi koleksi dengan visual yang lebih hangat dan terarah.
+                        Katalog publik tetap terbuka tanpa login. Akun hanya diperlukan untuk mengelola profil dan preferensi bacaanmu.
                     </p>
                 </div>
 
                 <div class="mt-10 space-y-5 text-sm text-[#4c5b54]">
                     <div class="flex items-start gap-3 rounded-[1.75rem] border border-[#f4bb7a]/40 bg-white/80 px-4 py-3">
-                        <span class="material-symbols-rounded text-base text-[#f97316]">hub</span>
+                        <span class="material-symbols-rounded text-base text-[#f97316]">public</span>
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#b95d23]">Untuk admin</p>
-                            <p class="mt-1">Sinkronisasi data stok, peminjaman, dan pengembalian buku tanpa spreadsheet tambahan.</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#b95d23]">Akses publik</p>
+                            <p class="mt-1">Jelajahi dan baca chapter tanpa registrasi, login, ataupun biaya.</p>
                         </div>
                     </div>
                     <div class="flex items-start gap-3 rounded-[1.75rem] border border-[#0f766e]/40 bg-[#0f766e]/10 px-4 py-3">
                         <span class="material-symbols-rounded text-base text-[#0f766e]">bookmark_added</span>
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#0f766e]">Untuk siswa</p>
-                            <p class="mt-1">Temukan buku favoritmu, baca sinopsis, dan ajukan peminjaman dalam satu alur.</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#0f766e]">Untuk pembaca</p>
+                            <p class="mt-1">Simpan favorit dan riwayat bacaan langsung di perangkatmu.</p>
                         </div>
                     </div>
                 </div>
@@ -63,16 +63,16 @@
                         <span class="material-symbols-rounded text-2xl">lock</span>
                     </span>
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#6b766f]">Portal aman</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#6b766f]">Portal akun</p>
                         <h2 class="text-xl font-semibold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
-                            Masuk ke BiblioCore
+                            Masuk ke BiblioManga
                         </h2>
                     </div>
                 </div>
 
                 <div class="space-y-2 text-sm text-[#4c5b54]">
-                    <p>Gunakan akun admin atau siswa yang telah terdaftar untuk mengakses katalog internal.</p>
-                    <p class="text-xs text-[#9aa29a]">Belum punya akun? Hubungi petugas perpustakaan sekolah.</p>
+                    <p>Gunakan akun yang telah terdaftar untuk mengakses profilmu.</p>
+                    <p class="text-xs text-[#9aa29a]">Ingin membaca tanpa akun? Katalog publik tetap bisa diakses langsung.</p>
                 </div>
 
                 <div class="space-y-6 animate-fadeInUp">
@@ -80,7 +80,7 @@
                 </div>
 
                 <p class="pt-6 text-center text-xs text-[#9aa29a]">
-                    &copy; {{ now()->year }} BiblioCore • Sistem Peminjaman Buku berbasis Digital
+                    &copy; {{ now()->year }} BiblioManga • Pembaca Manga Online Gratis
                 </p>
             </div>
         </div>
