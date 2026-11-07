@@ -158,22 +158,22 @@
                 <!-- Language Tabs -->
                 <div class="flex items-center gap-1.5 rounded-full border border-[#dcd2bd] bg-[#fbf9f4] p-1">
                     <button type="button" @click="activeTab = 'id'"
-                            class="rounded-full px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1"
+                            class="rounded-full px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5"
                             :class="activeTab === 'id' ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#4c5b54] hover:text-[#0f766e]'">
-                        <span>🇮🇩 Indo</span>
-                        <span class="rounded-full bg-white/20 px-1.5 text-[10px]">{{ count($indoChapters) }}</span>
+                        <span>Indo</span>
+                        <span class="rounded-full bg-black/10 dark:bg-white/20 px-1.5 text-[10px]">{{ count($indoChapters) }}</span>
                     </button>
                     <button type="button" @click="activeTab = 'en'"
-                            class="rounded-full px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1"
+                            class="rounded-full px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5"
                             :class="activeTab === 'en' ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#4c5b54] hover:text-[#0f766e]'">
-                        <span>🇬🇧 English</span>
-                        <span class="rounded-full bg-white/20 px-1.5 text-[10px]">{{ count($enChapters) }}</span>
+                        <span>Eng</span>
+                        <span class="rounded-full bg-black/10 dark:bg-white/20 px-1.5 text-[10px]">{{ count($enChapters) }}</span>
                     </button>
                     <button type="button" @click="activeTab = 'all'"
-                            class="rounded-full px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1"
+                            class="rounded-full px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5"
                             :class="activeTab === 'all' ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#4c5b54] hover:text-[#0f766e]'">
                         <span>Semua</span>
-                        <span class="rounded-full bg-white/20 px-1.5 text-[10px]">{{ count($allChapters) }}</span>
+                        <span class="rounded-full bg-black/10 dark:bg-white/20 px-1.5 text-[10px]">{{ count($allChapters) }}</span>
                     </button>
                 </div>
             </div>
@@ -190,7 +190,7 @@
                             $isExt = !empty($chap['externalUrl']);
                             $readUrl = $isExt ? $chap['externalUrl'] : route('manga.read', ['id' => $manga['id'], 'chapterId' => $chap['id']]);
                             $target = $isExt ? 'target="_blank"' : '';
-                            $langFlag = $chap['language'] === 'id' ? '🇮🇩 ID' : ($chap['language'] === 'en' ? '🇬🇧 EN' : strtoupper($chap['language']));
+                            $langFlag = $chap['language'] === 'id' ? 'Indo' : ($chap['language'] === 'en' ? 'Eng' : strtoupper($chap['language']));
 
                             $html .= '<div class="group flex items-center justify-between gap-4 rounded-2xl border border-[#eaddc2] bg-[#fbf9f4] p-3.5 transition hover:border-[#0f766e] hover:bg-white hover:shadow-sm">
                                 <div class="min-w-0">

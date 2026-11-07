@@ -51,19 +51,22 @@ class MangaPillProvider
     }
 
     /**
-     * Fetch English chapters from MangaPill.
+     * Fetch English chapters from MangaPill with strict title matching.
      */
     public function getChapters(string $title, array $altTitles = []): array
     {
-        $cacheKey = 'mangapill_ch_' . md5($title);
+        $cacheKey = 'mangapill_ch_v2_' . md5($title);
 
         return Cache::remember($cacheKey, 3600, function () use ($title, $altTitles) {
+            $normalize = fn(string $s) => strtolower(trim(preg_replace('/[^a-z0-9]/', '', $s)));
+            $targetNorms = array_values(array_filter(array_map($normalize, array_merge([$title], $altTitles))));
+
             $searchQueries = [$title];
             foreach (array_slice($altTitles, 0, 3) as $alt) {
                 $searchQueries[] = $alt;
             }
 
-            $candidateUrls = [];
+            $candidateList = [];
             foreach ($searchQueries as $q) {
                 $cleanQ = trim(preg_replace('/[^a-zA-Z0-9\s]/', '', $q));
                 if (empty($cleanQ)) continue;
@@ -72,25 +75,55 @@ class MangaPillProvider
                 $html = $this->request($searchUrl);
                 if (!$html) continue;
 
-                preg_match_all('/<a[^>]+href="(\/manga\/\d+\/[^"]+)"/i', $html, $matches);
-                foreach ($matches[1] ?? [] as $mUrl) {
-                    $candidateUrls[] = $mUrl;
+                preg_match_all('/<a[^>]+href="(\/manga\/\d+\/([^"]+))"[^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER);
+                foreach ($matches as $m) {
+                    $mPath = $m[1];
+                    $mSlug = $m[2];
+                    $mText = trim(strip_tags($m[3]));
+
+                    $bestScore = 0;
+                    $slugNorm = $normalize($mSlug);
+                    $textNorm = $normalize($mText);
+
+                    foreach ($targetNorms as $tNorm) {
+                        if ($tNorm === $slugNorm || $tNorm === $textNorm) {
+                            $bestScore = max($bestScore, 100);
+                            break;
+                        }
+                        similar_text($tNorm, $slugNorm, $pctSlug);
+                        similar_text($tNorm, $textNorm, $pctText);
+                        $bestScore = max($bestScore, $pctSlug, $pctText);
+                    }
+
+                    // Only candidates with at least 70% similarity are accepted
+                    if ($bestScore >= 70) {
+                        $candidateList[$mPath] = max($candidateList[$mPath] ?? 0, $bestScore);
+                    }
                 }
             }
 
-            $candidateUrls = array_values(array_unique($candidateUrls));
-            if (empty($candidateUrls)) {
+            if (empty($candidateList)) {
                 return [];
             }
 
+            // Sort candidates by highest similarity score first
+            arsort($candidateList);
+
             $bestChapters = [];
-            foreach (array_slice($candidateUrls, 0, 3) as $mangaPath) {
+            $highestScore = reset($candidateList);
+
+            foreach ($candidateList as $mangaPath => $score) {
+                // If candidate is substantially worse than best match, skip
+                if ($score < ($highestScore - 15)) {
+                    continue;
+                }
+
                 $url = "{$this->baseUrl}{$mangaPath}";
                 $html = $this->request($url);
                 if (!$html) continue;
 
                 preg_match_all('/<a[^>]+href="(\/chapters\/([0-9\-]+)\/[^"]+)"[^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER);
-                if (count($matches) > count($bestChapters)) {
+                if (!empty($matches)) {
                     $chapters = [];
                     foreach ($matches as $m) {
                         $path = $m[1];
@@ -112,7 +145,14 @@ class MangaPillProvider
                             'readPath' => $path,
                         ];
                     }
-                    $bestChapters = $chapters;
+
+                    if ($score >= 90) {
+                        return $chapters;
+                    }
+
+                    if (count($chapters) > count($bestChapters)) {
+                        $bestChapters = $chapters;
+                    }
                 }
             }
 

@@ -129,6 +129,21 @@ class AniListProvider
             }
 
             $list = array_map([$this, 'formatMangaCard'], $pageData['media']);
+            
+            // Deduplicate by normalized title to prevent identical cards (e.g. Manga vs Novel format of same title)
+            $deduped = [];
+            $seenTitles = [];
+            foreach ($list as $item) {
+                $norm = strtolower(preg_replace('/[^a-z0-9]/', '', $item['title'] ?? ''));
+                if (!empty($norm) && !isset($seenTitles[$norm])) {
+                    $seenTitles[$norm] = true;
+                    $deduped[] = $item;
+                } elseif (empty($norm)) {
+                    $deduped[] = $item;
+                }
+            }
+            $list = $deduped;
+
             $total = $pageData['pageInfo']['total'] ?? count($list);
             $totalPages = $pageData['pageInfo']['lastPage'] ?? ceil($total / $limit);
 
@@ -213,6 +228,21 @@ class AniListProvider
             }
 
             $list = array_map([$this, 'formatMangaCard'], $pageData['media']);
+            
+            // Deduplicate by normalized title to prevent identical cards (e.g. Manga vs Novel format of same title)
+            $deduped = [];
+            $seenTitles = [];
+            foreach ($list as $item) {
+                $norm = strtolower(preg_replace('/[^a-z0-9]/', '', $item['title'] ?? ''));
+                if (!empty($norm) && !isset($seenTitles[$norm])) {
+                    $seenTitles[$norm] = true;
+                    $deduped[] = $item;
+                } elseif (empty($norm)) {
+                    $deduped[] = $item;
+                }
+            }
+            $list = $deduped;
+
             $total = $pageData['pageInfo']['total'] ?? count($list);
             $totalPages = $pageData['pageInfo']['lastPage'] ?? ceil($total / $limit);
 

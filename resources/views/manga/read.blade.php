@@ -32,14 +32,14 @@
     </style>
 </head>
 <body x-data="{
-        mode: localStorage.getItem('reader_mode') || 'webtoon',
-        widthMode: localStorage.getItem('reader_width') || 'normal', // 'compact', 'normal', 'full'
-        quality: localStorage.getItem('reader_quality') || 'hd', // 'hd' or 'saver'
+        mode: localStorage.getItem('reader_mode') || 'paged',
+        widthMode: localStorage.getItem('reader_width') || 'normal',
+        quality: localStorage.getItem('reader_quality') || 'hd',
         currentPage: 1,
         totalPages: {{ $totalPages }},
         progress: 0,
-        showTopBar: true,
-        lastScrollTop: 0,
+        showMenu: false,
+        isFullscreen: false,
         nextChapterUrl: @js($nextChapter ? route('manga.read', ['id' => $manga['id'], 'chapterId' => $nextChapter['id']]) : null),
         prevChapterUrl: @js($prevChapter ? route('manga.read', ['id' => $manga['id'], 'chapterId' => $prevChapter['id']]) : null),
         
@@ -61,6 +61,10 @@
             } catch(e) {}
         },
         
+        toggleMode() {
+            this.mode = (this.mode === 'paged') ? 'webtoon' : 'paged';
+            localStorage.setItem('reader_mode', this.mode);
+        },
         setMode(newMode) {
             this.mode = newMode;
             localStorage.setItem('reader_mode', newMode);
@@ -79,7 +83,6 @@
                 this.currentPage++;
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } else if (this.nextChapterUrl) {
-                // Di panel manga terakhir: otomatis lompat ke chapter selanjutnya!
                 window.location.href = this.nextChapterUrl;
             }
         },
@@ -93,9 +96,13 @@
         },
         toggleFullscreen() {
             if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(() => {});
+                document.documentElement.requestFullscreen().then(() => {
+                    this.isFullscreen = true;
+                }).catch(() => {});
             } else {
-                document.exitFullscreen().catch(() => {});
+                document.exitFullscreen().then(() => {
+                    this.isFullscreen = false;
+                }).catch(() => {});
             }
         },
         scrollToTop() {
@@ -109,149 +116,134 @@
             this.progress = Math.min(100, Math.round(((h[st]||b[st]) / ((h[sh]||b[sh]) - h.clientHeight)) * 100)) || 0;
         }
       }"
+      @fullscreenchange.window="isFullscreen = !!document.fullscreenElement"
       @scroll.window="updateProgress()"
       @keydown.right.window="if(mode === 'paged') nextPage()"
       @keydown.left.window="if(mode === 'paged') prevPage()"
-      class="min-h-screen selection:bg-[#0f766e] selection:text-white antialiased">
+      @keydown.escape.window="showMenu = false"
+      class="min-h-screen bg-[#08090a] selection:bg-[#0f766e] selection:text-white antialiased">
 
     <!-- Thin Reading Progress Bar at the very top -->
-    <div class="fixed top-0 left-0 right-0 z-50 h-1 bg-white/10">
+    <div class="fixed top-0 left-0 right-0 z-40 h-1 bg-white/10 pointer-events-none">
         <div class="h-full bg-gradient-to-r from-[#0f766e] to-[#f97316] transition-all duration-150"
              :style="'width: ' + (mode === 'webtoon' ? progress : ((currentPage / totalPages) * 100)) + '%'"></div>
     </div>
 
-    <!-- Sticky Navigation & Control Bar -->
-    <header class="sticky top-0 z-40 border-b border-white/10 bg-[#14171c]/95 backdrop-blur-md px-3 py-2.5 sm:px-6 transition-all duration-200">
-        <div class="mx-auto flex max-w-7xl items-center justify-between gap-2 sm:gap-4">
-            
-            <!-- Left: Back button & Manga Title -->
-            <div class="flex items-center gap-2.5 min-w-0">
-                <a href="{{ route('manga.show', $manga['id']) }}"
-                   class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20 hover:scale-105"
-                   title="Kembali ke Detail Manga">
-                    <span class="material-symbols-rounded text-lg">arrow_back</span>
-                </a>
-                
-                <div class="min-w-0">
-                    <h1 class="text-xs sm:text-sm font-bold text-white truncate max-w-[160px] sm:max-w-xs md:max-w-md" style="font-family: 'Space Grotesk', sans-serif;">
-                        {{ $manga['title'] }}
-                    </h1>
-                    <div class="flex items-center gap-1.5 text-[11px] text-[#2dd4bf] font-medium">
-                        <span>Chapter {{ $currentChapter['chapter'] }}</span>
-                        @if($currentChapter['title'])
-                            <span class="text-white/30">•</span>
-                            <span class="text-white/60 truncate max-w-[130px] hidden sm:inline">{{ $currentChapter['title'] }}</span>
-                        @endif
-                        <span class="text-white/30">•</span>
-                        <span class="text-white/50 text-[10px] uppercase font-bold">{{ strtoupper($currentChapter['language']) }}</span>
-                    </div>
-                </div>
-            </div>
+    <!-- ==============================================
+         OVERLAY CONTROLS (Muncul saat tekan tengah layar)
+         ============================================== -->
 
-            <!-- Center: Chapter Selector Dropdown -->
-            <div class="hidden md:flex items-center gap-1.5">
-                @if($prevChapter && empty($prevChapter['externalUrl']))
-                    <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $prevChapter['id']]) }}"
-                       class="rounded-lg p-1.5 bg-white/10 text-white/80 hover:bg-white/20 transition"
-                       title="Chapter Sebelumnya">
-                        <span class="material-symbols-rounded text-base block">chevron_left</span>
-                    </a>
-                @endif
+    <!-- 1. Top Chapter Pill: < Ch. X / Y > -->
+    <div x-show="showMenu"
+         x-cloak
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 -translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 -translate-y-4"
+         class="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-2xl bg-[#14171d]/95 backdrop-blur-md border border-white/10 px-4 py-2.5 shadow-2xl">
+        
+        <!-- Prev Chapter Button -->
+        @if($prevChapter && empty($prevChapter['externalUrl']))
+            <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $prevChapter['id']]) }}"
+               @click.stop
+               class="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 text-white/80 hover:bg-white/15 hover:text-white transition"
+               title="Chapter Sebelumnya">
+                <span class="material-symbols-rounded text-lg">chevron_left</span>
+            </a>
+        @else
+            <span class="flex h-8 w-8 items-center justify-center rounded-xl text-white/20 cursor-not-allowed">
+                <span class="material-symbols-rounded text-lg">chevron_left</span>
+            </span>
+        @endif
 
-                <select onchange="window.location.href=this.value"
-                        class="rounded-xl border border-white/20 bg-[#1c2027] px-3 py-1.5 text-xs font-semibold text-white focus:border-[#0f766e] focus:outline-none">
-                    @foreach($sameLangChapters ?? $allChapters as $chap)
-                        @if(empty($chap['externalUrl']))
-                            <option value="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $chap['id']]) }}"
-                                    {{ $chap['id'] === $currentChapter['id'] ? 'selected' : '' }}>
-                                Ch. {{ $chap['chapter'] }} [{{ strtoupper($chap['language']) }}] {{ $chap['title'] ? ' - ' . Str::limit($chap['title'], 22) : '' }}
-                            </option>
-                        @endif
-                    @endforeach
-                </select>
-
-                @if($nextChapter && empty($nextChapter['externalUrl']))
-                    <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $nextChapter['id']]) }}"
-                       class="rounded-lg p-1.5 bg-white/10 text-white/80 hover:bg-white/20 transition"
-                       title="Chapter Selanjutnya">
-                        <span class="material-symbols-rounded text-base block">chevron_right</span>
-                    </a>
-                @endif
-            </div>
-
-            <!-- Right: Controls (Reading Mode, Width, Quality, Fullscreen) -->
-            <div class="flex items-center gap-1.5 sm:gap-2">
-                
-                <!-- Mode Switcher -->
-                <div class="flex items-center rounded-xl bg-white/10 p-0.5 text-xs">
-                    <button type="button" @click="setMode('webtoon')"
-                            :class="mode === 'webtoon' ? 'bg-[#0f766e] text-white shadow-sm' : 'text-white/60 hover:text-white'"
-                            class="rounded-lg px-2 py-1 text-[11px] font-bold transition flex items-center gap-1"
-                            title="Mode Webtoon (Vertikal Scroll)">
-                        <span class="material-symbols-rounded text-sm">view_stream</span>
-                        <span class="hidden lg:inline">Webtoon</span>
-                    </button>
-                    <button type="button" @click="setMode('paged')"
-                            :class="mode === 'paged' ? 'bg-[#0f766e] text-white shadow-sm' : 'text-white/60 hover:text-white'"
-                            class="rounded-lg px-2 py-1 text-[11px] font-bold transition flex items-center gap-1"
-                            title="Mode Slide (Halaman Tunggal)">
-                        <span class="material-symbols-rounded text-sm">auto_stories</span>
-                        <span class="hidden lg:inline">Slide</span>
-                    </button>
-                </div>
-
-                <!-- Width Adjuster (for Webtoon mode) -->
-                <div class="hidden sm:flex items-center rounded-xl bg-white/10 p-0.5 text-[10px]" x-show="mode === 'webtoon'">
-                    <button type="button" @click="setWidth('compact')"
-                            :class="widthMode === 'compact' ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white'"
-                            class="rounded-lg px-2 py-1 font-semibold transition" title="Lebar Ringkas (720px)">
-                        720p
-                    </button>
-                    <button type="button" @click="setWidth('normal')"
-                            :class="widthMode === 'normal' ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white'"
-                            class="rounded-lg px-2 py-1 font-semibold transition" title="Lebar Normal (960px)">
-                        960p
-                    </button>
-                    <button type="button" @click="setWidth('full')"
-                            :class="widthMode === 'full' ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white'"
-                            class="rounded-lg px-2 py-1 font-semibold transition" title="Layar Penuh">
-                        100%
-                    </button>
-                </div>
-
-                <!-- Quality Toggle Button -->
-                <button type="button" @click="toggleQuality()"
-                        class="rounded-xl px-2.5 py-1 text-[11px] font-bold border transition hidden sm:inline-flex items-center gap-1"
-                        :class="quality === 'hd' ? 'border-[#0f766e]/40 bg-[#0f766e]/15 text-[#2dd4bf]' : 'border-amber-500/40 bg-amber-500/15 text-amber-300'"
-                        :title="quality === 'hd' ? 'Kualitas HD (Asli). Klik untuk mode Hemat Kuota.' : 'Mode Hemat Kuota Aktif. Klik untuk Kualitas HD.'">
-                    <span class="material-symbols-rounded text-xs" x-text="quality === 'hd' ? 'hd' : 'speed'"></span>
-                    <span x-text="quality === 'hd' ? 'HD' : 'Hemat'"></span>
-                </button>
-
-                <!-- Fullscreen Toggle -->
-                <button type="button" @click="toggleFullscreen()"
-                        class="rounded-xl bg-white/10 p-1.5 text-white/80 hover:bg-white/20 hover:text-white transition"
-                        title="Layar Penuh">
-                    <span class="material-symbols-rounded text-lg block">fullscreen</span>
-                </button>
-            </div>
-
+        <!-- Chapter Display -->
+        <div class="px-2 select-none text-center">
+            <span class="text-xs sm:text-sm font-bold text-white tracking-wide" style="font-family: 'Space Grotesk', sans-serif;">
+                Ch. {{ $currentChapter['chapter'] }}
+            </span>
+            @php
+                $latestChapNum = !empty($sameLangChapters[0]['chapter']) ? $sameLangChapters[0]['chapter'] : count($sameLangChapters);
+            @endphp
+            <span class="text-xs sm:text-sm text-white/40 font-medium">
+                / {{ $latestChapNum }}
+            </span>
         </div>
-    </header>
+
+        <!-- Next Chapter Button -->
+        @if($nextChapter && empty($nextChapter['externalUrl']))
+            <a href="{{ route('manga.read', ['id' => $manga['id'], 'chapterId' => $nextChapter['id']]) }}"
+               @click.stop
+               class="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 text-white/80 hover:bg-white/15 hover:text-white transition"
+               title="Chapter Selanjutnya">
+                <span class="material-symbols-rounded text-lg">chevron_right</span>
+            </a>
+        @else
+            <span class="flex h-8 w-8 items-center justify-center rounded-xl text-white/20 cursor-not-allowed">
+                <span class="material-symbols-rounded text-lg">chevron_right</span>
+            </span>
+        @endif
+
+    </div>
+
+    <!-- 2. Right Floating Vertical Action Bar -->
+    <div x-show="showMenu"
+         x-cloak
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 translate-x-4"
+         x-transition:enter-end="opacity-100 translate-x-0"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 translate-x-0"
+         x-transition:leave-end="opacity-0 translate-x-4"
+         class="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center rounded-2xl bg-[#14171d]/95 backdrop-blur-md border border-white/10 p-2 gap-3 shadow-2xl">
+        
+        <!-- Tombol Back to Home -->
+        <a href="{{ route('manga.index') }}"
+           @click.stop
+           class="flex h-10 w-10 items-center justify-center rounded-xl text-white/80 hover:bg-white/15 hover:text-white transition"
+           title="Kembali ke Beranda">
+            <span class="material-symbols-rounded text-2xl">home</span>
+        </a>
+
+        <!-- Tombol Reading Mode Toggle (Bentuk Buku Terbuka: Slide <=> Webtoon) -->
+        <button type="button"
+                @click.stop="toggleMode()"
+                :title="mode === 'paged' ? 'Mode: Slide (Klik untuk ganti ke Webtoon)' : 'Mode: Webtoon (Klik untuk ganti ke Slide)'"
+                class="flex h-10 w-10 items-center justify-center rounded-xl transition hover:bg-white/15 relative"
+                :class="mode === 'paged' ? 'text-[#2dd4bf] bg-white/10' : 'text-white/80 hover:text-white'">
+            <span class="material-symbols-rounded text-2xl">menu_book</span>
+            <span class="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full"
+                  :class="mode === 'paged' ? 'bg-[#2dd4bf]' : 'bg-amber-400'"></span>
+        </button>
+
+        <!-- Tombol Kembali ke Detail Manga / Chapter List -->
+        <a href="{{ route('manga.show', $manga['id']) }}"
+           @click.stop
+           class="flex h-10 w-10 items-center justify-center rounded-xl text-white/80 hover:bg-white/15 hover:text-white transition"
+           title="Detail Manga & Daftar Chapter">
+            <span class="material-symbols-rounded text-2xl">format_list_bulleted</span>
+        </a>
+
+        <!-- Tombol Fullscreen -->
+        <button type="button"
+                @click.stop="toggleFullscreen()"
+                title="Layar Penuh"
+                class="flex h-10 w-10 items-center justify-center rounded-xl text-white/80 hover:bg-white/15 hover:text-white transition">
+            <span class="material-symbols-rounded text-2xl" x-text="isFullscreen ? 'fullscreen_exit' : 'fullscreen'">fullscreen</span>
+        </button>
+
+    </div>
 
     <!-- Reader Canvas -->
-    <main class="min-h-screen py-4 sm:py-8 px-0 sm:px-4">
+    <main class="min-h-screen py-0 px-0">
         
         <!-- ==============================================
              MODE 1: WEBTOON (Continuous Seamless Scroll)
              ============================================== -->
         <div x-show="mode === 'webtoon'"
-             class="mx-auto transition-all duration-300"
-             :class="{
-                'max-w-2xl': widthMode === 'compact',
-                'max-w-4xl': widthMode === 'normal',
-                'max-w-full': widthMode === 'full'
-             }">
+             @click="showMenu = !showMenu"
+             class="mx-auto transition-all duration-300 max-w-4xl cursor-pointer">
 
             <!-- Manga Panels Stack -->
             <div class="flex flex-col items-center">
@@ -274,11 +266,9 @@
                             },
                             handleError() {
                                 if (!this.failed) {
-                                    // First error: silently switch to proxy without showing error card
                                     this.failed = true;
                                     this.src = this.fallbackSrc;
                                 } else {
-                                    // Both direct and proxy failed: now show error
                                     this.showError = true;
                                 }
                             },
@@ -307,12 +297,12 @@
                              class="w-full h-auto block select-none pointer-events-none transition-opacity duration-300 shadow-sm"
                              :class="loaded ? 'opacity-100' : 'opacity-0'" />
 
-                        <!-- Error fallback box (hanya muncul jika direct & proxy keduanya benar-benar gagal) -->
+                        <!-- Error fallback box -->
                         <div x-show="showError && !loaded"
                              class="absolute inset-0 flex flex-col items-center justify-center p-6 bg-[#1a1315] text-center space-y-2">
                             <span class="material-symbols-rounded text-2xl text-amber-500">broken_image</span>
                             <p class="text-xs text-white/80">Halaman {{ $p['page'] }} terhambat koneksi.</p>
-                            <button type="button" @click="retry()"
+                            <button type="button" @click.stop="retry()"
                                     class="rounded-full bg-[#0f766e] px-4 py-1.5 text-xs font-bold text-white transition hover:bg-[#115e59]">
                                 Coba Muat Ulang
                             </button>
@@ -325,20 +315,28 @@
         </div>
 
         <!-- ==============================================
-             MODE 2: SLIDE / PAGED (Pure Image Focus - No Box/No Border)
+             MODE 2: SLIDE / PAGED (Pure Image Focus - Borderless)
              ============================================== -->
-        <div x-show="mode === 'paged'" class="relative min-h-[85vh] flex flex-col items-center justify-center w-full select-none py-1">
+        <div x-show="mode === 'paged'" class="relative min-h-screen flex flex-col items-center justify-center w-full select-none">
             
-            <!-- Click Areas (Left 30% = Prev, Right 70% = Next) -->
-            <div class="fixed inset-y-16 left-0 w-1/3 z-20 cursor-default"
+            <!-- Click Areas:
+                 Left 30%: Previous Page
+                 Middle 40%: Toggle Menu
+                 Right 30%: Next Page -->
+            <div class="fixed inset-y-0 left-0 w-[30%] z-20 cursor-default"
                  @click="prevPage()"
-                 title="Halaman Sebelumnya (Panah Kiri)"></div>
-            <div class="fixed inset-y-16 right-0 w-2/3 z-20 cursor-default"
-                 @click="nextPage()"
-                 title="Halaman Berikutnya (Panah Kanan)"></div>
+                 title="Halaman Sebelumnya (Klik / Panah Kiri)"></div>
+            
+            <div class="fixed inset-y-0 left-[30%] w-[40%] z-20 cursor-pointer"
+                 @click="showMenu = !showMenu"
+                 title="Menu Navigasi (Ketuk Tengah Layar)"></div>
 
-            <!-- The Pure Manga Image (Borderless, Frameless, 100% Focused) -->
-            <div class="relative w-full flex items-center justify-center">
+            <div class="fixed inset-y-0 right-0 w-[30%] z-20 cursor-default"
+                 @click="nextPage()"
+                 title="Halaman Berikutnya (Klik / Panah Kanan)"></div>
+
+            <!-- The Pure Manga Image -->
+            <div class="relative w-full flex items-center justify-center min-h-screen">
                 @foreach($pages as $p)
                     <div x-show="currentPage === {{ $p['page'] }}"
                          x-cloak
@@ -383,15 +381,15 @@
                              referrerpolicy="no-referrer"
                              x-on:load="pLoaded = true; pShowError = false"
                              x-on:error="handleError()"
-                             class="max-h-[88vh] sm:max-h-[93vh] w-auto max-w-full object-contain block transition-opacity duration-200 select-none shadow-2xl"
+                             class="max-h-screen w-auto max-w-full object-contain block transition-opacity duration-200 select-none shadow-2xl pointer-events-none"
                              :class="pLoaded ? 'opacity-100' : 'opacity-0'" />
 
                         <!-- Error fallback in Slide mode -->
                         <div x-show="pShowError && !pLoaded"
-                             class="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-3">
+                             class="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-3 z-30">
                             <span class="material-symbols-rounded text-3xl text-amber-500">broken_image</span>
                             <p class="text-xs text-white/80">Halaman {{ $p['page'] }} terhambat koneksi.</p>
-                            <button type="button" @click="retry()"
+                            <button type="button" @click.stop="retry()"
                                     class="rounded-full bg-[#0f766e] px-4 py-1.5 text-xs font-bold text-white transition hover:bg-[#115e59]">
                                 Coba Muat Ulang
                             </button>
@@ -403,9 +401,9 @@
 
     </main>
 
-    <!-- Floating Scroll-To-Top Button -->
-    <button type="button" @click="scrollToTop()"
-            x-show="progress > 15"
+    <!-- Floating Scroll-To-Top Button (Hanya di mode Webtoon) -->
+    <button type="button" @click.stop="scrollToTop()"
+            x-show="mode === 'webtoon' && progress > 15"
             x-transition
             class="fixed bottom-6 right-6 z-40 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0f766e] text-white shadow-xl shadow-[#0f766e]/40 transition hover:scale-110 hover:bg-[#115e59]"
             title="Kembali ke Atas">

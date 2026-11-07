@@ -70,27 +70,52 @@ class MangaService
      */
     public function search(string $query, int $page = 1, int $limit = 24, ?string $category = null, ?string $genre = null): array
     {
+        $result = null;
         try {
             $result = $this->aniListProvider->search($query, $page, $limit, $category, $genre);
-            if (!empty($result['data'])) {
-                return $result;
-            }
         } catch (\Throwable $e) {
             Log::warning("AniList search failed: " . $e->getMessage());
         }
 
-        try {
-            return $this->mangaDexProvider->search($query, $page, $limit, $category, $genre);
-        } catch (\Throwable $e) {
-            Log::error("MangaService search error: " . $e->getMessage());
-            return [
-                'data' => [],
-                'total' => 0,
-                'page' => $page,
-                'limit' => $limit,
-                'totalPages' => 1,
-            ];
+        if (empty($result['data'])) {
+            try {
+                $result = $this->mangaDexProvider->search($query, $page, $limit, $category, $genre);
+            } catch (\Throwable $e) {
+                Log::error("MangaService search error: " . $e->getMessage());
+                return [
+                    'data' => [],
+                    'total' => 0,
+                    'page' => $page,
+                    'limit' => $limit,
+                    'totalPages' => 1,
+                ];
+            }
         }
+
+        if (!empty($result['data'])) {
+            // Deduplicate cards by normalized title across sources
+            $deduped = [];
+            $seenTitles = [];
+            foreach ($result['data'] as $item) {
+                $norm = strtolower(preg_replace('/[^a-z0-9]/', '', $item['title'] ?? ''));
+                if (!empty($norm) && !isset($seenTitles[$norm])) {
+                    $seenTitles[$norm] = true;
+                    $deduped[] = $item;
+                } elseif (empty($norm)) {
+                    $deduped[] = $item;
+                }
+            }
+            $result['data'] = $deduped;
+            return $result;
+        }
+
+        return [
+            'data' => [],
+            'total' => 0,
+            'page' => $page,
+            'limit' => $limit,
+            'totalPages' => 1,
+        ];
     }
 
     /**
@@ -163,9 +188,18 @@ class MangaService
             try {
                 $dexId = $id;
                 if (str_starts_with($id, 'al_') || is_numeric($id)) {
-                    $search = $this->mangaDexProvider->search($title, 1, 1);
-                    if (!empty($search['data'][0]['id'])) {
-                        $dexId = $search['data'][0]['id'];
+                    $search = $this->mangaDexProvider->search($title, 1, 5);
+                    if (!empty($search['data'])) {
+                        $normalize = fn(string $s) => strtolower(trim(preg_replace('/[^a-z0-9]/', '', $s)));
+                        $targetNorm = $normalize($title);
+                        foreach ($search['data'] as $cand) {
+                            $candNorm = $normalize($cand['title'] ?? '');
+                            similar_text($targetNorm, $candNorm, $pct);
+                            if ($targetNorm === $candNorm || $pct >= 65) {
+                                $dexId = $cand['id'];
+                                break;
+                            }
+                        }
                     }
                 }
                 if ($dexId && !str_starts_with($dexId, 'al_')) {

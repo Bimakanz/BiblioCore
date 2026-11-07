@@ -51,13 +51,16 @@ class MangaNatoProvider
     }
 
     /**
-     * Search and get chapters from MangaNato.
+     * Search and get chapters from MangaNato with strict title matching.
      */
     public function getChapters(string $title, array $altTitles = []): array
     {
-        $cacheKey = 'manganato_ch_' . md5($title);
+        $cacheKey = 'manganato_ch_v2_' . md5($title);
 
         return Cache::remember($cacheKey, 3600, function () use ($title, $altTitles) {
+            $normalize = fn(string $s) => strtolower(trim(preg_replace('/[^a-z0-9]/', '', $s)));
+            $targetNorms = array_values(array_filter(array_map($normalize, array_merge([$title], $altTitles))));
+
             $slug = strtolower(trim(preg_replace('/[^a-zA-Z0-9\s]/', '', $title)));
             $slug = preg_replace('/\s+/', '_', $slug);
 
@@ -67,14 +70,40 @@ class MangaNatoProvider
                 return [];
             }
 
-            // Find first search result
-            preg_match('/<a[^>]+class="item-img[^"]*"[^>]+href="([^"]+)"/i', $html, $firstMatch);
-            if (empty($firstMatch[1])) {
+            // Find candidate search results
+            preg_match_all('/<a[^>]+class="item-img[^"]*"[^>]+href="([^"]+)"[^>]+title="([^"]+)"/i', $html, $matches, PREG_SET_ORDER);
+            if (empty($matches)) {
+                preg_match_all('/<a[^>]+class="item-title[^"]*"[^>]+href="([^"]+)"[^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER);
+            }
+
+            $bestUrl = null;
+            $bestScore = 0;
+
+            foreach ($matches as $m) {
+                $candUrl = $m[1];
+                $candTitle = trim(strip_tags($m[2]));
+                $candNorm = $normalize($candTitle);
+
+                foreach ($targetNorms as $tNorm) {
+                    if ($tNorm === $candNorm) {
+                        $bestScore = 100;
+                        $bestUrl = $candUrl;
+                        break 2;
+                    }
+                    similar_text($tNorm, $candNorm, $pct);
+                    if ($pct > $bestScore) {
+                        $bestScore = $pct;
+                        $bestUrl = $candUrl;
+                    }
+                }
+            }
+
+            // Reject if similarity is below 70%
+            if (!$bestUrl || $bestScore < 70) {
                 return [];
             }
 
-            $detailUrl = $firstMatch[1];
-            $detailHtml = $this->request($detailUrl);
+            $detailHtml = $this->request($bestUrl);
             if (!$detailHtml) {
                 return [];
             }
