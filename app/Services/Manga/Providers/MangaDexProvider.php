@@ -59,10 +59,9 @@ class MangaDexProvider implements MangaProviderInterface
             if ($useResolve && !empty($this->dnsResolves)) {
                 curl_setopt($ch, CURLOPT_RESOLVE, $this->dnsResolves);
             }
-            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
+            curl_setopt($ch, CURLOPT_USERAGENT, 'BiblioManga/1.0.0 (https://github.com/Bimakanz/BiblioCore; contact@bibliomanga.app)');
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 'Accept: application/json',
-                'Referer: https://mangadex.org/',
             ]);
 
             $response = curl_exec($ch);
