@@ -3,6 +3,7 @@
 namespace App\Services\Manga;
 
 use App\Services\Manga\Contracts\MangaProviderInterface;
+use App\Services\Manga\Providers\AniListProvider;
 use App\Services\Manga\Providers\MangaDexProvider;
 use App\Services\Manga\Providers\KomikuProvider;
 use App\Services\Manga\Providers\KomikIndoProvider;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Log;
 
 class MangaService
 {
+    protected AniListProvider $aniListProvider;
     protected MangaDexProvider $mangaDexProvider;
     protected KomikuProvider $komikuProvider;
     protected KomikIndoProvider $komikIndoProvider;
@@ -20,12 +22,14 @@ class MangaService
     protected MangaNatoProvider $mangaNatoProvider;
 
     public function __construct(
+        ?AniListProvider $aniList = null,
         ?MangaDexProvider $mangaDex = null,
         ?KomikuProvider $komiku = null,
         ?KomikIndoProvider $komikIndo = null,
         ?MangaPillProvider $mangaPill = null,
         ?MangaNatoProvider $mangaNato = null
     ) {
+        $this->aniListProvider = $aniList ?? new AniListProvider();
         $this->mangaDexProvider = $mangaDex ?? new MangaDexProvider();
         $this->komikuProvider = $komiku ?? new KomikuProvider();
         $this->komikIndoProvider = $komikIndo ?? new KomikIndoProvider();
@@ -38,13 +42,24 @@ class MangaService
      */
     public function getPopular(int $page = 1, int $limit = 24, ?string $category = 'popular', ?string $genre = null): array
     {
+        // 1. Primary Global Catalog: AniList GraphQL (Fast, 100% reliable covers, never blocked by Cloudflare/datacenter IPs)
+        try {
+            $result = $this->aniListProvider->getPopular($page, $limit, $category, $genre);
+            if (!empty($result['data'])) {
+                return $result;
+            }
+        } catch (\Throwable $e) {
+            Log::warning("AniList getPopular failed: " . $e->getMessage());
+        }
+
+        // 2. Secondary Catalog: MangaDex
         try {
             $result = $this->mangaDexProvider->getPopular($page, $limit, $category, $genre);
             if (!empty($result['data'])) {
                 return $result;
             }
         } catch (\Throwable $e) {
-            Log::error("MangaService getPopular error: " . $e->getMessage());
+            Log::warning("MangaDex getPopular failed: " . $e->getMessage());
         }
 
         return $this->getFallbackCatalog($page, $limit);
@@ -55,6 +70,15 @@ class MangaService
      */
     public function search(string $query, int $page = 1, int $limit = 24, ?string $category = null, ?string $genre = null): array
     {
+        try {
+            $result = $this->aniListProvider->search($query, $page, $limit, $category, $genre);
+            if (!empty($result['data'])) {
+                return $result;
+            }
+        } catch (\Throwable $e) {
+            Log::warning("AniList search failed: " . $e->getMessage());
+        }
+
         try {
             return $this->mangaDexProvider->search($query, $page, $limit, $category, $genre);
         } catch (\Throwable $e) {
@@ -74,13 +98,24 @@ class MangaService
      */
     public function getDetail(string $id): ?array
     {
+        if (str_starts_with($id, 'al_') || is_numeric($id)) {
+            try {
+                $manga = $this->aniListProvider->getDetail($id);
+                if ($manga) {
+                    return $manga;
+                }
+            } catch (\Throwable $e) {
+                Log::warning("AniList getDetail failed for {$id}: " . $e->getMessage());
+            }
+        }
+
         try {
             $manga = $this->mangaDexProvider->getDetail($id);
             if ($manga && !empty($manga['title'])) {
                 return $manga;
             }
         } catch (\Throwable $e) {
-            Log::error("MangaService getDetail error: " . $e->getMessage());
+            Log::warning("MangaDex getDetail failed for {$id}: " . $e->getMessage());
         }
 
         // Fallback detail from catalog to prevent 404
@@ -116,7 +151,7 @@ class MangaService
      */
     public function getChapters(string $id, ?string $language = null): array
     {
-        $cacheKey = "aggregated_v2_chapters_{$id}_{$language}";
+        $cacheKey = "aggregated_v3_chapters_{$id}_{$language}";
 
         return Cache::remember($cacheKey, 1800, function () use ($id, $language) {
             $manga = $this->getDetail($id);
@@ -126,9 +161,18 @@ class MangaService
             // 1. Primary Source: MangaDex Chapters (EN & ID)
             $dexChapters = [];
             try {
-                $dexChapters = $this->mangaDexProvider->getChapters($id, $language);
-                foreach ($dexChapters as &$dc) {
-                    $dc['provider'] = 'MangaDex';
+                $dexId = $id;
+                if (str_starts_with($id, 'al_') || is_numeric($id)) {
+                    $search = $this->mangaDexProvider->search($title, 1, 1);
+                    if (!empty($search['data'][0]['id'])) {
+                        $dexId = $search['data'][0]['id'];
+                    }
+                }
+                if ($dexId && !str_starts_with($dexId, 'al_')) {
+                    $dexChapters = $this->mangaDexProvider->getChapters($dexId, $language);
+                    foreach ($dexChapters as &$dc) {
+                        $dc['provider'] = 'MangaDex';
+                    }
                 }
             } catch (\Throwable $e) {
                 Log::warning("MangaDex chapter fetch failed for {$id}: " . $e->getMessage());
