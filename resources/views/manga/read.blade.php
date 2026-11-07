@@ -260,6 +260,7 @@
                          x-data="{
                             loaded: false,
                             failed: false,
+                            showError: false,
                             src: '{{ $p['directUrl'] ?? $p['url'] ?? '' }}',
                             fallbackSrc: '{{ $p['proxyUrl'] ?? route('manga.proxy.image', ['url' => $p['directUrl'] ?? $p['url'] ?? '']) }}',
                             saverSrc: '{{ $p['saverUrl'] ?? $p['directUrl'] ?? $p['url'] ?? '' }}',
@@ -273,15 +274,19 @@
                             },
                             handleError() {
                                 if (!this.failed) {
-                                    // First fallback: Switch to proxy
+                                    // First error: silently switch to proxy without showing error card
                                     this.failed = true;
                                     this.src = this.fallbackSrc;
+                                } else {
+                                    // Both direct and proxy failed: now show error
+                                    this.showError = true;
                                 }
                             },
                             retry() {
                                 this.loaded = false;
-                                this.failed = false;
-                                this.src = this.fallbackSrc + '&retry=' + Date.now();
+                                this.failed = true;
+                                this.showError = false;
+                                this.src = this.fallbackSrc + (this.fallbackSrc.includes('?') ? '&' : '?') + 'retry=' + Date.now();
                             }
                          }">
                         
@@ -302,8 +307,8 @@
                              class="w-full h-auto block select-none pointer-events-none transition-opacity duration-300 shadow-sm"
                              :class="loaded ? 'opacity-100' : 'opacity-0'" />
 
-                        <!-- Error fallback box (hanya muncul jika direct & proxy gagal) -->
-                        <div x-show="failed && !loaded"
+                        <!-- Error fallback box (hanya muncul jika direct & proxy keduanya benar-benar gagal) -->
+                        <div x-show="showError && !loaded"
                              class="absolute inset-0 flex flex-col items-center justify-center p-6 bg-[#1a1315] text-center space-y-2">
                             <span class="material-symbols-rounded text-2xl text-amber-500">broken_image</span>
                             <p class="text-xs text-white/80">Halaman {{ $p['page'] }} terhambat koneksi.</p>
@@ -341,6 +346,7 @@
                          x-data="{
                             pLoaded: false,
                             pFailed: false,
+                            pShowError: false,
                             pSrc: '{{ $p['directUrl'] ?? $p['url'] ?? '' }}',
                             pFallbackSrc: '{{ $p['proxyUrl'] ?? route('manga.proxy.image', ['url' => $p['directUrl'] ?? $p['url'] ?? '']) }}',
                             init() {
@@ -353,7 +359,15 @@
                                 if (!this.pFailed) {
                                     this.pFailed = true;
                                     this.pSrc = this.pFallbackSrc;
+                                } else {
+                                    this.pShowError = true;
                                 }
+                            },
+                            retry() {
+                                this.pLoaded = false;
+                                this.pFailed = true;
+                                this.pShowError = false;
+                                this.pSrc = this.pFallbackSrc + (this.pFallbackSrc.includes('?') ? '&' : '?') + 'retry=' + Date.now();
                             }
                          }">
                         
@@ -367,10 +381,21 @@
                         <img :src="pSrc"
                              alt="Halaman {{ $p['page'] }}"
                              referrerpolicy="no-referrer"
-                             x-on:load="pLoaded = true"
+                             x-on:load="pLoaded = true; pShowError = false"
                              x-on:error="handleError()"
                              class="max-h-[88vh] sm:max-h-[93vh] w-auto max-w-full object-contain block transition-opacity duration-200 select-none shadow-2xl"
                              :class="pLoaded ? 'opacity-100' : 'opacity-0'" />
+
+                        <!-- Error fallback in Slide mode -->
+                        <div x-show="pShowError && !pLoaded"
+                             class="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-3">
+                            <span class="material-symbols-rounded text-3xl text-amber-500">broken_image</span>
+                            <p class="text-xs text-white/80">Halaman {{ $p['page'] }} terhambat koneksi.</p>
+                            <button type="button" @click="retry()"
+                                    class="rounded-full bg-[#0f766e] px-4 py-1.5 text-xs font-bold text-white transition hover:bg-[#115e59]">
+                                Coba Muat Ulang
+                            </button>
+                        </div>
                     </div>
                 @endforeach
             </div>

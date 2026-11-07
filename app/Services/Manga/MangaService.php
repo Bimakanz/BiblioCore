@@ -151,9 +151,9 @@ class MangaService
      */
     public function getChapters(string $id, ?string $language = null): array
     {
-        $cacheKey = "aggregated_v3_chapters_{$id}_{$language}";
+        $cacheKey = "aggregated_v4_chapters_{$id}_{$language}";
 
-        return Cache::remember($cacheKey, 1800, function () use ($id, $language) {
+        return Cache::remember($cacheKey, 43200, function () use ($id, $language) {
             $manga = $this->getDetail($id);
             $title = $manga['title'] ?? '';
             $altTitles = $manga['altTitles'] ?? [];

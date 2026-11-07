@@ -40,7 +40,7 @@ class MangaDexProvider implements MangaProviderInterface
     /**
      * Helper to perform cURL requests to MangaDex with DoH DNS resolve fallback.
      */
-    protected function request(string $endpoint, array $params = [], int $timeout = 10): ?array
+    protected function request(string $endpoint, array $params = [], int $timeout = 5): ?array
     {
         $url = $this->apiBase . $endpoint;
         if (!empty($params)) {
@@ -435,7 +435,7 @@ class MangaDexProvider implements MangaProviderInterface
     public function fetchImage(string $url): ?array
     {
         $host = parse_url($url, PHP_URL_HOST);
-        if (!$host || (!str_contains($host, 'mangadex.org') && !str_contains($host, 'mangadex.network') && !str_contains($host, 'anilist.co'))) {
+        if (!$host || !filter_var($url, FILTER_VALIDATE_URL)) {
             return null;
         }
 
@@ -462,7 +462,7 @@ class MangaDexProvider implements MangaProviderInterface
 
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 12);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
         if (!$isVercel && !empty($this->dnsResolves)) {
@@ -471,12 +471,14 @@ class MangaDexProvider implements MangaProviderInterface
         curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
         
         $referer = 'https://mangadex.org/';
-        if (str_contains($url, 'komiku')) {
+        if (str_contains($url, 'komiku') || str_contains($host, 'komiku')) {
             $referer = 'https://komiku.org/';
-        } elseif (str_contains($url, 'mangapill') || str_contains($url, 'readdetectiveconan')) {
+        } elseif (str_contains($url, 'mangapill') || str_contains($url, 'readdetectiveconan') || str_contains($host, 'readdetectiveconan')) {
             $referer = 'https://mangapill.com/';
-        } elseif (str_contains($url, 'manganato')) {
+        } elseif (str_contains($url, 'manganato') || str_contains($host, 'manganato')) {
             $referer = 'https://readmanganato.com/';
+        } elseif (str_contains($url, 'komikindo') || str_contains($host, 'komikindo')) {
+            $referer = 'https://komikindo.tv/';
         }
         curl_setopt($ch, CURLOPT_REFERER, $referer);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
