@@ -7,7 +7,7 @@
   "functions": {
     "api/index.php": {
       "runtime": "vercel-php@0.7.4",
-      "maxDuration": 30
+      "maxDuration": 60
     }
   },
   "routes": [
@@ -44,6 +44,7 @@
     "REDIS_TIMEOUT": "2",
     "REDIS_READ_TIMEOUT": "2",
     "REDIS_MAX_RETRIES": "1",
+    "CHAPTERS_TIME_BUDGET": "12",
     "SESSION_DRIVER": "cookie",
     "LOG_CHANNEL": "stderr",
     "DB_CONNECTION": "sqlite",

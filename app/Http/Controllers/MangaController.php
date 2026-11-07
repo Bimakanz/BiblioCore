@@ -118,8 +118,9 @@ class MangaController extends Controller
         }
 
         $failed = false;
+        $partial = false;
         try {
-            $chapters = $this->mangaService->getChapters($id, $language) ?: [];
+            $chapters = $this->mangaService->getChapters($id, $language, $partial) ?: [];
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error("chaptersJson failed for {$id}: ".$e->getMessage());
             $chapters = [];
@@ -127,11 +128,17 @@ class MangaController extends Controller
         }
 
         $payload = $this->buildChapterPayload($chapters, $id);
+        $payload['partial'] = $partial;
 
-        // Do not let a transient upstream failure poison the edge cache.
-        $cacheControl = ($failed || empty($chapters))
-            ? 'public, max-age=0, s-maxage=60, stale-while-revalidate=60'
-            : 'public, max-age=300, s-maxage=43200, stale-while-revalidate=86400';
+        // Do not let a transient upstream failure poison the edge cache, and
+        // keep partial lists on a short TTL so the next request can enrich them.
+        if ($failed || empty($chapters)) {
+            $cacheControl = 'no-store';
+        } elseif ($partial) {
+            $cacheControl = 'public, max-age=10, s-maxage=30, stale-while-revalidate=30';
+        } else {
+            $cacheControl = 'public, max-age=300, s-maxage=43200, stale-while-revalidate=86400';
+        }
 
         return response()
             ->json($payload)

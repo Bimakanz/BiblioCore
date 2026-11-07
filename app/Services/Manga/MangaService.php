@@ -187,43 +187,68 @@ class MangaService
      * 3 Indonesian sources (Komiku, KomikIndo, MangaDex ID).
      * If one source has missing or DMCA'd chapters, other sources complement each other.
      */
-    public function getChapters(string $id, ?string $language = null): array
+    public function getChapters(string $id, ?string $language = null, ?bool &$partial = null): array
     {
+        $partial = false;
         $langKey = $language ?: 'all';
         $cacheKey = "aggregated_v4_chapters_{$id}_{$langKey}";
 
-        $chapters = Cache::remember($cacheKey, 43200, function () use ($id, $language) {
+        $cached = Cache::get($cacheKey);
+        if (is_array($cached) && ! empty($cached)) {
+            return $cached;
+        }
+
+        // Hard time budget: we would rather return a partial list than let the
+        // serverless function hit its timeout (which produces a 504 and no
+        // cache at all). Provider-level caches make the next attempt much
+        // cheaper, so partial results still converge quickly.
+        $startedAt = microtime(true);
+        $budget = (float) env('CHAPTERS_TIME_BUDGET', 15);
+        $deadlineHit = false;
+        $hasTime = function () use ($startedAt, $budget, &$deadlineHit): bool {
+            if ((microtime(true) - $startedAt) >= $budget) {
+                $deadlineHit = true;
+
+                return false;
+            }
+
+            return true;
+        };
+
+        $chapters = (function () use ($id, $language, $hasTime, &$deadlineHit) {
             $manga = $this->getDetail($id);
             $title = $manga['title'] ?? '';
             $altTitles = $manga['altTitles'] ?? [];
 
             // 1. Primary Source: MangaDex Chapters (EN & ID)
             $dexChapters = [];
-            try {
-                $dexId = $id;
-                if (str_starts_with($id, 'al_') || is_numeric($id)) {
-                    $search = $this->mangaDexProvider->search($title, 1, 5);
-                    if (!empty($search['data'])) {
-                        $normalize = fn(string $s) => strtolower(trim(preg_replace('/[^a-z0-9]/', '', $s)));
-                        $targetNorm = $normalize($title);
-                        foreach ($search['data'] as $cand) {
-                            $candNorm = $normalize($cand['title'] ?? '');
-                            similar_text($targetNorm, $candNorm, $pct);
-                            if ($targetNorm === $candNorm || $pct >= 65) {
-                                $dexId = $cand['id'];
-                                break;
+            if ($hasTime()) {
+                try {
+                    $dexId = $id;
+                    if (str_starts_with($id, 'al_') || is_numeric($id)) {
+                        $search = $this->mangaDexProvider->search($title, 1, 5);
+                        if (! empty($search['data'])) {
+                            $normalize = fn (string $s) => strtolower(trim(preg_replace('/[^a-z0-9]/', '', $s)));
+                            $targetNorm = $normalize($title);
+                            foreach ($search['data'] as $cand) {
+                                $candNorm = $normalize($cand['title'] ?? '');
+                                similar_text($targetNorm, $candNorm, $pct);
+                                if ($targetNorm === $candNorm || $pct >= 65) {
+                                    $dexId = $cand['id'];
+                                    break;
+                                }
                             }
                         }
                     }
-                }
-                if ($dexId && !str_starts_with($dexId, 'al_')) {
-                    $dexChapters = $this->mangaDexProvider->getChapters($dexId, $language);
-                    foreach ($dexChapters as &$dc) {
-                        $dc['provider'] = 'MangaDex';
+                    if ($dexId && ! str_starts_with($dexId, 'al_')) {
+                        $dexChapters = $this->mangaDexProvider->getChapters($dexId, $language);
+                        foreach ($dexChapters as &$dc) {
+                            $dc['provider'] = 'MangaDex';
+                        }
                     }
+                } catch (\Throwable $e) {
+                    Log::warning("MangaDex chapter fetch failed for {$id}: ".$e->getMessage());
                 }
-            } catch (\Throwable $e) {
-                Log::warning("MangaDex chapter fetch failed for {$id}: " . $e->getMessage());
             }
 
             // Count what MangaDex already delivered. When it has a healthy
@@ -235,10 +260,10 @@ class MangaService
 
             // 2. Indonesian Sources (Komiku + KomikIndo + WestManga + Bacakomik + Shinigami ID)
             $indoChapters = [];
-            if ((!$language || $language === 'id') && $dexIndoCount < $enoughChapters) {
+            if ((! $language || $language === 'id') && $dexIndoCount < $enoughChapters && $hasTime()) {
                 // Indonesian Source 1: Komiku
                 try {
-                    if (count($indoChapters) + $dexIndoCount < $enoughChapters) {
+                    if ($hasTime() && count($indoChapters) + $dexIndoCount < $enoughChapters) {
                         $komiku = $this->komikuProvider->getChapters($title, $altTitles);
                         $indoChapters = array_merge($indoChapters, $komiku);
                     }
@@ -248,7 +273,7 @@ class MangaService
 
                 // Indonesian Source 2: KomikIndo
                 try {
-                    if (count($indoChapters) + $dexIndoCount < $enoughChapters) {
+                    if ($hasTime() && count($indoChapters) + $dexIndoCount < $enoughChapters) {
                         $komikindo = $this->komikIndoProvider->getChapters($title, $altTitles);
                         $indoChapters = array_merge($indoChapters, $komikindo);
                     }
@@ -258,7 +283,7 @@ class MangaService
 
                 // Indonesian Source 3: MultiSource (Bacakomik, WestManga)
                 try {
-                    if (count($indoChapters) + $dexIndoCount < $enoughChapters) {
+                    if ($hasTime() && count($indoChapters) + $dexIndoCount < $enoughChapters) {
                         $multiId = $this->multiSourceProvider->getIndoChapters($title, $altTitles);
                         $indoChapters = array_merge($indoChapters, $multiId);
                     }
@@ -269,10 +294,10 @@ class MangaService
 
             // 3. English Sources (MangaPill + MangaNato + WeebCentral + MangaHere)
             $enChapters = [];
-            if ((!$language || $language === 'en') && $dexEnCount < $enoughChapters) {
+            if ((! $language || $language === 'en') && $dexEnCount < $enoughChapters && $hasTime()) {
                 // English Source 1: MangaPill (comprehensive English archive)
                 try {
-                    if (count($enChapters) + $dexEnCount < $enoughChapters) {
+                    if ($hasTime() && count($enChapters) + $dexEnCount < $enoughChapters) {
                         $mp = $this->mangaPillProvider->getChapters($title, $altTitles);
                         $enChapters = array_merge($enChapters, $mp);
                     }
@@ -282,7 +307,7 @@ class MangaService
 
                 // English Source 2: WeebCentral & MangaHere
                 try {
-                    if (count($enChapters) + $dexEnCount < $enoughChapters) {
+                    if ($hasTime() && count($enChapters) + $dexEnCount < $enoughChapters) {
                         $multiEn = $this->multiSourceProvider->getEnglishChapters($title, $altTitles);
                         $enChapters = array_merge($enChapters, $multiEn);
                     }
@@ -292,7 +317,7 @@ class MangaService
 
                 // English Source 3: MangaNato (fallback)
                 try {
-                    if (count($enChapters) + $dexEnCount < $enoughChapters) {
+                    if ($hasTime() && count($enChapters) + $dexEnCount < $enoughChapters) {
                         $nato = $this->mangaNatoProvider->getChapters($title, $altTitles);
                         $enChapters = array_merge($enChapters, $nato);
                     }
@@ -333,27 +358,34 @@ class MangaService
                 return ($numA < $numB) ? 1 : -1;
             });
 
+            $ttl = $deadlineHit ? 300 : 43200;
+
             // If fetching all languages, also prime individual language caches
-            if (!$language) {
-                $indoCh = array_values(array_filter($merged, fn($c) => ($c['language'] ?? '') === 'id'));
-                $enCh = array_values(array_filter($merged, fn($c) => ($c['language'] ?? '') === 'en'));
-                Cache::put("aggregated_v4_chapters_{$id}_id", $indoCh, 43200);
-                Cache::put("aggregated_v4_chapters_{$id}_en", $enCh, 43200);
+            if (! $language) {
+                $indoCh = array_values(array_filter($merged, fn ($c) => ($c['language'] ?? '') === 'id'));
+                $enCh = array_values(array_filter($merged, fn ($c) => ($c['language'] ?? '') === 'en'));
+                Cache::put("aggregated_v4_chapters_{$id}_id", $indoCh, $ttl);
+                Cache::put("aggregated_v4_chapters_{$id}_en", $enCh, $ttl);
             }
 
             // Filter by requested language if specified
             if ($language && in_array($language, ['id', 'en'])) {
-                $merged = array_values(array_filter($merged, fn($c) => ($c['language'] ?? '') === $language));
+                $merged = array_values(array_filter($merged, fn ($c) => ($c['language'] ?? '') === $language));
             }
 
             return $merged;
-        });
+        })();
 
         // Never keep an empty aggregation around: a transient upstream failure
         // should be retried on the next visit instead of sticking for 12 hours.
         if (empty($chapters)) {
             Cache::forget($cacheKey);
+        } else {
+            // Partial results expire quickly so the next request can finish the job.
+            Cache::put($cacheKey, $chapters, $deadlineHit ? 300 : 43200);
         }
+
+        $partial = $deadlineHit;
 
         return $chapters;
     }

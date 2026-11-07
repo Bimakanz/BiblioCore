@@ -8,17 +8,24 @@
             chapterData: @js($chapterPayload),
             loading: @js(! $chaptersPreloaded),
             loadError: false,
+            retries: 0,
             visibleLimit: 80,
             init() {
                 if (this.loading) {
                     this.fetchChapters();
                 }
             },
-            async fetchChapters() {
-                this.loading = true;
+            async fetchChapters(silent = false) {
+                if (!silent) {
+                    this.loading = true;
+                }
                 this.loadError = false;
                 try {
-                    const response = await fetch(this.chaptersUrl, { headers: { 'Accept': 'application/json' } });
+                    // Silent retries bypass the CDN so we get the enriched list.
+                    const url = silent
+                        ? this.chaptersUrl + (this.chaptersUrl.includes('?') ? '&' : '?') + '_r=' + Date.now()
+                        : this.chaptersUrl;
+                    const response = await fetch(url, { headers: { 'Accept': 'application/json' }, cache: silent ? 'no-store' : 'default' });
                     if (!response.ok) {
                         throw new Error('HTTP ' + response.status);
                     }
@@ -28,10 +35,20 @@
                     } else if (this.chapterData.counts.en > 0) {
                         this.activeTab = 'en';
                     }
+                    // The server hit its time budget: poll a couple of times so
+                    // the list keeps filling in without a manual refresh.
+                    if (this.chapterData.partial && this.retries < 2) {
+                        this.retries++;
+                        setTimeout(() => this.fetchChapters(true), 5000 * this.retries);
+                    }
                 } catch (e) {
-                    this.loadError = true;
+                    if (!silent) {
+                        this.loadError = true;
+                    }
                 } finally {
-                    this.loading = false;
+                    if (!silent) {
+                        this.loading = false;
+                    }
                 }
             },
             get counts() {
