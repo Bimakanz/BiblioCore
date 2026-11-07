@@ -80,6 +80,9 @@ class MangaController extends Controller
             abort(404, 'Manga tidak ditemukan.');
         }
 
+        // Cache manga detail explicitly for fast reader access
+        \Illuminate\Support\Facades\Cache::put("manga_detail_{$id}", $manga, 7200);
+
         $allChapters = $this->mangaService->getChapters($id);
 
         $indoChapters = array_values(array_filter($allChapters, fn($c) => $c['language'] === 'id'));
@@ -121,6 +124,7 @@ class MangaController extends Controller
                 'title' => 'Manga Reader',
                 'coverUrl' => '',
             ];
+            \Illuminate\Support\Facades\Cache::put("manga_detail_{$id}", $manga, 7200);
         }
 
         // 3. Current chapter metadata
@@ -135,7 +139,9 @@ class MangaController extends Controller
         // 4. Retrieve cached chapters for prev/next without running scrapers
         $currentLang = $currentChapter['language'];
         $cachedChapters = \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_{$currentLang}")
+            ?: \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_all")
             ?: \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_null")
+            ?: \Illuminate\Support\Facades\Cache::get("aggregated_v4_chapters_{$id}_")
             ?: [];
 
         $prevChapter = null;

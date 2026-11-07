@@ -253,15 +253,15 @@
                             loaded: false,
                             failed: false,
                             showError: false,
-                            src: '{{ $p['directUrl'] ?? $p['url'] ?? '' }}',
-                            fallbackSrc: '{{ $p['proxyUrl'] ?? route('manga.proxy.image', ['url' => $p['directUrl'] ?? $p['url'] ?? '']) }}',
-                            saverSrc: '{{ $p['saverUrl'] ?? $p['directUrl'] ?? $p['url'] ?? '' }}',
-                            proxySaverSrc: '{{ $p['proxySaverUrl'] ?? $p['proxyUrl'] ?? route('manga.proxy.image', ['url' => $p['directUrl'] ?? $p['url'] ?? '']) }}',
+                            src: '{{ $p['proxyUrl'] ?? route('manga.proxy.image', ['url' => $p['directUrl'] ?? $p['url'] ?? '']) }}',
+                            fallbackSrc: '{{ $p['directUrl'] ?? $p['url'] ?? '' }}',
+                            saverSrc: '{{ $p['proxySaverUrl'] ?? $p['proxyUrl'] ?? route('manga.proxy.image', ['url' => $p['directUrl'] ?? $p['url'] ?? '']) }}',
+                            fallbackSaverSrc: '{{ $p['saverUrl'] ?? $p['directUrl'] ?? $p['url'] ?? '' }}',
                             
                             init() {
                                 if (localStorage.getItem('reader_quality') === 'saver') {
                                     this.src = this.saverSrc;
-                                    this.fallbackSrc = this.proxySaverSrc;
+                                    this.fallbackSrc = this.fallbackSaverSrc;
                                 }
                             },
                             handleError() {
@@ -345,12 +345,12 @@
                             pLoaded: false,
                             pFailed: false,
                             pShowError: false,
-                            pSrc: '{{ $p['directUrl'] ?? $p['url'] ?? '' }}',
-                            pFallbackSrc: '{{ $p['proxyUrl'] ?? route('manga.proxy.image', ['url' => $p['directUrl'] ?? $p['url'] ?? '']) }}',
+                            pSrc: '{{ $p['proxyUrl'] ?? route('manga.proxy.image', ['url' => $p['directUrl'] ?? $p['url'] ?? '']) }}',
+                            pFallbackSrc: '{{ $p['directUrl'] ?? $p['url'] ?? '' }}',
                             init() {
                                 if (localStorage.getItem('reader_quality') === 'saver') {
-                                    this.pSrc = '{{ $p['saverUrl'] ?? $p['directUrl'] ?? $p['url'] ?? '' }}';
-                                    this.pFallbackSrc = '{{ $p['proxySaverUrl'] ?? $p['proxyUrl'] ?? route('manga.proxy.image', ['url' => $p['directUrl'] ?? $p['url'] ?? '']) }}';
+                                    this.pSrc = '{{ $p['proxySaverUrl'] ?? $p['proxyUrl'] ?? route('manga.proxy.image', ['url' => $p['directUrl'] ?? $p['url'] ?? '']) }}';
+                                    this.pFallbackSrc = '{{ $p['saverUrl'] ?? $p['directUrl'] ?? $p['url'] ?? '' }}';
                                 }
                             },
                             handleError() {

@@ -189,7 +189,8 @@ class MangaService
      */
     public function getChapters(string $id, ?string $language = null): array
     {
-        $cacheKey = "aggregated_v4_chapters_{$id}_{$language}";
+        $langKey = $language ?: 'all';
+        $cacheKey = "aggregated_v4_chapters_{$id}_{$langKey}";
 
         return Cache::remember($cacheKey, 43200, function () use ($id, $language) {
             $manga = $this->getDetail($id);
@@ -311,11 +312,6 @@ class MangaService
 
             $merged = array_values($uniqueMap);
 
-            // Filter by requested language if specified
-            if ($language && in_array($language, ['id', 'en'])) {
-                $merged = array_values(array_filter($merged, fn($c) => ($c['language'] ?? '') === $language));
-            }
-
             // Natural sort descending by chapter number
             usort($merged, function ($a, $b) {
                 $numA = (float) ($a['chapter'] ?? 0);
@@ -325,6 +321,19 @@ class MangaService
                 }
                 return ($numA < $numB) ? 1 : -1;
             });
+
+            // If fetching all languages, also prime individual language caches
+            if (!$language) {
+                $indoCh = array_values(array_filter($merged, fn($c) => ($c['language'] ?? '') === 'id'));
+                $enCh = array_values(array_filter($merged, fn($c) => ($c['language'] ?? '') === 'en'));
+                Cache::put("aggregated_v4_chapters_{$id}_id", $indoCh, 43200);
+                Cache::put("aggregated_v4_chapters_{$id}_en", $enCh, 43200);
+            }
+
+            // Filter by requested language if specified
+            if ($language && in_array($language, ['id', 'en'])) {
+                $merged = array_values(array_filter($merged, fn($c) => ($c['language'] ?? '') === $language));
+            }
 
             return $merged;
         });

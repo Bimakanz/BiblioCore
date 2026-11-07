@@ -23,8 +23,10 @@ class MangaNatoProvider
         $execute = function (bool $useResolve) use ($url): ?string {
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 2.5);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 4);
             curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
             if ($useResolve && !empty($this->dnsResolves)) {
                 curl_setopt($ch, CURLOPT_RESOLVE, $this->dnsResolves);
             }
@@ -148,7 +150,7 @@ class MangaNatoProvider
         }
 
         $cacheKey = 'nato_pages_' . md5($chapterId);
-        return Cache::remember($cacheKey, 600, function () use ($chapUrl, $chapterId) {
+        return Cache::remember($cacheKey, 7200, function () use ($chapUrl, $chapterId) {
             $html = $this->request($chapUrl);
             if (!$html) {
                 return null;

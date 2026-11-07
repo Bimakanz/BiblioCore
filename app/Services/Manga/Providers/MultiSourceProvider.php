@@ -20,7 +20,7 @@ class MultiSourceProvider
     /**
      * Resilient HTTP GET request with DoH resolution and fallback.
      */
-    protected function request(string $url, float|int $timeout = 2.5): ?string
+    protected function request(string $url, int $timeout = 4): ?string
     {
         $isVercel = isset($_ENV['VERCEL']) || isset($_SERVER['VERCEL']) || env('VERCEL');
 
@@ -29,6 +29,8 @@ class MultiSourceProvider
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
             curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
             if ($useResolve && !empty($this->dnsResolves)) {
                 curl_setopt($ch, CURLOPT_RESOLVE, $this->dnsResolves);
             }
@@ -324,7 +326,7 @@ class MultiSourceProvider
     {
         $cacheKey = 'multisrc_pages_' . md5($chapterId);
 
-        return Cache::remember($cacheKey, 600, function () use ($chapterId) {
+        return Cache::remember($cacheKey, 7200, function () use ($chapterId) {
             $prefix = explode('_', $chapterId)[0] ?? '';
             $url = null;
 

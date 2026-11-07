@@ -40,7 +40,7 @@ class MangaDexProvider implements MangaProviderInterface
     /**
      * Helper to perform cURL requests to MangaDex with DoH DNS resolve fallback.
      */
-    protected function request(string $endpoint, array $params = [], float|int $timeout = 2.5): ?array
+    protected function request(string $endpoint, array $params = [], int $timeout = 4): ?array
     {
         $url = $this->apiBase . $endpoint;
         if (!empty($params)) {
@@ -56,6 +56,8 @@ class MangaDexProvider implements MangaProviderInterface
             curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
             curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
             if ($useResolve && !empty($this->dnsResolves)) {
                 curl_setopt($ch, CURLOPT_RESOLVE, $this->dnsResolves);
             }
@@ -392,7 +394,7 @@ class MangaDexProvider implements MangaProviderInterface
     {
         $cacheKey = "mangadex_pages_{$chapterId}";
 
-        return Cache::remember($cacheKey, 600, function () use ($chapterId) {
+        return Cache::remember($cacheKey, 7200, function () use ($chapterId) {
             $raw = $this->request("/at-home/server/{$chapterId}");
             if (!$raw || empty($raw['baseUrl']) || empty($raw['chapter']['hash'])) {
                 return null;
@@ -482,6 +484,7 @@ class MangaDexProvider implements MangaProviderInterface
         }
         curl_setopt($ch, CURLOPT_REFERER, $referer);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
         ]);
