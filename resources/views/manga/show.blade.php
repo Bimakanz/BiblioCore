@@ -20,36 +20,112 @@
                     this.loading = true;
                 }
                 this.loadError = false;
-                try {
-                    // Silent retries bypass the CDN so we get the enriched list.
-                    const url = silent
-                        ? this.chaptersUrl + (this.chaptersUrl.includes('?') ? '&' : '?') + '_r=' + Date.now()
-                        : this.chaptersUrl;
-                    const response = await fetch(url, { headers: { 'Accept': 'application/json' }, cache: silent ? 'no-store' : 'default' });
+                const base = this.chaptersUrl;
+                const sep = base.includes('?') ? '&' : '?';
+                const bust = silent ? '&_r=' + Date.now() : '';
+                const payloads = [];
+                const apply = () => {
+                    if (!payloads.length) return;
+                    this.chapterData = this.mergePayloads(payloads);
+                    if (!silent) {
+                        // Only pick the default tab during the initial load; never
+                        // yank the user away from the tab they selected later.
+                        if (this.chapterData.counts.id > 0) {
+                            this.activeTab = 'id';
+                        } else if (this.chapterData.counts.en > 0) {
+                            this.activeTab = 'en';
+                        }
+                        this.loading = false;
+                    }
+                };
+                const load = (lang) => fetch(
+                    base + sep + 'lang=' + lang + bust,
+                    { headers: { 'Accept': 'application/json' }, cache: silent ? 'no-store' : 'default' }
+                ).then(response => {
                     if (!response.ok) {
                         throw new Error('HTTP ' + response.status);
                     }
-                    this.chapterData = await response.json();
-                    if (this.chapterData.counts.id > 0) {
-                        this.activeTab = 'id';
-                    } else if (this.chapterData.counts.en > 0) {
-                        this.activeTab = 'en';
-                    }
-                    // The server hit its time budget: poll a couple of times so
-                    // the list keeps filling in without a manual refresh.
-                    if (this.chapterData.partial && this.retries < 2) {
-                        this.retries++;
-                        setTimeout(() => this.fetchChapters(true), 5000 * this.retries);
-                    }
-                } catch (e) {
-                    if (!silent) {
-                        this.loadError = true;
-                    }
-                } finally {
+                    return response.json();
+                }).then(payload => {
+                    payloads.push(payload);
+                    apply();
+                    return payload;
+                });
+
+                // Two parallel requests: each language only scrapes its own
+                // sources, so a cold manga becomes readable in roughly half the
+                // time. The first response is rendered immediately.
+                const settled = await Promise.allSettled([load('id'), load('en')]);
+                if (!payloads.length) {
                     if (!silent) {
                         this.loading = false;
+                        this.loadError = true;
+                    }
+                    return;
+                }
+                apply();
+                // The server hit its time budget (or one language failed): poll
+                // a couple of times so the list keeps filling in without a
+                // manual refresh. Cached languages return instantly.
+                const incomplete = this.chapterData.partial || settled.some(r => r.status === 'rejected');
+                if (incomplete && this.retries < 2) {
+                    this.retries++;
+                    setTimeout(() => this.fetchChapters(true), 5000 * this.retries);
+                }
+            },
+            mergePayloads(payloads) {
+                const seen = new Set();
+                const chapters = [];
+                for (const payload of payloads) {
+                    for (const chapter of (payload.chapters || [])) {
+                        const key = (chapter.language || 'en') + '_' + (chapter.chapter || '0');
+                        if (seen.has(key)) {
+                            continue;
+                        }
+                        seen.add(key);
+                        chapters.push(chapter);
                     }
                 }
+                chapters.sort((a, b) => {
+                    const na = parseFloat(a.chapter) || 0;
+                    const nb = parseFloat(b.chapter) || 0;
+                    if (na === nb) {
+                        return String(a.language || '').localeCompare(String(b.language || ''));
+                    }
+                    return nb - na;
+                });
+                const counts = { all: 0, id: 0, en: 0 };
+                for (const payload of payloads) {
+                    counts.id = Math.max(counts.id, (payload.counts && payload.counts.id) || 0);
+                    counts.en = Math.max(counts.en, (payload.counts && payload.counts.en) || 0);
+                }
+                counts.all = counts.id + counts.en;
+                const visible = chapters.slice(0, 400);
+                let first = null;
+                let latest = null;
+                for (const payload of payloads) {
+                    if (payload.first) {
+                        const n = parseFloat(payload.first.chapter) || 0;
+                        if (!first || n < (parseFloat(first.chapter) || 0)) {
+                            first = payload.first;
+                        }
+                    }
+                    if (payload.latest) {
+                        const n = parseFloat(payload.latest.chapter) || 0;
+                        if (!latest || n > (parseFloat(latest.chapter) || 0)) {
+                            latest = payload.latest;
+                        }
+                    }
+                }
+                return {
+                    mangaId: this.mangaId,
+                    chapters: visible,
+                    counts: counts,
+                    first: first || (chapters.length ? chapters[chapters.length - 1] : null),
+                    latest: latest || (chapters.length ? chapters[0] : null),
+                    truncated: chapters.length > visible.length,
+                    partial: payloads.some(payload => payload.partial),
+                };
             },
             get counts() {
                 return this.chapterData.counts || { all: 0, id: 0, en: 0 };

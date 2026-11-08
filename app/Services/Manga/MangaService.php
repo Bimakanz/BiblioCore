@@ -194,8 +194,30 @@ class MangaService
         $cacheKey = "aggregated_v8_chapters_{$id}_{$langKey}";
 
         $cached = Cache::get($cacheKey);
+        if (is_array($cached) && ! empty($cached)) {
+            return $cached;
+        }
+
+        // If the combined list is already cached, derive a single-language view
+        // from it instead of scraping every provider again. This is what makes
+        // the parallel per-language requests on the detail page instant.
+        if ($language && in_array($language, ['id', 'en'], true)) {
+            $allCached = Cache::get("aggregated_v8_chapters_{$id}_all");
+            if (is_array($allCached) && ! empty($allCached)) {
+                $filtered = array_values(array_filter(
+                    $allCached,
+                    fn ($c) => ($c['language'] ?? '') === $language
+                ));
+                if (! empty($filtered)) {
+                    Cache::put($cacheKey, $filtered, 43200);
+
+                    return $filtered;
+                }
+            }
+        }
+
+        // An empty array is a deliberate short-lived "nothing found" marker.
         if (is_array($cached)) {
-            // An empty array is a deliberate short-lived "nothing found" marker.
             return $cached;
         }
 
