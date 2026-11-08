@@ -275,14 +275,18 @@
 
         // Also warm the (possibly cold) chapter aggregation in the background,
         // so the skeleton on the detail page resolves almost immediately.
-        // Fire-and-forget: failures are ignored and the page fetches again.
-        try {
-            fetch(url + '/chapters.json?v=' + encodeURIComponent(@js($chaptersVersion)), {
-                headers: { 'Accept': 'application/json' },
-                cache: 'default',
-                priority: 'low',
-            }).catch(() => {});
-        } catch (e) {}
+        // Use exactly the same per-language URLs the detail page requests, so
+        // its fetches are already edge-cached. Fire-and-forget.
+        const version = encodeURIComponent(@js($chaptersVersion));
+        for (const lang of ['id', 'en']) {
+            try {
+                fetch(url + '/chapters.json?v=' + version + '&lang=' + lang, {
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'default',
+                    priority: 'low',
+                }).catch(() => {});
+            } catch (e) {}
+        }
     };
     </script>
 </x-manga-layout>
