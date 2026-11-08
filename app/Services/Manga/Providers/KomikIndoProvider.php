@@ -96,7 +96,6 @@ class KomikIndoProvider
                             $chapNum = !empty($num[1]) ? (string)$num[1] : '0';
 
                             $id = 'kmd_' . md5($chapUrl);
-                            \App\Services\Manga\Support\CacheBatcher::put("kmd_url_{$id}", $chapUrl, 604800);
 
                             $chapters[] = [
                                 'id' => $id,
@@ -117,8 +116,6 @@ class KomikIndoProvider
 
             return [];
         });
-
-        \App\Services\Manga\Support\CacheBatcher::flush();
 
         if (empty($result)) {
             Cache::forget($cacheKey);

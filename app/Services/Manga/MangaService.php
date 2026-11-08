@@ -381,8 +381,6 @@ class MangaService
             return $merged;
         })();
 
-        \App\Services\Manga\Support\CacheBatcher::flush();
-
         // Never keep an empty aggregation around: a transient upstream failure
         // should be retried on the next visit instead of sticking for 12 hours.
         if (empty($chapters)) {

@@ -286,16 +286,25 @@ class MangaController extends Controller
     protected function preloadChapters(string $id): array
     {
         $v = self::CHAPTERS_CACHE_VERSION;
-        $all = Cache::get("aggregated_{$v}_chapters_{$id}_all");
+        $keys = [
+            "aggregated_{$v}_chapters_{$id}_all",
+            "aggregated_{$v}_chapters_{$id}_id",
+            "aggregated_{$v}_chapters_{$id}_en",
+        ];
+
+        // One round trip instead of three: matters with remote Redis.
+        $cached = Cache::many($keys);
+
+        $all = $cached[$keys[0]] ?? null;
         if (is_array($all) && ! empty($all)) {
             return $all;
         }
 
         $merged = [];
         foreach (['id', 'en'] as $language) {
-            $cached = Cache::get("aggregated_{$v}_chapters_{$id}_{$language}");
-            if (is_array($cached) && ! empty($cached)) {
-                $merged = array_merge($merged, $cached);
+            $value = $cached["aggregated_{$v}_chapters_{$id}_{$language}"] ?? null;
+            if (is_array($value) && ! empty($value)) {
+                $merged = array_merge($merged, $value);
             }
         }
 
@@ -671,9 +680,10 @@ class MangaController extends Controller
             "aggregated_v5_chapters_{$mangaId}_en",
         ];
 
+        $cachedChapters = \Illuminate\Support\Facades\Cache::many($searchKeys);
+
         foreach ($searchKeys as $searchKey) {
-            $chapters = \Illuminate\Support\Facades\Cache::get($searchKey, []);
-            foreach ($chapters as $chap) {
+            foreach ((array) ($cachedChapters[$searchKey] ?? []) as $chap) {
                 if ($chap['id'] === $chapterId && ! empty($chap['readPath'])) {
                     \Illuminate\Support\Facades\Cache::put($cacheKey, $chap['readPath'], 604800);
 
