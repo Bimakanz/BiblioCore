@@ -122,7 +122,7 @@ class MangaNatoProvider
                 $chapterNum = !empty($num[1]) ? (string)$num[1] : '0';
 
                 $chapId = 'nato_' . md5($chapUrl);
-                Cache::put("nato_url_{$chapId}", $chapUrl, 604800);
+                \App\Services\Manga\Support\CacheBatcher::put("nato_url_{$chapId}", $chapUrl, 604800);
 
                 $chapters[] = [
                     'id' => $chapId,
@@ -139,6 +139,8 @@ class MangaNatoProvider
 
             return $chapters;
         });
+
+        \App\Services\Manga\Support\CacheBatcher::flush();
 
         if (empty($result)) {
             Cache::forget($cacheKey);

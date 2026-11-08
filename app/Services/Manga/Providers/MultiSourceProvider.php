@@ -121,7 +121,7 @@ class MultiSourceProvider
                             preg_match('/(?:Chapter|Ch\.)\s*([0-9\.]+)/i', $cText, $num);
                             $chNum = ! empty($num[1]) ? (string) $num[1] : '0';
 
-                            Cache::put("weeb_url_{$cId}", $chapUrl, 604800);
+                            \App\Services\Manga\Support\CacheBatcher::put("weeb_url_{$cId}", $chapUrl, 604800);
 
                             $chapters[] = [
                                 'id' => 'wb_'.$cId,
@@ -143,6 +143,8 @@ class MultiSourceProvider
 
             return $chapters;
         });
+
+        \App\Services\Manga\Support\CacheBatcher::flush();
 
         if (empty($result)) {
             Cache::forget($cacheKey);
@@ -209,6 +211,8 @@ class MultiSourceProvider
             return [];
         });
 
+        \App\Services\Manga\Support\CacheBatcher::flush();
+
         if (empty($result)) {
             Cache::forget($cacheKey);
         }
@@ -231,7 +235,7 @@ class MultiSourceProvider
             $chNum = ! empty($num[1]) ? (string) $num[1] : '0';
 
             $cid = $prefix.'_'.md5($chapUrl);
-            Cache::put("{$prefix}_url_{$cid}", $chapUrl, 604800);
+            \App\Services\Manga\Support\CacheBatcher::put("{$prefix}_url_{$cid}", $chapUrl, 604800);
 
             $chapters[] = [
                 'id' => $cid,
