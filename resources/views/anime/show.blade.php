@@ -58,6 +58,39 @@
                 </div>
             </div>
 
+            {{-- Title names --}}
+            @if(!empty($anime['titles']) || !empty($anime['synonyms']))
+                <section class="mt-8 rounded-3xl border border-[#e0d9c8] bg-white p-6 shadow-sm">
+                    <h2 class="mb-3 text-base font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Nama Judul</h2>
+                    <dl class="space-y-2.5 text-sm">
+                        @if(!empty($anime['titles']['native']))
+                            <div class="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
+                                <dt class="w-24 flex-shrink-0 font-bold text-[#172a37]">Judul Asli</dt>
+                                <dd class="text-[#4c5b54]">{{ $anime['titles']['native'] }}</dd>
+                            </div>
+                        @endif
+                        @if(!empty($anime['titles']['english']))
+                            <div class="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
+                                <dt class="w-24 flex-shrink-0 font-bold text-[#172a37]">English</dt>
+                                <dd class="text-[#4c5b54]">{{ $anime['titles']['english'] }}</dd>
+                            </div>
+                        @endif
+                        @if(!empty($anime['titles']['romaji']))
+                            <div class="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
+                                <dt class="w-24 flex-shrink-0 font-bold text-[#172a37]">Romaji</dt>
+                                <dd class="text-[#4c5b54]">{{ $anime['titles']['romaji'] }}</dd>
+                            </div>
+                        @endif
+                        @if(!empty($anime['synonyms']))
+                            <div class="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
+                                <dt class="w-24 flex-shrink-0 font-bold text-[#172a37]">Sinonim</dt>
+                                <dd class="leading-relaxed text-[#4c5b54]">{{ implode(', ', $anime['synonyms']) }}</dd>
+                            </div>
+                        @endif
+                    </dl>
+                </section>
+            @endif
+
             {{-- Synopsis --}}
             <section class="mt-8 rounded-3xl border border-[#e0d9c8] bg-white p-6 shadow-sm">
                 <h2 class="mb-2 text-base font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Sinopsis</h2>

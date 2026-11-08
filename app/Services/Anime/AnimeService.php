@@ -196,7 +196,7 @@ class AnimeService
             return null;
         }
 
-        return Cache::remember("anime_detail_{$numericId}", 86400, function () use ($numericId) {
+        return Cache::remember("anime_detail_v2_{$numericId}", 86400, function () use ($numericId) {
             $gql = '
             query ($id: Int) {
               Media(id: $id, type: ANIME) {
@@ -411,6 +411,23 @@ class AnimeService
         $title = $m['title']['english'] ?? $m['title']['romaji'] ?? $m['title']['native'] ?? 'Untitled';
         $altTitles = array_values(array_filter(array_unique(array_merge(array_values($m['title'] ?? []), $m['synonyms'] ?? []))));
 
+        $titles = array_filter([
+            'romaji' => $m['title']['romaji'] ?? null,
+            'english' => $m['title']['english'] ?? null,
+            'native' => $m['title']['native'] ?? null,
+        ]);
+        $seenNames = array_map(fn ($t) => mb_strtolower(trim((string) $t)), array_values($titles));
+        $synonyms = [];
+        foreach (($m['synonyms'] ?? []) as $syn) {
+            $syn = trim((string) $syn);
+            $key = mb_strtolower($syn);
+            if ($syn === '' || in_array($key, $seenNames, true)) {
+                continue;
+            }
+            $seenNames[] = $key;
+            $synonyms[] = $syn;
+        }
+
         $rawDesc = (string) ($m['description'] ?? '');
         $cleanDesc = html_entity_decode(trim(strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $rawDesc))));
         if ($cleanDesc === '') {
@@ -431,6 +448,8 @@ class AnimeService
             'malId' => isset($m['idMal']) && $m['idMal'] ? (int) $m['idMal'] : null,
             'title' => $title,
             'altTitles' => $altTitles,
+            'titles' => $titles,
+            'synonyms' => $synonyms,
             'description' => $cleanDesc,
             'coverUrl' => $m['coverImage']['extraLarge'] ?? $m['coverImage']['large'] ?? $m['coverImage']['medium'] ?? '',
             'bannerUrl' => $m['bannerImage'] ?? null,
