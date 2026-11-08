@@ -194,7 +194,8 @@ class MangaService
         $cacheKey = "aggregated_v8_chapters_{$id}_{$langKey}";
 
         $cached = Cache::get($cacheKey);
-        if (is_array($cached) && ! empty($cached)) {
+        if (is_array($cached)) {
+            // An empty array is a deliberate short-lived "nothing found" marker.
             return $cached;
         }
 
@@ -381,10 +382,12 @@ class MangaService
             return $merged;
         })();
 
-        // Never keep an empty aggregation around: a transient upstream failure
-        // should be retried on the next visit instead of sticking for 12 hours.
+        // Never keep an empty aggregation around for long: a transient upstream
+        // failure should be retried soon, but re-scraping on every single page
+        // view of a manga with no sources is far worse. Five minutes is the
+        // compromise.
         if (empty($chapters)) {
-            Cache::forget($cacheKey);
+            Cache::put($cacheKey, [], 300);
         } else {
             // Partial results expire quickly so the next request can finish the job.
             Cache::put($cacheKey, $chapters, $deadlineHit ? 300 : 43200);

@@ -134,8 +134,13 @@ class MangaController extends Controller
 
         // Do not let a transient upstream failure poison the edge cache, and
         // keep partial lists on a short TTL so the next request can enrich them.
-        if ($failed || empty($chapters)) {
+        if ($failed) {
             $cacheControl = 'no-store';
+        } elseif (empty($chapters)) {
+            // A deliberate empty result is already cached for a few minutes in
+            // the shared store; let the edge absorb the traffic too instead of
+            // hitting the function (and Redis) on every page view.
+            $cacheControl = 'public, max-age=30, s-maxage=60, stale-while-revalidate=120';
         } elseif ($partial) {
             $cacheControl = 'public, max-age=10, s-maxage=30, stale-while-revalidate=30';
         } else {
@@ -533,8 +538,11 @@ class MangaController extends Controller
             "aggregated_v5_chapters_{$mangaId}_en",
         ];
 
+        // Single round trip instead of up to twelve sequential gets.
+        $cachedValues = Cache::many($keys);
+
         foreach ($keys as $key) {
-            $cached = Cache::get($key);
+            $cached = $cachedValues[$key] ?? null;
             if (! empty($cached)) {
                 return $cached;
             }
