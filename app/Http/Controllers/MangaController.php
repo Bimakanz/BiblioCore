@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class MangaController extends Controller
 {
-    private const CHAPTERS_CACHE_VERSION = 'v8';
+    public const CHAPTERS_CACHE_VERSION = 'v8';
 
     protected MangaService $mangaService;
 
@@ -75,6 +75,7 @@ class MangaController extends Controller
                 'currentCategory' => $categoryFilter,
                 'currentGenre' => $genre,
                 'genres' => $genres,
+                'chaptersVersion' => self::CHAPTERS_CACHE_VERSION,
             ])
             ->header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400');
     }

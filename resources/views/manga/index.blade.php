@@ -277,7 +277,7 @@
         // so the skeleton on the detail page resolves almost immediately.
         // Fire-and-forget: failures are ignored and the page fetches again.
         try {
-            fetch(url + '/chapters.json', {
+            fetch(url + '/chapters.json?v=' + encodeURIComponent(@js($chaptersVersion)), {
                 headers: { 'Accept': 'application/json' },
                 cache: 'default',
                 priority: 'low',
