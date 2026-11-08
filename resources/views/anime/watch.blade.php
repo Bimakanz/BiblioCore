@@ -277,6 +277,9 @@
             return raw.slice(0, 2) || ('s' + idx);
         }
 
+        let currentSubtitles = [];
+        let currentSubIdx = -1;
+
         function buildSubtitleOptions(subtitles) {
             video.querySelectorAll('track').forEach(t => t.remove());
             const menu = subtitleDropdown.menu;
@@ -301,8 +304,12 @@
                 opt.textContent = sub.label;
                 menu.appendChild(opt);
             });
-            // Default: Indonesia > Indonesia (Auto) > English > first available
+            // Restore the language chosen in a previous session when this
+            // episode offers it; otherwise fall back to the default ladder:
+            // Indonesia > Indonesia (Auto) > English > first available.
             let def = -1;
+            const savedLang = localStorage.getItem('biblioanime_sub_lang');
+            if (savedLang) subtitles.forEach((sub, i) => { if (def === -1 && (sub.lang || '').toLowerCase() === savedLang) def = i; });
             subtitles.forEach((sub, i) => {
                 const raw = (sub.lang || '').toLowerCase();
                 if (def === -1 && (raw === 'id' || raw.indexOf('indo') === 0)) def = i;
@@ -310,15 +317,50 @@
             if (def === -1) subtitles.forEach((sub, i) => { if (def === -1 && (sub.lang || '').toLowerCase() === 'id-auto') def = i; });
             if (def === -1) subtitles.forEach((sub, i) => { if (def === -1 && langCode(sub, i) === 'en') def = i; });
             if (def === -1 && subtitles.length) def = 0;
+            // A viewer who turned CC off keeps it off across refreshes.
+            if (localStorage.getItem('biblioanime_cc') === 'off') def = -1;
+            currentSubtitles = subtitles;
+            currentSubIdx = def;
             subtitleDropdown.setActive(def);
             applySubtitle(def);
         }
 
+        // Map through the <track> elements themselves: the order of
+        // video.textTracks is NOT guaranteed to match DOM/source order
+        // (Chrome re-sorts by browser language), while trackEl.track is
+        // always the exact track for that element.
         function applySubtitle(idx) {
-            const tracks = video.textTracks;
-            for (let i = 0; i < tracks.length; i++) {
-                tracks[i].mode = (i === idx) ? 'showing' : 'disabled';
+            currentSubIdx = idx;
+            video.querySelectorAll('track').forEach((el, i) => {
+                el.track.mode = (i === idx) ? 'showing' : 'disabled';
+            });
+            if (idx >= 0 && currentSubtitles[idx]) {
+                localStorage.setItem('biblioanime_sub_lang', (currentSubtitles[idx].lang || '').toLowerCase());
+                localStorage.setItem('biblioanime_cc', 'on');
+            } else if (idx === -1) {
+                localStorage.setItem('biblioanime_cc', 'off');
             }
+        }
+
+        // 'C' hotkey: toggle closed captions. Turning CC back on restores
+        // the last chosen language (or the best default for this episode).
+        function toggleCC() {
+            const tracks = video.querySelectorAll('track');
+            if (!tracks.length) return;
+            let showing = -1;
+            tracks.forEach((el, i) => { if (el.track.mode === 'showing') showing = i; });
+            if (showing >= 0) {
+                subtitleDropdown.setActive(-1);
+                applySubtitle(-1);
+                return;
+            }
+            let target = -1;
+            const savedLang = localStorage.getItem('biblioanime_sub_lang');
+            if (savedLang) currentSubtitles.forEach((sub, i) => { if (target === -1 && (sub.lang || '').toLowerCase() === savedLang) target = i; });
+            if (target === -1) currentSubtitles.forEach((sub, i) => { const raw = (sub.lang || '').toLowerCase(); if (target === -1 && (raw === 'id' || raw.indexOf('indo') === 0 || raw === 'id-auto')) target = i; });
+            if (target === -1 && currentSubtitles.length) target = 0;
+            subtitleDropdown.setActive(target);
+            applySubtitle(target);
         }
 
         function shiftSubtitles(delta) {
@@ -444,6 +486,11 @@
         }
 
         video.addEventListener('loadedmetadata', function () {
+            // Re-assert the chosen subtitle track: browsers may reset a
+            // freshly added track to hidden/disabled while its VTT loads,
+            // which is why CC vanished after a refresh even though the
+            // settings label still showed the right language.
+            if (currentSubIdx >= 0) applySubtitle(currentSubIdx);
             loadingEl.style.display = 'none';
             if (!resumeApplied) {
                 const target = storedResume();
@@ -489,6 +536,11 @@
                 e.preventDefault();
                 const delta = e.key === 'ArrowRight' ? 5 : -5;
                 video.currentTime = Math.min(Math.max(0, video.currentTime + delta), Math.max(0, video.duration - 0.5));
+                return;
+            }
+            if (e.key === 'c' || e.key === 'C') {
+                e.preventDefault();
+                toggleCC();
                 return;
             }
             if (e.key !== 'f' && e.key !== 'F') return;
