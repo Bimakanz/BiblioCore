@@ -26,24 +26,51 @@ class AnimeStreamProvider
 {
     protected string $base;
 
+    /** Additional resolver bases (comma-separated ANIME_API_URL), tried when the primary is unreachable. */
+    protected array $fallbacks = [];
+
+    /** Shared secret for keyed resolver instances (ANIME_API_KEY), sent as x-api-key. */
+    protected ?string $apiKey = null;
+
     /** Provider priority: proven HLS + subtitle sources first. */
     protected array $priority = [
-        'animedunya', 'anizone', 'aniwaves', 'anipm', 'animenosub',
-        'animeonsen', 'reanime', 'anikoto', 'animegg', 'senshi', 'mkissa', 'kaa',
+        'anikoto', 'aniwaves', 'animedunya', 'anizone', 'anipm', 'animenosub',
+        'animeonsen', 'reanime', 'animegg', 'senshi', 'mkissa', 'kaa',
     ];
 
     public function __construct()
     {
-        $this->base = rtrim((string) env('ANIME_API_URL', env('CONSUMET_API_URL', 'http://127.0.0.1:4000')), '/');
+        $urls = collect(explode(',', (string) env('ANIME_API_URL', env('CONSUMET_API_URL', 'http://127.0.0.1:4000'))))
+            ->map(fn ($u) => rtrim(trim($u), '/'))
+            ->filter()
+            ->unique()
+            ->values();
+        $this->base = $urls->first() ?: 'http://127.0.0.1:4000';
+        $this->fallbacks = $urls->slice(1)->all();
+        $key = env('ANIME_API_KEY');
+        $this->apiKey = is_string($key) && $key !== '' ? $key : null;
     }
 
+    /**
+     * All configured resolver bases, primary first.
+     *
+     * @return array<int, string>
+     */
+    protected function bases(): array
+    {
+        return [$this->base, ...$this->fallbacks];
+    }
     protected function getJson(string $url, int $timeout = 25): ?array
     {
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
         curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json']);
+$headers = ['Accept: application/json'];
+        if ($this->apiKey !== null) {
+            $headers[] = 'x-api-key: ' . $this->apiKey;
+        }
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_USERAGENT, 'BiblioManga/1.0.0 (https://github.com/Bimakanz/BiblioCore)');
         $res = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -78,11 +105,18 @@ class AnimeStreamProvider
         ];
         $blocks = [];
         foreach ($waves as $wave) {
-            $urls = [];
-            foreach ($wave as $name) {
-                $urls[$name] = $this->base . "/episodes/{$name}/{$anilistId}";
+            $results = [];
+            foreach ($this->bases() as $base) {
+                $urls = [];
+                foreach ($wave as $name) {
+                    $urls[$name] = $base . "/episodes/{$name}/{$anilistId}";
+                }
+                $results = $this->getJsonMulti($urls, 8000);
+                if (!empty($results)) {
+                    break;
+                }
             }
-            foreach ($this->getJsonMulti($urls, 8000) as $name => $data) {
+            foreach ($results as $name => $data) {
                 $block = $data[$name] ?? null;
                 if (is_array($block)) {
                     $blocks[$name] = $block;
@@ -105,7 +139,11 @@ class AnimeStreamProvider
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT_MS, 3000);
             curl_setopt($ch, CURLOPT_TIMEOUT_MS, $timeoutMs);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json']);
+    $headers = ['Accept: application/json'];
+        if ($this->apiKey !== null) {
+            $headers[] = 'x-api-key: ' . $this->apiKey;
+        }
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
             curl_setopt($ch, CURLOPT_USERAGENT, 'BiblioManga/1.0.0 (https://github.com/Bimakanz/BiblioCore)');
             curl_multi_add_handle($multi, $ch);
             $handles[$key] = $ch;
@@ -315,7 +353,13 @@ class AnimeStreamProvider
 
     protected function fetchStream(string $watchPath): ?array
     {
-        $data = $this->getJson($this->base . '/' . ltrim($watchPath, '/'), 30);
+        $data = null;
+        foreach ($this->bases() as $base) {
+            $data = $this->getJson($base . '/' . ltrim($watchPath, '/'), 30);
+            if ($data) {
+                break;
+            }
+        }
         if (!$data || empty($data['streams']) || !is_array($data['streams'])) {
             return null;
         }
@@ -374,3 +418,4 @@ class AnimeStreamProvider
         return $this->priority;
     }
 }
+
