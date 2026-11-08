@@ -327,29 +327,14 @@ class AnimeController extends Controller
         ], 900);
 
         $subtitles = [];
-        $hasEnglish = false;
-        $hasIndonesian = false;
         foreach ($stream['subtitles'] as $i => $sub) {
-            $langLower = strtolower($sub['lang']);
-            if (str_starts_with($langLower, 'english') || $langLower === 'en') {
-                $hasEnglish = true;
-            }
-            if ($langLower === 'id' || str_starts_with($langLower, 'indo')) {
-                $hasIndonesian = true;
-            }
             $subtitles[] = [
                 'lang' => $sub['lang'],
                 'label' => $sub['label'],
                 'url' => route('anime.proxy.subtitle', ['k' => $proxyKey, 'idx' => $i]),
             ];
         }
-        if ($hasEnglish && !$hasIndonesian) {
-            $subtitles[] = [
-                'lang' => 'id-auto',
-                'label' => 'Indonesia (Auto)',
-                'url' => route('anime.subtitle.id') . '?ep=' . urlencode($episodeId),
-            ];
-        }
+
 
         return response()->json([
             'source' => [

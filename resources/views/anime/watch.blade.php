@@ -308,13 +308,12 @@
             // episode offers it; otherwise fall back to the default ladder:
             // Indonesia > Indonesia (Auto) > English > first available.
             let def = -1;
+            // A saved 'id-auto' preference comes from the retired translated
+            // track: ignore it so the English default applies to everyone.
             const savedLang = localStorage.getItem('biblioanime_sub_lang');
-            if (savedLang) subtitles.forEach((sub, i) => { if (def === -1 && (sub.lang || '').toLowerCase() === savedLang) def = i; });
-            subtitles.forEach((sub, i) => {
-                const raw = (sub.lang || '').toLowerCase();
-                if (def === -1 && (raw === 'id' || raw.indexOf('indo') === 0)) def = i;
-            });
-            if (def === -1) subtitles.forEach((sub, i) => { if (def === -1 && (sub.lang || '').toLowerCase() === 'id-auto') def = i; });
+            if (savedLang && savedLang !== 'id-auto') subtitles.forEach((sub, i) => { if (def === -1 && (sub.lang || '').toLowerCase() === savedLang) def = i; });
+            // Default ladder: English (the native track, always present and
+            // ready) > first available track.
             if (def === -1) subtitles.forEach((sub, i) => { if (def === -1 && langCode(sub, i) === 'en') def = i; });
             if (def === -1 && subtitles.length) def = 0;
             // A viewer who turned CC off keeps it off across refreshes.
@@ -356,8 +355,8 @@
             }
             let target = -1;
             const savedLang = localStorage.getItem('biblioanime_sub_lang');
-            if (savedLang) currentSubtitles.forEach((sub, i) => { if (target === -1 && (sub.lang || '').toLowerCase() === savedLang) target = i; });
-            if (target === -1) currentSubtitles.forEach((sub, i) => { const raw = (sub.lang || '').toLowerCase(); if (target === -1 && (raw === 'id' || raw.indexOf('indo') === 0 || raw === 'id-auto')) target = i; });
+            if (savedLang && savedLang !== 'id-auto') currentSubtitles.forEach((sub, i) => { if (target === -1 && (sub.lang || '').toLowerCase() === savedLang) target = i; });
+            if (target === -1) currentSubtitles.forEach((sub, i) => { if (target === -1 && langCode(sub, i) === 'en') target = i; });
             if (target === -1 && currentSubtitles.length) target = 0;
             subtitleDropdown.setActive(target);
             applySubtitle(target);
