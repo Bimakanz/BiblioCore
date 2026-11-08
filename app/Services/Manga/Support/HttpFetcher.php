@@ -30,17 +30,14 @@ class HttpFetcher
         // Vercel, and a pinned DoH/IP map first during local development.
         $primaryResolve = ! $isVercel;
 
-        $results = self::execute($urls, $primaryResolve, $options);
+        [$results, $retryable] = self::execute($urls, $primaryResolve, $options);
 
-        $missing = [];
-        foreach ($urls as $url) {
-            if (($results[$url] ?? null) === null) {
-                $missing[] = $url;
-            }
-        }
-
-        if (! empty($missing)) {
-            $retry = self::execute($missing, ! $primaryResolve, $options);
+        // Only retry transport-level failures (no response, timeout, 5xx,
+        // 429) through the alternate DNS strategy. A definitive 4xx answer
+        // (e.g. 404) will not change on retry and previously wasted a full
+        // second wave (~4s) on every cold request that hit one.
+        if (! empty($retryable)) {
+            [$retry] = self::execute($retryable, ! $primaryResolve, $options);
             foreach ($retry as $url => $body) {
                 if ($body !== null) {
                     $results[$url] = $body;
@@ -53,7 +50,7 @@ class HttpFetcher
 
     /**
      * @param  array<int, string>  $urls
-     * @return array<string, string|null>
+     * @return array{0: array<string, string|null>, 1: array<int, string>} Results map plus the URLs worth retrying (transport failures only)
      */
     protected static function execute(array $urls, bool $useResolve, array $options): array
     {
@@ -103,12 +100,21 @@ class HttpFetcher
             }
         } while ($running && $status === CURLM_OK);
 
+        $retryable = [];
         foreach ($handles as $url => $ch) {
             $body = curl_multi_getcontent($ch);
             $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $results[$url] = ($body !== false && $body !== '' && $httpCode >= 200 && $httpCode < 400)
-                ? $body
-                : null;
+            $ok = $body !== false && $body !== '' && $httpCode >= 200 && $httpCode < 400;
+            $results[$url] = $ok ? $body : null;
+
+            if (! $ok) {
+                // Retry only when no definitive answer came back: connection
+                // failure/timeout (code 0), rate limit, or a server error.
+                // Other 4xx responses are final.
+                if ($httpCode === 0 || $httpCode === 429 || $httpCode >= 500) {
+                    $retryable[] = $url;
+                }
+            }
 
             curl_multi_remove_handle($multi, $ch);
             curl_close($ch);
@@ -116,6 +122,6 @@ class HttpFetcher
 
         curl_multi_close($multi);
 
-        return $results;
+        return [$results, $retryable];
     }
 }

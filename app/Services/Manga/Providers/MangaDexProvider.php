@@ -492,8 +492,12 @@ class MangaDexProvider implements MangaProviderInterface
 
             $ch = curl_init($currentUrl);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 12);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 6);
+            // Per-hop ceiling: up to 4 hops are followed manually, so 12s per
+            // hop allowed a 48s worst case on a slow-drip host. 8s/4s keeps
+            // large images feasible (size is capped separately) while
+            // bounding the total proxy wait.
+            curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 4);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
             curl_setopt($ch, CURLOPT_MAXREDIRS, 0);
             curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);

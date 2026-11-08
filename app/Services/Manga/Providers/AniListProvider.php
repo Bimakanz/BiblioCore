@@ -21,7 +21,11 @@ class AniListProvider
 
         $ch = curl_init($this->endpoint);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 12);
+        // AniList answers in ~1-2s when healthy; a 12s ceiling only stalled
+        // the caller's fallback chain on sick days. 6s total / 3s connect
+        // keeps the worst case bounded without cutting healthy responses.
+        curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
