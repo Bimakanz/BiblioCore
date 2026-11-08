@@ -266,10 +266,23 @@
         if (!url || window.__prefetchedUrls?.[url]) return;
         window.__prefetchedUrls = window.__prefetchedUrls || {};
         window.__prefetchedUrls[url] = true;
+
+        // Warm the detail page itself.
         const link = document.createElement('link');
         link.rel = 'prefetch';
         link.href = url;
         document.head.appendChild(link);
+
+        // Also warm the (possibly cold) chapter aggregation in the background,
+        // so the skeleton on the detail page resolves almost immediately.
+        // Fire-and-forget: failures are ignored and the page fetches again.
+        try {
+            fetch(url + '/chapters.json', {
+                headers: { 'Accept': 'application/json' },
+                cache: 'default',
+                priority: 'low',
+            }).catch(() => {});
+        } catch (e) {}
     };
     </script>
 </x-manga-layout>
