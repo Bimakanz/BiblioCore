@@ -23,6 +23,7 @@ Route::get('/manga/api/live-search', [MangaController::class, 'liveSearch'])->na
 
 // Cache warm-up endpoint (optional token protected, see WARM_TOKEN env)
 Route::get('/warm', [MangaController::class, 'warm'])->name('manga.warm');
+Route::get('/warm/diag', [MangaController::class, 'diag'])->name('manga.warm.diag');
 
 // Detail Manga, async chapter list & reader
 Route::get('/manga/{id}/chapters.json', [MangaController::class, 'chaptersJson'])->name('manga.chapters.json');

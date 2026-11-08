@@ -199,6 +199,86 @@ class MangaController extends Controller
     }
 
     /**
+     * Token-protected timing probe. Used to find slow stages in production.
+     */
+    public function diag(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $expected = (string) ($_ENV['WARM_TOKEN'] ?? $_SERVER['WARM_TOKEN'] ?? getenv('WARM_TOKEN') ?: '');
+        if ($expected !== '' && ! hash_equals($expected, (string) $request->query('token', ''))) {
+            abort(403, 'Invalid warm token.');
+        }
+
+        $id = (string) $request->query('id', 'al_105778');
+        $step = (string) $request->query('step', 'redis');
+        $out = [];
+        $measure = function (string $label, callable $fn) use (&$out) {
+            $t = microtime(true);
+            try {
+                $r = $fn();
+                $out[$label] = [
+                    'ms' => (int) round((microtime(true) - $t) * 1000),
+                    'count' => is_array($r) ? count($r) : null,
+                ];
+            } catch (\Throwable $e) {
+                $out[$label] = [
+                    'ms' => (int) round((microtime(true) - $t) * 1000),
+                    'error' => substr($e->getMessage(), 0, 240),
+                ];
+            }
+        };
+
+        if ($step === 'redis') {
+            $measure('get', fn () => Cache::get('diag_missing_'.time()));
+            $measure('put', function () {
+                Cache::put('diag_probe', 'x', 60);
+
+                return [1];
+            });
+            $measure('putmany_250', function () {
+                $values = [];
+                for ($i = 0; $i < 250; $i++) {
+                    $values["diag_batch_{$i}"] = str_repeat('x', 80);
+                }
+                Cache::putMany($values, 60);
+
+                return $values;
+            });
+            $measure('forget', function () {
+                Cache::forget('diag_probe');
+
+                return [1];
+            });
+        } elseif ($step === 'dex') {
+            $measure('search', fn () => app(\App\Services\Manga\Providers\MangaDexProvider::class)->search('Chainsaw Man', 1, 5));
+            $measure('get_detail', fn () => $this->mangaService->getDetail($id));
+        } elseif ($step === 'indo') {
+            $manga = $this->mangaService->getDetail($id) ?? [];
+            $title = $manga['title'] ?? 'Chainsaw Man';
+            $alt = $manga['altTitles'] ?? [];
+            $measure('komiku', fn () => app(\App\Services\Manga\Providers\KomikuProvider::class)->getChapters($title, $alt));
+            $measure('komikindo', fn () => app(\App\Services\Manga\Providers\KomikIndoProvider::class)->getChapters($title, $alt));
+            $measure('multisource_indo', fn () => app(\App\Services\Manga\Providers\MultiSourceProvider::class)->getIndoChapters($title, $alt));
+        } elseif ($step === 'en') {
+            $manga = $this->mangaService->getDetail($id) ?? [];
+            $title = $manga['title'] ?? 'Chainsaw Man';
+            $alt = $manga['altTitles'] ?? [];
+            $measure('mangapill', fn () => app(\App\Services\Manga\Providers\MangaPillProvider::class)->getChapters($title, $alt));
+            $measure('multisource_en', fn () => app(\App\Services\Manga\Providers\MultiSourceProvider::class)->getEnglishChapters($title, $alt));
+            $measure('manganato', fn () => app(\App\Services\Manga\Providers\MangaNatoProvider::class)->getChapters($title, $alt));
+        } else {
+            $partial = false;
+            $measure('full_get_chapters', function () use ($id, &$partial) {
+                return $this->mangaService->getChapters($id, null, $partial);
+            });
+            $out['_partial'] = $partial;
+        }
+
+        return response()
+            ->json(['step' => $step, 'id' => $id, 'timings' => $out])
+            ->header('Cache-Control', 'no-store');
+    }
+
+    /**
      * Read whatever chapter list is already cached without triggering any
      * network aggregation. Merges the per-language caches when the "all"
      * cache has not been built yet.
