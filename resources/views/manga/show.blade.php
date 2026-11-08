@@ -13,10 +13,15 @@
             init() {
                 if (this.loading) {
                     this.fetchChapters();
+                } else {
+                    // Render the preloaded list instantly, then refresh from the
+                    // (edge-cached) endpoint in the background so new chapters
+                    // show up without waiting for the 12h aggregation TTL.
+                    this.fetchChapters(false, true);
                 }
             },
-            async fetchChapters(silent = false) {
-                if (!silent) {
+            async fetchChapters(silent = false, background = false) {
+                if (!silent && !background) {
                     this.loading = true;
                 }
                 this.loadError = false;
@@ -26,8 +31,14 @@
                 const payloads = [];
                 const apply = () => {
                     if (!payloads.length) return;
-                    this.chapterData = this.mergePayloads(payloads);
-                    if (!silent) {
+                    const merged = this.mergePayloads(payloads);
+                    // Never shrink a richer preloaded list while a background
+                    // refresh is still waiting for its second language.
+                    if (background && merged.counts.all < (this.chapterData.counts.all || 0)) {
+                        return;
+                    }
+                    this.chapterData = merged;
+                    if (!silent && !background) {
                         // Only pick the default tab during the initial load; never
                         // yank the user away from the tab they selected later.
                         if (this.chapterData.counts.id > 0) {
@@ -57,7 +68,7 @@
                 // time. The first response is rendered immediately.
                 const settled = await Promise.allSettled([load('id'), load('en')]);
                 if (!payloads.length) {
-                    if (!silent) {
+                    if (!silent && !background) {
                         this.loading = false;
                         this.loadError = true;
                     }
@@ -68,7 +79,7 @@
                 // a couple of times so the list keeps filling in without a
                 // manual refresh. Cached languages return instantly.
                 const incomplete = this.chapterData.partial || settled.some(r => r.status === 'rejected');
-                if (incomplete && this.retries < 2) {
+                if (incomplete && !background && this.retries < 2) {
                     this.retries++;
                     setTimeout(() => this.fetchChapters(true), 5000 * this.retries);
                 }
