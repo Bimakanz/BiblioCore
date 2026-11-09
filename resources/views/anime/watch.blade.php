@@ -17,9 +17,12 @@
                     <video id="player" class="aspect-video w-full bg-black" controls crossorigin="anonymous" playsinline
                            poster="{{ $anime['bannerUrl'] ?: $anime['coverUrl'] }}"></video>
 
-                    <div id="playerLoading" class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 text-white">
-                        <div class="h-10 w-10 animate-spin rounded-full border-[3px] border-white/30 border-t-white"></div>
-                        <p class="text-sm font-semibold">Menyiapkan stream...</p>
+                    <div id="playerLoading" class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 text-white backdrop-blur-[2px]">
+                        <div class="relative h-14 w-14 overflow-hidden rounded-2xl">
+                            <img src="{{ asset('images/loading/loading-1.webp') }}" alt="" fetchpriority="high" class="loader-img loader-img-1">
+                            <img src="{{ asset('images/loading/loading-2.webp') }}" alt="" fetchpriority="high" class="loader-img loader-img-2">
+                        </div>
+                        <p class="text-sm font-semibold">Loading wait a damn minute wontcha?</p>
                         <p class="text-xs text-white/60">Sumber langsung tanpa embed &amp; tanpa iklan</p>
                     </div>
 
@@ -129,6 +132,11 @@
 
     <style>
         #playerWrap:fullscreen { border-radius: 0; }
+        /* Custom two-image crossfade loader (watch page only) */
+        .loader-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; animation: loaderCross 3.2s ease-in-out infinite; }
+        .loader-img-2 { animation-delay: -1.6s; }
+        @keyframes loaderCross { 0% { opacity: 0.55; } 35% { opacity: 0.55; } 50% { opacity: 0; } 85% { opacity: 0; } 100% { opacity: 0.55; } }
+        @media (prefers-reduced-motion: reduce) { .loader-img { animation: none; } .loader-img-1 { opacity: 0.55; } .loader-img-2 { opacity: 0; } }
         #playerWrap:fullscreen video { width: 100%; height: 100%; }
         /* Custom pill dropdowns (button + own menu panel, no native select) */
         .pill-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 92px; border-radius: 9999px; border: 1px solid #dcd2bd; background-color: #fbf9f4; padding: 6px 16px; font-size: 12px; font-weight: 600; color: #172a37; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s; }
