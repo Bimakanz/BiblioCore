@@ -1038,4 +1038,5 @@
 
         loadStream();
     })();
+    </script>
 </x-manga-layout>
