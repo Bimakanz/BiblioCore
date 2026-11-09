@@ -336,6 +336,28 @@ class AnimeController extends Controller
             ];
         }
 
+        // English is always the default. Most providers ship an English
+        // track, but when a title only has Arabic/Thai/Italian/... the
+        // player must not silently show those: add an "English (Auto)"
+        // track translated from the best available source instead.
+        $hasEnglish = false;
+        foreach ($subtitles as $sub) {
+            if ($this->subtitleLanguageFromLabel($sub['label']) === 'en') {
+                $hasEnglish = true;
+                break;
+            }
+        }
+        if (!$hasEnglish && !empty($stream['subtitles'])) {
+            $sourceIdx = $this->pickTranslationSource($stream['subtitles']);
+            if ($sourceIdx !== null) {
+                $subtitles[] = [
+                    'lang' => 'en',
+                    'label' => 'English (Auto)',
+                    'url' => route('anime.subtitle.en-auto', ['k' => $proxyKey, 'idx' => $sourceIdx]),
+                ];
+            }
+        }
+
 
         return response()->json([
             'source' => [
@@ -565,6 +587,88 @@ class AnimeController extends Controller
         return response($vtt)
             ->header('Content-Type', 'text/vtt; charset=utf-8')
             ->header('Cache-Control', 'public, max-age=86400');
+    }
+
+    /**
+     * English subtitle generated from the best available track when the
+     * provider ships no English subtitle at all (cached 30 days). The
+     * player's default selection points at this track, so titles without
+     * English never fall back to Arabic/Thai/Indonesian.
+     */
+    public function autoEnglishSubtitle(Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $key = (string) $request->query('k', '');
+        $idx = (int) $request->query('idx', -1);
+        $entry = Cache::get('anime_proxy_' . $key);
+        $url = $entry['subtitles'][$idx] ?? null;
+        if (!$url) {
+            abort(404, 'Subtitle tidak ditemukan.');
+        }
+
+        $vtt = $this->subtitleTranslator->englishVtt($url);
+        if ($vtt === null) {
+            // Translation failed: serve the original track so subtitles
+            // still work instead of leaving an empty English track.
+            return redirect()->route('anime.proxy.subtitle', ['k' => $key, 'idx' => $idx]);
+        }
+
+        return response($vtt)
+            ->header('Content-Type', 'text/vtt; charset=utf-8')
+            ->header('Cache-Control', 'public, max-age=86400');
+    }
+
+    /**
+     * Language code from a human label ("Arabic" -> ar). Labels are far
+     * more reliable than provider srclang tags, which are often all "en".
+     */
+    protected function subtitleLanguageFromLabel(?string $label): ?string
+    {
+        $l = strtolower(trim((string) $label));
+        if ($l === '') {
+            return null;
+        }
+
+        $map = [
+            'english' => 'en', 'eng' => 'en', 'en' => 'en',
+            'indonesian' => 'id', 'indonesia' => 'id', 'indo' => 'id', 'id' => 'id',
+            'arabic' => 'ar', 'ara' => 'ar', 'ar' => 'ar',
+            'thai' => 'th', 'tha' => 'th', 'th' => 'th',
+            'french' => 'fr', 'fra' => 'fr', 'fre' => 'fr', 'fr' => 'fr',
+            'german' => 'de', 'deu' => 'de', 'ger' => 'de', 'de' => 'de',
+            'italian' => 'it', 'ita' => 'it', 'it' => 'it',
+            'portuguese' => 'pt', 'por' => 'pt', 'pt' => 'pt',
+            'russian' => 'ru', 'rus' => 'ru', 'ru' => 'ru',
+            'spanish' => 'es', 'spa' => 'es', 'es' => 'es',
+            'vietnamese' => 'vi', 'vie' => 'vi', 'vi' => 'vi',
+            'bengali' => 'bn', 'ben' => 'bn', 'bn' => 'bn',
+            'persian' => 'fa', 'farsi' => 'fa', 'fas' => 'fa', 'fa' => 'fa',
+            'turkish' => 'tr', 'tur' => 'tr', 'tr' => 'tr',
+        ];
+
+        foreach ($map as $name => $code) {
+            if ($l === $name || str_starts_with($l, $name . ' ')) {
+                return $code;
+            }
+        }
+
+        return null;
+    }
+
+    /** Prefer the Indonesian track, otherwise the first labelled track. */
+    protected function pickTranslationSource(array $rawSubtitles): ?int
+    {
+        $fallback = null;
+        foreach ($rawSubtitles as $i => $sub) {
+            $code = $this->subtitleLanguageFromLabel($sub['label'] ?? null);
+            if ($code === 'id') {
+                return $i;
+            }
+            if ($code !== null && $fallback === null) {
+                $fallback = $i;
+            }
+        }
+
+        return $fallback ?? (array_key_exists(0, $rawSubtitles) ? 0 : null);
     }
 
     protected function resolveUrl(string $base, string $relative): string

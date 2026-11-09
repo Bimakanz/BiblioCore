@@ -329,21 +329,19 @@
         let currentSubtitles = [];
         let currentSubIdx = -1;
 
-        // English is THE default, unconditionally. Indonesian is the only
-        // accepted fallback when a source has no English track. Any other
-        // language is never chosen automatically: subtitles stay off instead
-        // of silently switching to an unexpected language (Arabic, Spanish,
-        // Vietnamese, ...). A language the viewer picked by hand still works
-        // for the current episode, but the next page load starts at English.
+        // English is THE default, unconditionally. There is no fallback to
+        // Indonesian or any other language: when a provider ships no English
+        // track the server adds an "English (Auto)" translated track, so an
+        // English option always exists. If even that is impossible the
+        // subtitles stay off instead of silently switching to Arabic, Thai,
+        // Spanish, ... A language the viewer picked by hand still works for
+        // the current episode, but the next page load starts at English.
         function preferredSubtitleIndex(subtitles) {
             let en = -1;
-            let id = -1;
             subtitles.forEach((sub, i) => {
-                const code = subtitleLanguage(sub, i);
-                if (en === -1 && code === 'en') en = i;
-                if (id === -1 && code === 'id') id = i;
+                if (en === -1 && subtitleLanguage(sub, i) === 'en') en = i;
             });
-            return en !== -1 ? en : id;
+            return en;
         }
 
         function buildSubtitleOptions(subtitles) {
@@ -370,9 +368,10 @@
                 opt.textContent = sub.label;
                 menu.appendChild(opt);
             });
-            // Default on load is always English; Indonesian is the only
-            // fallback. Never fall back to the saved preference or to the
-            // first track.
+            // Default on load is always English (the server guarantees an
+            // English track via "English (Auto)" when the provider has
+            // none). Never fall back to the saved preference or the first
+            // track.
             let def = preferredSubtitleIndex(subtitles);
             // A viewer who turned CC off keeps it off across refreshes.
             if (localStorage.getItem('biblioanime_cc') === 'off') def = -1;
@@ -590,6 +589,12 @@
                 }
                 resumeApplied = true;
             }
+        });
+
+        // Attaching a new HLS source resets text track modes in Chrome, so
+        // re-assert the selection once playback actually starts as well.
+        video.addEventListener('play', function () {
+            if (currentSubIdx >= 0) applySubtitle(currentSubIdx, false);
         });
         function updateSkipButtons() {
             const t = video.currentTime || 0;

@@ -6,11 +6,12 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Best-effort English -> Indonesian subtitle translation.
+ * Best-effort subtitle translation (English -> Indonesian, and any
+ * language -> English for "English (Auto)" tracks).
  *
- * Takes an English WebVTT track, translates only the cue TEXT (timings are
- * copied verbatim, so sync is preserved) and caches the result for 30 days:
- * an episode is translated once, every later viewer gets it instantly.
+ * Takes a WebVTT track, translates only the cue TEXT (timings are copied
+ * verbatim, so sync is preserved) and caches the result for 30 days: an
+ * episode is translated once, every later viewer gets it instantly.
  *
  * Safety properties:
  * - Translation runs in chunks; if a chunk comes back with a different cue
@@ -60,10 +61,11 @@ class SubtitleTranslator
         return ($res === false || $code >= 400) ? null : $res;
     }
 
-    protected function translateChunk(array $lines): array
+    protected function translateChunk(array $lines, string $sourceLang = 'en', string $targetLang = 'id'): array
     {
         $text = implode("\n", $lines);
-        $url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=id&dt=t&q=' . urlencode($text);
+        $url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' . urlencode($sourceLang)
+            . '&tl=' . urlencode($targetLang) . '&dt=t&q=' . urlencode($text);
         $json = $this->fetchText($url);
         if ($json === null) {
             return $lines;
@@ -89,14 +91,34 @@ class SubtitleTranslator
      */
     public function indonesianVtt(string $englishVttUrl): ?string
     {
-        $cacheKey = 'anime_sub_id_' . md5($englishVttUrl);
+        return $this->translatedVtt($englishVttUrl, 'en', 'id', 'Indonesian (Auto)', 'anime_sub_id_');
+    }
+
+    /**
+     * Return English VTT content for a track in any language, or null.
+     * Used when a provider ships no English track at all so the player can
+     * still default to English instead of silently showing Arabic/Thai/...
+     */
+    public function englishVtt(string $sourceVttUrl): ?string
+    {
+        return $this->translatedVtt($sourceVttUrl, 'auto', 'en', 'English (Auto)', 'anime_sub_en_');
+    }
+
+    protected function translatedVtt(
+        string $sourceVttUrl,
+        string $sourceLang,
+        string $targetLang,
+        string $label,
+        string $cachePrefix,
+    ): ?string {
+        $cacheKey = $cachePrefix . md5($sourceVttUrl . '|' . $targetLang);
         $cached = Cache::get($cacheKey);
         if (is_string($cached) && $cached !== '') {
             return $cached;
         }
 
-        $vtt = Cache::remember('anime_sub_raw_' . md5($englishVttUrl), 21600, function () use ($englishVttUrl) {
-            return $this->fetchText($englishVttUrl);
+        $vtt = Cache::remember('anime_sub_raw_' . md5($sourceVttUrl), 21600, function () use ($sourceVttUrl) {
+            return $this->fetchText($sourceVttUrl);
         });
         if (!is_string($vtt) || $vtt === '' || !str_contains($vtt, '-->')) {
             return null;
@@ -136,9 +158,9 @@ class SubtitleTranslator
         $translated = [];
         $chunk = [];
         $chunkLen = 0;
-        $flush = function () use (&$chunk, &$translated, &$chunkLen) {
+        $flush = function () use (&$chunk, &$translated, &$chunkLen, $sourceLang, $targetLang) {
             if (!empty($chunk)) {
-                $translated = array_merge($translated, $this->translateChunk($chunk));
+                $translated = array_merge($translated, $this->translateChunk($chunk, $sourceLang, $targetLang));
                 $chunk = [];
                 $chunkLen = 0;
             }
@@ -157,7 +179,23 @@ class SubtitleTranslator
             return null;
         }
 
-        $out = "WEBVTT - Indonesian (Auto)\n\n";
+        // A failed/rate-limited translation returns the source lines
+        // unchanged. Serving that as "English (Auto)" would silently show
+        // Arabic/Indonesian/... under an English label, so treat it as a
+        // failure and let the player fall back instead of caching it.
+        $changed = false;
+        foreach ($translated as $i => $line) {
+            if (trim((string) $line) !== trim((string) $texts[$i])) {
+                $changed = true;
+                break;
+            }
+        }
+        if (!$changed) {
+            Log::warning('Subtitle translation produced no changes; serving none');
+            return null;
+        }
+
+        $out = "WEBVTT - {$label}\n\n";
         foreach ($cues as $i => $cue) {
             $out .= $cue['timing'] . "\n" . $translated[$i] . "\n\n";
         }
