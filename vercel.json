@@ -23,6 +23,13 @@
       "dest": "/$1"
     },
     {
+      "src": "/images/(.*)",
+      "dest": "/images/$1",
+      "headers": {
+        "cache-control": "public, max-age=604800"
+      }
+    },
+    {
       "src": "/(.*)",
       "dest": "/api/index.php"
     }
