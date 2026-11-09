@@ -1,8 +1,8 @@
-<x-manga-layout title="BiblioAnime — Nonton Anime Sub Indo Gratis">
+<x-manga-layout title="BiblioAnime — Watch Anime with English Subs for Free">
     <div class="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 space-y-10">
 
         @if($mode === 'home')
-            {{-- ===== HERO SLIDER: Trending/Populer dengan gambar HD ===== --}}
+            {{-- ===== HERO SLIDER: Trending/Popular with HD images ===== --}}
             @if(!empty($hero))
                 <section x-data="{ active: 0, total: {{ count($hero) }}, timer: null, next() { this.active = (this.active + 1) % this.total }, start() { if (!this.timer && this.total > 1) this.timer = setInterval(() => this.next(), 6000) }, stop() { if (this.timer) { clearInterval(this.timer); this.timer = null } } }" x-init="start()" @mouseenter="stop()" @mouseleave="start()"
                          class="relative h-[340px] overflow-hidden rounded-[2rem] bg-[#172a37] shadow-[0_25px_60px_-30px_rgba(23,42,55,0.7)] sm:h-[460px] sm:rounded-[2.5rem]">
@@ -24,16 +24,16 @@
                                     @if($slide['score'])<span class="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1"><span class="material-symbols-rounded text-sm text-[#fbbf24]">star</span>{{ $slide['score'] }}</span>@endif
                                     @if($slide['year'])<span class="rounded-full bg-white/10 px-2.5 py-1">{{ $slide['year'] }}</span>@endif
                                     <span class="rounded-full bg-white/10 px-2.5 py-1">{{ $slide['format'] }}</span>
-                                    @if($slide['episodes'])<span class="rounded-full bg-white/10 px-2.5 py-1">{{ $slide['episodes'] }} Episode</span>@endif
+                                    @if($slide['episodes'])<span class="rounded-full bg-white/10 px-2.5 py-1">{{ $slide['episodes'] }} Episodes</span>@endif
                                     <span class="rounded-full bg-[#0f766e] px-2.5 py-1 text-white">{{ $slide['status'] }}</span>
                                 </div>
                                 <p class="max-w-2xl text-sm leading-relaxed text-white/75 line-clamp-2">{{ $slide['description'] }}</p>
                                 <div class="flex flex-wrap gap-3 pt-1">
                                     <a href="{{ route('anime.show', ['id' => $slide['id']]) }}" class="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-[#172a37] transition hover:bg-[#f97316] hover:text-white">
-                                        <span class="material-symbols-rounded">play_circle</span> Tonton Sekarang
+                                        <span class="material-symbols-rounded">play_circle</span> Watch Now
                                     </a>
                                     <a href="{{ route('anime.index', ['category' => 'trending']) }}" class="inline-flex items-center gap-2 rounded-full border border-white/40 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-white/10">
-                                        Semua Trending
+                                        All Trending
                                     </a>
                                 </div>
                             </div>
@@ -45,8 +45,8 @@
             {{-- ===== CONTINUE WATCHING (localStorage) ===== --}}
             <section x-data="{ items: JSON.parse(localStorage.getItem('biblioanime_history') || '[]'), fmt(s) { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = String(s % 60).padStart(2, '0'); return h > 0 ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; } }" x-show="items.length > 0" x-cloak>
                 <div class="mb-4 flex items-end justify-between">
-                    <h2 class="text-xl sm:text-2xl font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Lanjutkan Menonton</h2>
-                    <span class="text-xs font-semibold text-[#84948a]">Posisi terakhir kamu tersimpan otomatis</span>
+                    <h2 class="text-xl sm:text-2xl font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Continue Watching</h2>
+                    <span class="text-xs font-semibold text-[#84948a]">Your last position is saved automatically</span>
                 </div>
                 <div class="flex gap-4 overflow-x-auto pb-2 custom-scroll snap-x">
                     <template x-for="item in items" :key="item.id">
@@ -63,7 +63,7 @@
                                 <h3 class="truncate text-sm font-bold text-[#172a37]" x-text="item.title"></h3>
                                 <div class="flex items-center justify-between text-[11px] font-semibold text-[#84948a]">
                                     <span>Episode <span x-text="item.episodeNumber"></span></span>
-                                    <span x-text="item.durationSec > 0 ? Math.round(100 * (item.positionSec || 0) / item.durationSec) + '% ditonton' : ''"></span>
+                                    <span x-text="item.durationSec > 0 ? Math.round(100 * (item.positionSec || 0) / item.durationSec) + '% watched' : ''"></span>
                                 </div>
                                 <div class="h-1.5 w-full rounded-full bg-[#eaddc2] overflow-hidden">
                                     <div class="h-full rounded-full bg-[#f97316]" :style="'width: ' + (item.durationSec > 0 ? Math.min(100, Math.round(100 * (item.positionSec || 0) / item.durationSec)) : 0) + '%'"></div>
@@ -78,8 +78,8 @@
             @if(!empty($trending))
                 <section>
                     <div class="mb-4 flex items-end justify-between">
-                        <h2 class="text-xl sm:text-2xl font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Sedang Trending</h2>
-                        <a href="{{ route('anime.index', ['category' => 'trending']) }}" class="text-xs font-bold text-[#0f766e] hover:underline">Lihat semua &rarr;</a>
+                        <h2 class="text-xl sm:text-2xl font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Trending Now</h2>
+                        <a href="{{ route('anime.index', ['category' => 'trending']) }}" class="text-xs font-bold text-[#0f766e] hover:underline">View All &rarr;</a>
                     </div>
                     <div class="flex gap-4 overflow-x-auto pb-2 custom-scroll snap-x">
                         @foreach($trending as $anime)
@@ -96,10 +96,10 @@
                 <section>
                     <div class="mb-4 flex items-end justify-between">
                         <div>
-                            <h2 class="text-xl sm:text-2xl font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Populer Musim Ini</h2>
-                            <p class="text-xs font-semibold text-[#84948a]">{{ ucfirst(strtolower($seasonInfo['season'])) }} {{ $seasonInfo['year'] }} &middot; rilisan terbaru &amp; terpopuler</p>
+                            <h2 class="text-xl sm:text-2xl font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Popular This Season</h2>
+                            <p class="text-xs font-semibold text-[#84948a]">{{ ucfirst(strtolower($seasonInfo['season'])) }} {{ $seasonInfo['year'] }} &middot; latest &amp; most popular releases</p>
                         </div>
-                        <a href="{{ route('anime.index', ['category' => 'season']) }}" class="text-xs font-bold text-[#0f766e] hover:underline">Lihat semua &rarr;</a>
+                        <a href="{{ route('anime.index', ['category' => 'season']) }}" class="text-xs font-bold text-[#0f766e] hover:underline">View All &rarr;</a>
                     </div>
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         @foreach($seasonPopular as $anime)
@@ -113,8 +113,8 @@
             @if(!empty($topRated))
                 <section>
                     <div class="mb-4 flex items-end justify-between">
-                        <h2 class="text-xl sm:text-2xl font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Skor Tertinggi Sepanjang Masa</h2>
-                        <a href="{{ route('anime.index', ['category' => 'top']) }}" class="text-xs font-bold text-[#0f766e] hover:underline">Lihat semua &rarr;</a>
+                        <h2 class="text-xl sm:text-2xl font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Highest Rated of All Time</h2>
+                        <a href="{{ route('anime.index', ['category' => 'top']) }}" class="text-xs font-bold text-[#0f766e] hover:underline">View All &rarr;</a>
                     </div>
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         @foreach(array_slice($topRated, 0, 6) as $anime)
@@ -128,8 +128,8 @@
             @if(!empty($upcoming))
                 <section>
                     <div class="mb-4 flex items-end justify-between">
-                        <h2 class="text-xl sm:text-2xl font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Segera Tayang</h2>
-                        <a href="{{ route('anime.index', ['category' => 'upcoming']) }}" class="text-xs font-bold text-[#0f766e] hover:underline">Lihat semua &rarr;</a>
+                        <h2 class="text-xl sm:text-2xl font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Coming Soon</h2>
+                        <a href="{{ route('anime.index', ['category' => 'upcoming']) }}" class="text-xs font-bold text-[#0f766e] hover:underline">View All &rarr;</a>
                     </div>
                     <div class="flex gap-4 overflow-x-auto pb-2 custom-scroll snap-x">
                         @foreach($upcoming as $anime)
@@ -147,21 +147,21 @@
                 <div class="space-y-1">
                     <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
                         @if($search !== '')
-                            Hasil untuk &ldquo;{{ $search }}&rdquo;
+                            Results for &ldquo;{{ $search }}&rdquo;
                         @else
-                            Katalog Anime
+                            Anime Catalog
                         @endif
                     </h1>
-                    <p class="text-sm text-[#6f7e75]">{{ number_format($total) }} judul ditemukan</p>
+                    <p class="text-sm text-[#6f7e75]">{{ number_format($total) }} titles found</p>
                 </div>
 
-                @php $catLabels = ['popular' => 'Populer', 'trending' => 'Trending', 'season' => 'Musim Ini', 'top' => 'Skor Tertinggi', 'ongoing' => 'Ongoing', 'completed' => 'Tamat', 'upcoming' => 'Segera Tayang']; @endphp
+                @php $catLabels = ['popular' => 'Popular', 'trending' => 'Trending', 'season' => 'This Season', 'top' => 'Highest Rated', 'ongoing' => 'Ongoing', 'completed' => 'Finished', 'upcoming' => 'Coming Soon']; @endphp
                 <div class="flex flex-wrap items-center gap-2.5">
                     {{-- Category: single dropdown button --}}
                     <div class="relative" x-data="{ open: false }" @keydown.escape="open = false">
                         <button type="button" @click="open = !open" class="inline-flex items-center gap-2 rounded-full border border-[#dcd2bd] bg-white px-4 py-2 text-xs font-bold text-[#172a37] shadow-sm transition hover:border-[#0f766e]/50">
                             <span class="material-symbols-rounded text-base text-[#0f766e]">tune</span>
-                            Kategori: <span class="text-[#0f766e]">{{ $catLabels[$currentCategory] ?? 'Populer' }}</span>
+                            Category: <span class="text-[#0f766e]">{{ $catLabels[$currentCategory] ?? 'Popular' }}</span>
                             <span class="material-symbols-rounded text-base transition-transform duration-200" :class="open ? 'rotate-180' : ''">expand_more</span>
                         </button>
                         <div x-show="open" x-cloak @click.outside="open = false" class="absolute left-0 z-30 mt-2 w-52 overflow-hidden rounded-2xl border border-[#e0d9c8] bg-white p-1.5 shadow-[0_20px_45px_-18px_rgba(23,42,55,0.45)]">
@@ -178,13 +178,13 @@
                     <div class="relative" x-data="{ open: false }" @keydown.escape="open = false">
                         <button type="button" @click="open = !open" class="inline-flex items-center gap-2 rounded-full border border-[#dcd2bd] bg-white px-4 py-2 text-xs font-bold text-[#172a37] shadow-sm transition hover:border-[#0f766e]/50">
                             <span class="material-symbols-rounded text-base text-[#0f766e]">theater_comedy</span>
-                            Genre: <span class="text-[#0f766e]">{{ $currentGenre ?: 'Semua Genre' }}</span>
+                            Genre: <span class="text-[#0f766e]">{{ $currentGenre ?: 'All Genres' }}</span>
                             <span class="material-symbols-rounded text-base transition-transform duration-200" :class="open ? 'rotate-180' : ''">expand_more</span>
                         </button>
                         <div x-show="open" x-cloak @click.outside="open = false" class="absolute left-0 z-30 mt-2 w-56 overflow-hidden rounded-2xl border border-[#e0d9c8] bg-white p-1.5 shadow-[0_20px_45px_-18px_rgba(23,42,55,0.45)]">
                             <div class="custom-scroll max-h-72 overflow-y-auto">
                                 <a href="{{ route('anime.index', array_merge(request()->except(['genre', 'page']), [])) }}" class="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition {{ !$currentGenre ? 'bg-[#0f766e] text-white' : 'text-[#4c5b54] hover:bg-[#f6f1e8]' }}">
-                                    Semua Genre
+                                    All Genres
                                     @if(!$currentGenre)<span class="material-symbols-rounded text-sm">check</span>@endif
                                 </a>
                                 @foreach($genres as $genre)
@@ -201,7 +201,7 @@
                 @if(empty($animes))
                     <div class="rounded-3xl border border-dashed border-[#dcd2bd] bg-white/60 py-16 text-center">
                         <span class="material-symbols-rounded text-4xl text-[#c1cbbb]">search_off</span>
-                        <p class="mt-2 text-sm font-medium text-[#6f7e75]">Tidak ada anime yang cocok. Coba kata kunci atau filter lain.</p>
+                        <p class="mt-2 text-sm font-medium text-[#6f7e75]">No matching anime found. Try another keyword or filter.</p>
                     </div>
                 @else
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -213,15 +213,15 @@
                     <div class="flex items-center justify-between pt-2">
                         @if($page > 1)
                             <a href="{{ route('anime.index', array_merge(request()->query(), ['page' => $page - 1])) }}" class="inline-flex items-center gap-1 rounded-full border border-[#dcd2bd] bg-white px-4 py-2 text-xs font-bold text-[#172a37] transition hover:border-[#0f766e]/50">
-                                <span class="material-symbols-rounded text-base">arrow_back</span> Sebelumnya
+                                <span class="material-symbols-rounded text-base">arrow_back</span> Previous
                             </a>
                         @else
                             <span></span>
                         @endif
-                        <span class="text-xs font-semibold text-[#84948a]">Halaman {{ $page }} dari {{ $totalPages }}</span>
+                        <span class="text-xs font-semibold text-[#84948a]">Page {{ $page }} of {{ $totalPages }}</span>
                         @if($page < $totalPages)
                             <a href="{{ route('anime.index', array_merge(request()->query(), ['page' => $page + 1])) }}" class="inline-flex items-center gap-1 rounded-full bg-[#0f766e] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#115e59]">
-                                Berikutnya <span class="material-symbols-rounded text-base">arrow_forward</span>
+                                Next <span class="material-symbols-rounded text-base">arrow_forward</span>
                             </a>
                         @else
                             <span></span>

@@ -64,26 +64,32 @@ class SubtitleTranslator
     protected function translateChunk(array $lines, string $sourceLang = 'en', string $targetLang = 'id'): array
     {
         $text = implode("\n", $lines);
-        $url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' . urlencode($sourceLang)
+        $query = 'client=gtx&sl=' . urlencode($sourceLang)
             . '&tl=' . urlencode($targetLang) . '&dt=t&q=' . urlencode($text);
-        $json = $this->fetchText($url);
-        if ($json === null) {
-            return $lines;
+
+        // Google occasionally rate-limits one host while another still
+        // answers, so try both before giving up.
+        foreach (['https://translate.googleapis.com', 'https://translate.google.com'] as $host) {
+            $json = $this->fetchText($host . '/translate_a/single?' . $query);
+            if ($json === null) {
+                continue;
+            }
+            $data = json_decode($json, true);
+            if (!isset($data[0]) || !is_array($data[0])) {
+                continue;
+            }
+            $translated = '';
+            foreach ($data[0] as $segment) {
+                $translated .= $segment[0] ?? '';
+            }
+            $out = explode("\n", trim($translated));
+            // Alignment check: never risk a shifted timeline.
+            if (count($out) === count($lines)) {
+                return array_map(fn ($l) => trim($l) === '' ? $l : trim($l), $out);
+            }
         }
-        $data = json_decode($json, true);
-        if (!isset($data[0]) || !is_array($data[0])) {
-            return $lines;
-        }
-        $translated = '';
-        foreach ($data[0] as $segment) {
-            $translated .= $segment[0] ?? '';
-        }
-        $out = explode("\n", trim($translated));
-        // Alignment check: never risk a shifted timeline.
-        if (count($out) !== count($lines)) {
-            return $lines;
-        }
-        return array_map(fn ($l) => trim($l) === '' ? $l : trim($l), $out);
+
+        return $lines;
     }
 
     /**
@@ -193,6 +199,19 @@ class SubtitleTranslator
         if (!$changed) {
             Log::warning('Subtitle translation produced no changes; serving none');
             return null;
+        }
+
+        // English output must actually be English: a partially failed
+        // translation can still contain mostly Arabic/CJK/Thai script under
+        // an "English (Auto)" label, which is exactly what we must prevent.
+        if ($targetLang === 'en') {
+            $joined = implode(' ', $translated);
+            $latin = preg_match_all('/[A-Za-z]/', $joined);
+            $other = preg_match_all('/[\x{0600}-\x{06FF}\x{0E00}-\x{0E7F}\x{4E00}-\x{9FFF}\x{3040}-\x{30FF}\x{AC00}-\x{D7AF}\x{0400}-\x{04FF}]/u', $joined);
+            if ($latin < 20 || $other > $latin) {
+                Log::warning('Subtitle translation did not produce English output; serving none');
+                return null;
+            }
         }
 
         $out = "WEBVTT - {$label}\n\n";

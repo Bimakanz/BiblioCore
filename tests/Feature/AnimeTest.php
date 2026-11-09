@@ -10,7 +10,7 @@ class AnimeTest extends TestCase
     {
         $response = $this->get('/');
         $response->assertOk();
-        $response->assertSee('aria-label="Pilih mode"', false);
+        $response->assertSee('aria-label="Select mode"', false);
         $response->assertSee('href="' . route('anime.index') . '"', false);
         $response->assertSee('Manga', false);
     }
@@ -19,7 +19,7 @@ class AnimeTest extends TestCase
     {
         $response = $this->get('/anime');
         $response->assertOk();
-        $response->assertSee('aria-label="Pilih mode"', false);
+        $response->assertSee('aria-label="Select mode"', false);
         $response->assertSee('href="' . route('manga.index') . '"', false);
         $response->assertSee('BiblioAnime', false);
     }

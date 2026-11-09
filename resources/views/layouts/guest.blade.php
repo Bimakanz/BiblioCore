@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ $title ?? 'Masuk | BiblioManga' }}</title>
+    <title>{{ $title ?? 'Sign In | BiblioManga' }}</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -32,10 +32,10 @@
                         BiblioManga
                     </span>
                     <h1 class="text-4xl font-semibold leading-tight text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
-                        Baca manga, manhwa, dan manhua favoritmu tanpa batas.
+                        Read your favorite manga, manhwa, and manhua without limits.
                     </h1>
                     <p class="text-sm leading-relaxed text-[#4c5b54]">
-                        Katalog publik tetap terbuka tanpa login. Akun hanya diperlukan untuk mengelola profil dan preferensi bacaanmu.
+                        Public catalog remains open without login. Account is only required to manage your profile and reading preferences.
                     </p>
                 </div>
 
@@ -43,15 +43,15 @@
                     <div class="flex items-start gap-3 rounded-[1.75rem] border border-[#f4bb7a]/40 bg-white/80 px-4 py-3">
                         <span class="material-symbols-rounded text-base text-[#f97316]">public</span>
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#b95d23]">Akses publik</p>
-                            <p class="mt-1">Jelajahi dan baca chapter tanpa registrasi, login, ataupun biaya.</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#b95d23]">Public Access</p>
+                            <p class="mt-1">Browse and read chapters without registration, login, or fees.</p>
                         </div>
                     </div>
                     <div class="flex items-start gap-3 rounded-[1.75rem] border border-[#0f766e]/40 bg-[#0f766e]/10 px-4 py-3">
                         <span class="material-symbols-rounded text-base text-[#0f766e]">bookmark_added</span>
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#0f766e]">Untuk pembaca</p>
-                            <p class="mt-1">Simpan favorit dan riwayat bacaan langsung di perangkatmu.</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#0f766e]">For Readers</p>
+                            <p class="mt-1">Save favorites and reading history directly on your device.</p>
                         </div>
                     </div>
                 </div>
@@ -63,16 +63,16 @@
                         <span class="material-symbols-rounded text-2xl">lock</span>
                     </span>
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#6b766f]">Portal akun</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#6b766f]">Account Portal</p>
                         <h2 class="text-xl font-semibold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
-                            Masuk ke BiblioManga
+                            Sign In to BiblioManga
                         </h2>
                     </div>
                 </div>
 
                 <div class="space-y-2 text-sm text-[#4c5b54]">
-                    <p>Gunakan akun yang telah terdaftar untuk mengakses profilmu.</p>
-                    <p class="text-xs text-[#9aa29a]">Ingin membaca tanpa akun? Katalog publik tetap bisa diakses langsung.</p>
+                    <p>Use your registered account to access your profile.</p>
+                    <p class="text-xs text-[#9aa29a]">Want to read without an account? The public catalog is still accessible directly.</p>
                 </div>
 
                 <div class="space-y-6 animate-fadeInUp">
@@ -80,7 +80,7 @@
                 </div>
 
                 <p class="pt-6 text-center text-xs text-[#9aa29a]">
-                    &copy; {{ now()->year }} BiblioManga • Pembaca Manga Online Gratis
+                    &copy; {{ now()->year }} BiblioManga • Free Online Manga Reader
                 </p>
             </div>
         </div>

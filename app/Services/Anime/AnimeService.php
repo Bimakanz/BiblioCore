@@ -431,14 +431,14 @@ class AnimeService
         $rawDesc = (string) ($m['description'] ?? '');
         $cleanDesc = html_entity_decode(trim(strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $rawDesc))));
         if ($cleanDesc === '') {
-            $cleanDesc = 'Tidak ada sinopsis.';
+            $cleanDesc = 'No synopsis available.';
         }
 
         $statusMap = [
             'RELEASING' => 'Ongoing',
-            'FINISHED' => 'Tamat',
-            'NOT_YET_RELEASED' => 'Segera Tayang',
-            'CANCELLED' => 'Dibatalkan',
+            'FINISHED' => 'Finished',
+            'NOT_YET_RELEASED' => 'Coming Soon',
+            'CANCELLED' => 'Cancelled',
             'HIATUS' => 'Hiatus',
         ];
 

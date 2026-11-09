@@ -1,11 +1,11 @@
-<x-manga-layout title="Pengaturan Profil — BiblioManga">
+<x-manga-layout title="Profile Settings — BiblioManga">
     <div class="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 space-y-6">
         <div>
             <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
-                Pengaturan Profil
+                Profile Settings
             </h1>
             <p class="mt-1 text-sm text-[#4c5b54]">
-                Perbarui informasi akun, kata sandi, dan kelola akses BiblioManga-mu.
+                Update your account information, password, and manage your BiblioManga access.
             </p>
         </div>
 

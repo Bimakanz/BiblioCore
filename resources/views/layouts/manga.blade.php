@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>{{ $title ?? 'BiblioManga — Baca Manga Online Tanpa Batas' }}</title>
+    <title>{{ $title ?? 'BiblioManga — Read Manga Online Without Limits' }}</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -184,7 +184,7 @@
         $liveSearchEndpoint = $isAnimeMode ? '/anime/api/live-search' : '/manga/api/live-search';
         $detailBase = $isAnimeMode ? '/anime/' : '/manga/';
         $searchAllBase = $isAnimeMode ? '/anime?q=' : '/manga?q=';
-        $searchPlaceholder = $isAnimeMode ? 'Cari judul anime...' : 'Cari judul manga, manhwa, manhua...';
+        $searchPlaceholder = $isAnimeMode ? 'Search anime titles...' : 'Search manga, manhwa, manhua titles...';
     @endphp
 
     <!-- Header Navigation -->
@@ -279,7 +279,7 @@
 
                     <a :href="'{{ $searchAllBase }}' + encodeURIComponent(query)"
                        class="block w-full text-center py-2 text-xs font-bold text-[#0f766e] hover:bg-[#0f766e]/10 rounded-xl transition border-t border-[#e0d9c8] mt-1">
-                        Lihat semua hasil pencarian &rarr;
+                        View all search results &rarr;
                     </a>
                 </div>
             </div>
@@ -294,18 +294,18 @@
                     <span class="rounded-full bg-[#0f766e] text-white text-[10px] px-1.5 py-0.2" x-text="visibleHistory.length" x-show="visibleHistory.length > 0"></span>
                 </button>
 
-                <!-- Favorit Button: manga mode only (favorites are manga-only) -->
+                <!-- Favorites Button: manga mode only (favorites are manga-only) -->
                 @if(!$isAnimeMode)
                 <button type="button" @click="favModalOpen = true"
                         class="inline-flex items-center gap-1 rounded-full border border-[#f97316]/30 bg-[#f97316]/10 px-3.5 py-2.5 sm:py-1.5 text-xs font-semibold text-[#ea580c] transition hover:bg-[#f97316]/20">
                     <span class="material-symbols-rounded text-base">bookmark</span>
-                    <span class="hidden sm:inline">Favorit</span>
+                    <span class="hidden sm:inline">Favorites</span>
                     <span class="rounded-full bg-[#ea580c] text-white text-[10px] px-1.5 py-0.2" x-text="favorites.length"></span>
                 </button>
                 @endif
 
                 <!-- Mode Switch: two explicit buttons (Manga / Anime) -->
-                <div class="flex flex-shrink-0 items-center rounded-full border border-[#dcd2bd] bg-[#fbf9f4] p-1" role="group" aria-label="Pilih mode">
+                <div class="flex flex-shrink-0 items-center rounded-full border border-[#dcd2bd] bg-[#fbf9f4] p-1" role="group" aria-label="Select mode">
                     <a href="{{ route('manga.index') }}"
                        @if(!$isAnimeMode) aria-current="page" @endif
                        class="whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold leading-none transition sm:px-3 sm:py-1.5 sm:text-xs {{ $isAnimeMode ? 'text-[#6f7e75] hover:text-[#172a37]' : 'bg-[#0f766e] text-white shadow-sm' }}">
@@ -394,7 +394,7 @@
                 </template>
                 <a :href="'{{ $searchAllBase }}' + encodeURIComponent(query)"
                    class="block w-full text-center py-1.5 text-xs font-bold text-[#0f766e] hover:bg-[#0f766e]/10 rounded-xl transition border-t border-[#e0d9c8] mt-1">
-                    Lihat semua hasil &rarr;
+                    View all results &rarr;
                 </a>
             </div>
         </div>
@@ -418,7 +418,7 @@
             <div class="flex items-center justify-between border-b border-[#e0d9c8] pb-3">
                 <div class="flex items-center gap-2">
                     <span class="material-symbols-rounded text-[#f97316]">bookmarks</span>
-                    <h3 class="text-lg font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Manga Favorit Kamu</h3>
+                    <h3 class="text-lg font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Your Favorite Manga</h3>
                 </div>
                 <button type="button" @click="favModalOpen = false" class="text-gray-400 hover:text-gray-600">
                     <span class="material-symbols-rounded">close</span>
@@ -430,8 +430,8 @@
                 <template x-if="favorites.length === 0">
                     <div class="py-12 text-center text-[#6f7e75]">
                         <span class="material-symbols-rounded text-4xl text-[#c1cbbb]">bookmark_border</span>
-                        <p class="mt-2 text-sm font-medium">Belum ada manga yang kamu simpan.</p>
-                        <p class="text-xs text-[#9aa29a]">Klik tombol "Simpan ke Favorit" pada halaman manga favoritmu!</p>
+                        <p class="mt-2 text-sm font-medium">No manga saved yet.</p>
+                        <p class="text-xs text-[#9aa29a]">Click "Add to Favorites" on your favorite manga page!</p>
                     </div>
                 </template>
 
@@ -444,7 +444,7 @@
                                 <span class="inline-block mt-1 text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-[#0f766e]/10 text-[#0f766e]" x-text="item.status"></span>
                             </div>
                         </a>
-                        <button type="button" @click="toggleFav(item)" class="btn-delete-uiverse" title="Hapus dari favorit">
+                        <button type="button" @click="toggleFav(item)" class="btn-delete-uiverse" title="Remove from favorites">
                             <svg viewBox="0 0 448 512" class="delSvgIcon">
                                 <path d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64S14.3 96 32 96H416c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 296.3 0 284.2 0H163.8c-12.1 0-23.2 6.8-28.6 17.7zM416 128H32L53.2 467c1.6 25.3 22.6 45 47.9 45H346.9c25.3 0 46.3-19.7 47.9-45L416 128z"/>
                             </svg>
@@ -468,7 +468,7 @@
             <div class="flex items-center justify-between border-b border-[#e0d9c8] pb-3">
                 <div class="flex items-center gap-2">
                     <span class="material-symbols-rounded text-[#0f766e]">history</span>
-                    <h3 class="text-lg font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;" x-text="isAnimeMode ? 'Riwayat Menonton' : 'Riwayat Membaca'">Riwayat Membaca</h3>
+                    <h3 class="text-lg font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;" x-text="isAnimeMode ? 'Watch History' : 'Reading History'">Reading History</h3>
                 </div>
                 <button type="button" @click="historyModalOpen = false" class="text-gray-400 hover:text-gray-600 transition">
                     <span class="material-symbols-rounded">close</span>
@@ -480,8 +480,8 @@
                 <template x-if="visibleHistory.length === 0">
                     <div class="py-12 text-center text-[#6f7e75]">
                         <span class="material-symbols-rounded text-4xl text-[#c1cbbb]" x-text="isAnimeMode ? 'live_tv' : 'auto_stories'">auto_stories</span>
-                        <p class="mt-2 text-sm font-medium" x-text="isAnimeMode ? 'Belum ada riwayat tontonan.' : 'Belum ada riwayat bacaan.'">Belum ada riwayat bacaan.</p>
-                        <p class="text-xs text-[#9aa29a]" x-text="isAnimeMode ? 'Tonton episode anime apa saja dan riwayatmu otomatis tersimpan di sini!' : 'Buka chapter manga apa saja dan riwayatmu otomatis tersimpan di sini!'">Buka chapter manga apa saja dan riwayatmu otomatis tersimpan di sini!</p>
+                        <p class="mt-2 text-sm font-medium" x-text="isAnimeMode ? 'No watch history yet.' : 'No reading history yet.'">No reading history yet.</p>
+                        <p class="text-xs text-[#9aa29a]" x-text="isAnimeMode ? 'Watch any anime episode and your history will be saved here!' : 'Open any manga chapter and your history will be saved here!'">Open any manga chapter and your history will be saved here!</p>
                     </div>
                 </template>
 
@@ -519,9 +519,9 @@
                         <div class="flex items-center gap-2 flex-shrink-0">
                             <a :href="historyHref(item)"
                                class="rounded-xl bg-[#0f766e] px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#115e59] shadow-sm">
-                                Lanjut
+                                Continue
                             </a>
-                            <button type="button" @click="removeHistoryItem(item)" class="btn-delete-uiverse" title="Hapus dari riwayat">
+                            <button type="button" @click="removeHistoryItem(item)" class="btn-delete-uiverse" title="Remove from history">
                                 <svg viewBox="0 0 448 512" class="delSvgIcon">
                                     <path d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64S14.3 96 32 96H416c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 296.3 0 284.2 0H163.8c-12.1 0-23.2 6.8-28.6 17.7zM416 128H32L53.2 467c1.6 25.3 22.6 45 47.9 45H346.9c25.3 0 46.3-19.7 47.9-45L416 128z"/>
                                 </svg>
@@ -531,7 +531,7 @@
                 </template>
 
                 <div x-show="visibleHistory.length > 0" class="pt-1 text-right">
-                    <button type="button" @click="clearVisibleHistory()" class="text-xs font-bold text-[#ea580c] hover:underline">Hapus semua riwayat</button>
+                    <button type="button" @click="clearVisibleHistory()" class="text-xs font-bold text-[#ea580c] hover:underline">Clear all history</button>
                 </div>
             </div>
         </div>

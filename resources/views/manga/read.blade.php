@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -65,7 +65,7 @@
                     chapterNumber: this.currentChapter.chapter,
                     chapterTitle: this.currentChapter.title || '',
                     source: this.currentChapter.provider || 'MangaDex',
-                    readAt: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) + ', ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+                    readAt: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) + ', ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                 });
                 if (hist.length > 50) hist = hist.slice(0, 50);
                 localStorage.setItem('bibliomanga_history', JSON.stringify(hist));
@@ -299,7 +299,7 @@
                 :disabled="!prevChapter"
                 class="flex h-8 w-8 items-center justify-center rounded-xl transition"
                 :class="prevChapter ? 'bg-white/5 text-white/80 hover:bg-white/15 hover:text-white cursor-pointer' : 'text-white/20 cursor-not-allowed'"
-                :title="prevChapter ? ('Chapter Sebelumnya (Ch. ' + prevChapter.chapter + ')') : 'Tidak ada chapter sebelumnya'">
+                :title="prevChapter ? ('Previous Chapter (Ch. ' + prevChapter.chapter + ')') : 'No previous chapter'">
             <span class="material-symbols-rounded text-lg">chevron_left</span>
         </button>
 
@@ -319,7 +319,7 @@
                 :disabled="!nextChapter"
                 class="flex h-8 w-8 items-center justify-center rounded-xl transition"
                 :class="nextChapter ? 'bg-white/5 text-white/80 hover:bg-white/15 hover:text-white cursor-pointer' : 'text-white/20 cursor-not-allowed'"
-                :title="nextChapter ? ('Chapter Selanjutnya (Ch. ' + nextChapter.chapter + ')') : 'Tidak ada chapter selanjutnya'">
+                :title="nextChapter ? ('Next Chapter (Ch. ' + nextChapter.chapter + ')') : 'No next chapter'">
             <span class="material-symbols-rounded text-lg">chevron_right</span>
         </button>
 
@@ -340,14 +340,14 @@
         <a href="{{ route('manga.index') }}"
            @click.stop
            class="flex h-10 w-10 items-center justify-center rounded-xl text-white/80 hover:bg-white/15 hover:text-white transition"
-           title="Kembali ke Beranda">
+           title="Back to Home">
             <span class="material-symbols-rounded text-2xl">home</span>
         </a>
 
         <!-- Tombol Reading Mode Toggle (Bentuk Buku Terbuka: Slide <=> Webtoon) -->
         <button type="button"
                 @click.stop="toggleMode()"
-                :title="mode === 'paged' ? 'Mode: Slide (Klik untuk ganti ke Webtoon)' : 'Mode: Webtoon (Klik untuk ganti ke Slide)'"
+                :title="mode === 'paged' ? 'Mode: Slide (Click to switch to Webtoon)' : 'Mode: Webtoon (Click to switch to Slide)'"
                 class="flex h-10 w-10 items-center justify-center rounded-xl transition hover:bg-white/15 relative"
                 :class="mode === 'paged' ? 'text-[#2dd4bf] bg-white/10' : 'text-white/80 hover:text-white'">
             <span class="material-symbols-rounded text-2xl">menu_book</span>
@@ -359,7 +359,7 @@
         <button type="button"
                 x-show="mode === 'paged'"
                 @click.stop="toggleHandMode()"
-                :title="handMode === 'left' ? 'Mode Tangan Kiri Aktif (Ketuk kiri untuk Next)' : 'Mode Tangan Kanan Aktif (Ketuk kanan untuk Next)'"
+                :title="handMode === 'left' ? 'Left-Hand Mode Active (Tap left for Next)' : 'Right-Hand Mode Active (Tap right for Next)'"
                 class="flex h-10 w-10 items-center justify-center rounded-xl transition hover:bg-white/15 relative"
                 :class="handMode === 'left' ? 'text-amber-400 bg-white/10 ring-1 ring-amber-400/40' : 'text-white/80 hover:text-white'">
             <span class="material-symbols-rounded text-2xl">pan_tool_alt</span>
@@ -373,14 +373,14 @@
         <a href="{{ route('manga.show', $manga['id']) }}"
            @click.stop
            class="flex h-10 w-10 items-center justify-center rounded-xl text-white/80 hover:bg-white/15 hover:text-white transition"
-           title="Detail Manga & Daftar Chapter">
+           title="Manga Details & Chapter List">
             <span class="material-symbols-rounded text-2xl">format_list_bulleted</span>
         </a>
 
         <!-- Tombol Fullscreen -->
         <button type="button"
                 @click.stop="toggleFullscreen()"
-                title="Layar Penuh"
+                title="Fullscreen"
                 class="flex h-10 w-10 items-center justify-center rounded-xl text-white/80 hover:bg-white/15 hover:text-white transition">
             <span class="material-symbols-rounded text-2xl" x-text="isFullscreen ? 'fullscreen_exit' : 'fullscreen'">fullscreen</span>
         </button>
@@ -431,12 +431,12 @@
                         <div x-show="!loaded"
                              class="absolute inset-0 flex flex-col items-center justify-center bg-[#171a1e] text-[#6b766f] space-y-2">
                             <div class="h-8 w-8 animate-spin rounded-full border-2 border-[#0f766e] border-t-transparent"></div>
-                            <span class="text-[11px] font-semibold text-white/40 tracking-wider">Halaman <span x-text="p.page"></span></span>
+                            <span class="text-[11px] font-semibold text-white/40 tracking-wider">Page <span x-text="p.page"></span></span>
                         </div>
 
                         <!-- Panel Image -->
                         <img :src="src"
-                             :alt="'Halaman ' + p.page"
+                             :alt="'Page ' + p.page"
                              loading="lazy"
                              referrerpolicy="no-referrer"
                              x-on:load="loaded = true"
@@ -448,10 +448,10 @@
                         <div x-show="showError && !loaded"
                              class="absolute inset-0 flex flex-col items-center justify-center p-6 bg-[#1a1315] text-center space-y-2">
                             <span class="material-symbols-rounded text-2xl text-amber-500">broken_image</span>
-                            <p class="text-xs text-white/80">Halaman <span x-text="p.page"></span> terhambat koneksi.</p>
+                            <p class="text-xs text-white/80">Page <span x-text="p.page"></span> failed to load.</p>
                             <button type="button" @click.stop="retry()"
                                     class="rounded-full bg-[#0f766e] px-4 py-1.5 text-xs font-bold text-white transition hover:bg-[#115e59]">
-                                Coba Muat Ulang
+                                Retry
                             </button>
                         </div>
 
@@ -471,15 +471,15 @@
                  Left Hand Mode: Left 30% Next, Mid 40% Menu, Right 30% Prev -->
             <div class="fixed inset-y-0 left-0 w-[30%] z-20 cursor-default"
                  @click="handMode === 'left' ? nextPage() : prevPage()"
-                 :title="handMode === 'left' ? 'Halaman Berikutnya (Mode Tangan Kiri)' : 'Halaman Sebelumnya (Klik / Panah Kiri)'"></div>
+                 :title="handMode === 'left' ? 'Next Page (Left-Hand Mode)' : 'Previous Page (Click / Left Arrow)'"></div>
             
             <div class="fixed inset-y-0 left-[30%] w-[40%] z-20 cursor-pointer"
                  @click="showMenu = !showMenu"
-                 title="Menu Navigasi (Ketuk Tengah Layar)"></div>
+                 title="Navigation Menu (Tap Center)"></div>
 
             <div class="fixed inset-y-0 right-0 w-[30%] z-20 cursor-default"
                  @click="handMode === 'left' ? prevPage() : nextPage()"
-                 :title="handMode === 'left' ? 'Halaman Sebelumnya (Mode Tangan Kiri)' : 'Halaman Berikutnya (Klik / Panah Kanan)'"></div>
+                 :title="handMode === 'left' ? 'Previous Page (Left-Hand Mode)' : 'Next Page (Click / Right Arrow)'"></div>
 
             <!-- The Pure Manga Image -->
             <div class="relative w-full flex items-center justify-center min-h-screen">
@@ -515,12 +515,12 @@
                         <!-- Skeleton loading -->
                         <div x-show="!pLoaded" class="min-h-[70vh] flex flex-col items-center justify-center text-white/40 space-y-3">
                             <div class="h-8 w-8 animate-spin rounded-full border-2 border-[#0f766e] border-t-transparent"></div>
-                            <span class="text-xs font-semibold text-white/50 tracking-wider">Halaman <span x-text="p.page"></span></span>
+                            <span class="text-xs font-semibold text-white/50 tracking-wider">Page <span x-text="p.page"></span></span>
                         </div>
 
                         <!-- Pure Image -->
                         <img :src="pSrc"
-                             :alt="'Halaman ' + p.page"
+                             :alt="'Page ' + p.page"
                              referrerpolicy="no-referrer"
                              x-on:load="pLoaded = true; pShowError = false"
                              x-on:error="handleError()"
@@ -531,10 +531,10 @@
                         <div x-show="pShowError && !pLoaded"
                              class="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-3 z-30">
                             <span class="material-symbols-rounded text-3xl text-amber-500">broken_image</span>
-                            <p class="text-xs text-white/80">Halaman <span x-text="p.page"></span> terhambat koneksi.</p>
+                            <p class="text-xs text-white/80">Page <span x-text="p.page"></span> failed to load.</p>
                             <button type="button" @click.stop="retry()"
                                     class="rounded-full bg-[#0f766e] px-4 py-1.5 text-xs font-bold text-white transition hover:bg-[#115e59]">
-                                Coba Muat Ulang
+                                Retry
                             </button>
                         </div>
                     </div>
@@ -549,7 +549,7 @@
             x-show="mode === 'webtoon' && progress > 15"
             x-transition
             class="fixed bottom-6 right-6 z-40 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0f766e] text-white shadow-xl shadow-[#0f766e]/40 transition hover:scale-110 hover:bg-[#115e59]"
-            title="Kembali ke Atas">
+            title="Scroll to Top">
         <span class="material-symbols-rounded text-xl">arrow_upward</span>
     </button>
 

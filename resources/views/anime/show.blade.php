@@ -22,7 +22,7 @@
                         @if($anime['season'])<span class="rounded-full bg-white border border-[#dcd2bd] px-3 py-0.5 text-[11px] font-bold text-[#4c5b54]">{{ $anime['season'] }}</span>@endif
                         @if($anime['nextAiring'])
                             <span class="rounded-full bg-[#f97316]/10 border border-[#f97316]/30 px-3 py-0.5 text-[11px] font-bold text-[#ea580c]">
-                                Episode {{ $anime['nextAiring']['episode'] }} tayang dalam {{ (int) floor($anime['nextAiring']['timeUntilAiring'] / 86400) }} hari {{ (int) floor(($anime['nextAiring']['timeUntilAiring'] % 86400) / 3600) }} jam
+                                Episode {{ $anime['nextAiring']['episode'] }} airs in {{ (int) floor($anime['nextAiring']['timeUntilAiring'] / 86400) }} days {{ (int) floor(($anime['nextAiring']['timeUntilAiring'] % 86400) / 3600) }} hours
                             </span>
                         @endif
                     </div>
@@ -33,8 +33,8 @@
                     <div class="flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-1 text-sm font-semibold text-[#4c5b54]">
                         @if($anime['score'])<span class="inline-flex items-center gap-1"><span class="material-symbols-rounded text-base text-[#f59e0b]">star</span>{{ $anime['score'] }}/10</span>@endif
                         @if($anime['year'])<span>{{ $anime['year'] }}</span>@endif
-                        @if($anime['episodes'])<span>{{ $anime['episodes'] }} Episode</span>@endif
-                        @if($anime['duration'])<span>{{ $anime['duration'] }} menit/episode</span>@endif
+                        @if($anime['episodes'])<span>{{ $anime['episodes'] }} Episodes</span>@endif
+                        @if($anime['duration'])<span>{{ $anime['duration'] }} min/episode</span>@endif
                         @if(!empty($anime['studios']))<span>{{ implode(', ', $anime['studios']) }}</span>@endif
                     </div>
                     @if(!empty($anime['genres']))
@@ -51,7 +51,7 @@
                             <a :href="'/anime/{{ $anime['id'] }}/watch?ep=' + encodeURIComponent(entry.episodeId || '') + '&n=' + encodeURIComponent(entry.episodeNumber || 1) + '&t=' + Math.max(0, Math.floor((entry.positionSec || 0) - 5))"
                                class="inline-flex items-center gap-2 rounded-full bg-[#f97316] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#ea580c]">
                                 <span class="material-symbols-rounded">resume</span>
-                                Lanjut Episode <span x-text="entry.episodeNumber"></span>
+                                Resume Episode <span x-text="entry.episodeNumber"></span>
                             </a>
                         </template>
                     </div>
@@ -61,11 +61,11 @@
             {{-- Title names --}}
             @if(!empty($anime['titles']) || !empty($anime['synonyms']))
                 <section class="mt-8 rounded-3xl border border-[#e0d9c8] bg-white p-6 shadow-sm">
-                    <h2 class="mb-3 text-base font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Nama Judul</h2>
+                    <h2 class="mb-3 text-base font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Title Names</h2>
                     <dl class="space-y-2.5 text-sm">
                         @if(!empty($anime['titles']['native']))
                             <div class="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
-                                <dt class="w-24 flex-shrink-0 font-bold text-[#172a37]">Judul Asli</dt>
+                                <dt class="w-24 flex-shrink-0 font-bold text-[#172a37]">Native Title</dt>
                                 <dd class="text-[#4c5b54]">{{ $anime['titles']['native'] }}</dd>
                             </div>
                         @endif
@@ -83,7 +83,7 @@
                         @endif
                         @if(!empty($anime['synonyms']))
                             <div class="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
-                                <dt class="w-24 flex-shrink-0 font-bold text-[#172a37]">Sinonim</dt>
+                                <dt class="w-24 flex-shrink-0 font-bold text-[#172a37]">Synonyms</dt>
                                 <dd class="leading-relaxed text-[#4c5b54]">{{ implode(', ', $anime['synonyms']) }}</dd>
                             </div>
                         @endif
@@ -93,7 +93,7 @@
 
             {{-- Synopsis --}}
             <section class="mt-8 rounded-3xl border border-[#e0d9c8] bg-white p-6 shadow-sm">
-                <h2 class="mb-2 text-base font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Sinopsis</h2>
+                <h2 class="mb-2 text-base font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Synopsis</h2>
                 <p class="text-sm leading-relaxed text-[#4c5b54] whitespace-pre-line">{{ $anime['description'] }}</p>
             </section>
 
@@ -152,11 +152,11 @@
                      x-init="load()">
                 <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <h2 class="text-base font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
-                        Daftar Episode <span class="text-[#84948a] font-semibold" x-show="!loading" x-text="episodes.length ? '(' + episodes.length + ')' : ''"></span>
+                        Episode List <span class="text-[#84948a] font-semibold" x-show="!loading" x-text="episodes.length ? '(' + episodes.length + ')' : ''"></span>
                     </h2>
                     <div class="relative">
                         <span class="material-symbols-rounded absolute left-3 top-1/2 -translate-y-1/2 text-base text-[#84948a]">search</span>
-                        <input type="text" x-model="query" placeholder="Cari nomor episode..."
+                        <input type="text" x-model="query" placeholder="Search episode number..."
                                class="w-52 rounded-full border border-[#dcd2bd] bg-[#fbf9f4] py-1.5 pl-9 pr-3 text-xs text-[#172a37] placeholder:text-[#9aa29a] focus:border-[#0f766e] focus:bg-white focus:outline-none" />
                     </div>
                 </div>
@@ -177,13 +177,13 @@
                 </div>
 
                 <div x-show="!loading && failed" x-cloak class="py-10 text-center">
-                    <p class="text-sm font-medium text-[#6f7e75]">Daftar episode gagal dimuat dari sumber streaming.</p>
-                    <button type="button" @click="load()" class="mt-3 rounded-full bg-[#0f766e] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#115e59]">Coba Lagi</button>
+                    <p class="text-sm font-medium text-[#6f7e75]">Failed to load the episode list from the streaming source.</p>
+                    <button type="button" @click="load()" class="mt-3 rounded-full bg-[#0f766e] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#115e59]">Try Again</button>
                 </div>
 
                 <div x-show="!loading && !failed && episodes.length === 0" x-cloak class="py-10 text-center">
                     <span class="material-symbols-rounded text-4xl text-[#c1cbbb]">live_tv</span>
-                    <p class="mt-2 text-sm font-medium text-[#6f7e75]">Episode belum tersedia di sumber streaming untuk judul ini.</p>
+                    <p class="mt-2 text-sm font-medium text-[#6f7e75]">Episodes are not yet available from the streaming source for this title.</p>
                 </div>
 
                 <div x-show="!loading && episodes.length > 0" x-cloak class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">

@@ -1,4 +1,4 @@
-<x-manga-layout title="BiblioManga — Baca Manga & Komik Online Gratis">
+<x-manga-layout title="BiblioManga — Read Manga & Comics Online for Free">
     <div class="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 space-y-8">
 
         <!-- Hero Section -->
@@ -9,11 +9,11 @@
                     Open Manga Reader
                 </div>
                 <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
-                    Baca Manga & Komik Online <span class="text-[#0f766e]">Tanpa Batas</span>
+                    Read Manga & Comics Online <span class="text-[#0f766e]">Without Limits</span>
                 </h1>
                 <p class="text-sm sm:text-base leading-relaxed text-[#4c5b54]">
-                    Temukan ribuan judul manga, manhwa, dan manhua terpopuler, trending, dan rilisan terbaru.
-                    Semuanya langsung dapat dibaca secara gratis tanpa registrasi dan tanpa login.
+                    Discover thousands of the most popular, trending, and latest manga, manhwa, and manhua titles.
+                    Everything can be read instantly for free without registration or login.
                 </p>
 
                 <!-- Filter Bar: Category & Genre -->
@@ -22,10 +22,10 @@
                     
                     <!-- Category Tabs (No Icons) -->
                     <div class="flex flex-wrap items-center gap-1.5">
-                        <span class="text-xs font-bold uppercase tracking-wider text-[#6f7e75] mr-1">Kategori:</span>
+                        <span class="text-xs font-bold uppercase tracking-wider text-[#6f7e75] mr-1">Category:</span>
                         <a href="{{ route('manga.index', array_merge(request()->except(['category', 'page']), ['category' => 'popular'])) }}"
                            class="rounded-full px-3.5 py-1.5 text-xs font-semibold transition border {{ $currentCategory === 'popular' ? 'bg-[#0f766e] text-white border-[#0f766e] shadow-sm' : 'bg-white text-[#4c5b54] border-[#dcd2bd] hover:border-[#0f766e]/40' }}">
-                            Populer
+                            Popular
                         </a>
                         <a href="{{ route('manga.index', array_merge(request()->except(['category', 'page']), ['category' => 'trending'])) }}"
                            class="rounded-full px-3.5 py-1.5 text-xs font-semibold transition border {{ $currentCategory === 'trending' ? 'bg-[#0f766e] text-white border-[#0f766e] shadow-sm' : 'bg-white text-[#4c5b54] border-[#dcd2bd] hover:border-[#0f766e]/40' }}">
@@ -51,7 +51,7 @@
                                     @click="genreOpen = !genreOpen"
                                     class="inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold transition-all shadow-sm focus:outline-none {{ $currentGenre ? 'bg-[#0f766e] text-white border-[#0f766e] shadow-[#0f766e]/20' : 'bg-white text-[#172a37] border-[#dcd2bd] hover:border-[#0f766e] hover:bg-[#fbf9f4]' }}">
                                 <span class="material-symbols-rounded text-sm {{ $currentGenre ? 'text-white' : 'text-[#0f766e]' }}">tune</span>
-                                <span>{{ $currentGenre ? $currentGenre : 'Semua Genre' }}</span>
+                                <span>{{ $currentGenre ? $currentGenre : 'All Genres' }}</span>
                                 <span class="material-symbols-rounded text-base transition-transform duration-200"
                                       :class="genreOpen ? 'rotate-180' : ''">expand_more</span>
                             </button>
@@ -59,7 +59,7 @@
                             @if($currentGenre)
                                 <a href="{{ route('manga.index', array_merge(request()->query(), ['genre' => null, 'page' => 1])) }}"
                                    class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#eaddc2] text-[#5f6b63] transition hover:bg-[#ea580c] hover:text-white"
-                                   title="Hapus filter genre">
+                                   title="Remove genre filter">
                                     <span class="material-symbols-rounded text-sm">close</span>
                                 </a>
                             @endif
@@ -79,7 +79,7 @@
                             
                             <!-- Header inside Popover -->
                             <div class="flex items-center justify-between border-b border-[#e0d9c8] pb-2 px-1">
-                                <span class="text-xs font-bold text-[#172a37] uppercase tracking-wider" style="font-family: 'Space Grotesk', sans-serif;">Pilih Genre</span>
+                                <span class="text-xs font-bold text-[#172a37] uppercase tracking-wider" style="font-family: 'Space Grotesk', sans-serif;">Select Genre</span>
                                 @if($currentGenre)
                                     <a href="{{ route('manga.index', array_merge(request()->query(), ['genre' => null, 'page' => 1])) }}"
                                        class="text-[11px] font-bold text-[#ea580c] hover:underline">
@@ -88,10 +88,10 @@
                                 @endif
                             </div>
 
-                            <!-- "Semua Genre" Option -->
+                            <!-- "All Genres" Option -->
                             <a href="{{ route('manga.index', array_merge(request()->query(), ['genre' => null, 'page' => 1])) }}"
                                class="flex items-center justify-between w-full rounded-2xl px-3 py-2 text-xs font-semibold transition {{ empty($currentGenre) ? 'bg-[#0f766e] text-white shadow-sm' : 'bg-[#fbf9f4] text-[#4c5b54] hover:bg-[#0f766e]/10 hover:text-[#0f766e]' }}">
-                                <span>Semua Genre</span>
+                                <span>All Genres</span>
                                 @if(empty($currentGenre))
                                     <span class="material-symbols-rounded text-sm">check</span>
                                 @endif
@@ -120,10 +120,10 @@
             <div class="flex items-center justify-between rounded-2xl border border-[#dcd2bd] bg-white p-4">
                 <div class="flex items-center gap-2 text-sm text-[#263640]">
                     <span class="material-symbols-rounded text-[#0f766e]">search</span>
-                    <span>Hasil pencarian untuk: <strong class="text-[#0f766e]">"{{ $search }}"</strong></span>
+                    <span>Search results for: <strong class="text-[#0f766e]">"{{ $search }}"</strong></span>
                 </div>
                 <a href="{{ route('manga.index') }}" class="text-xs font-bold uppercase tracking-wider text-[#ea580c] hover:underline">
-                    Reset Pencarian
+                    Reset Search
                 </a>
             </div>
         @endif
@@ -134,33 +134,33 @@
                 <div>
                     <h2 class="text-2xl font-bold tracking-tight text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
                         @if($search !== '')
-                            Hasil Penelusuran
+                            Search Results
                         @elseif($currentCategory === 'trending')
-                            Manga Sedang Trending
+                            Trending Manga
                         @elseif($currentCategory === 'ongoing')
-                            Manga Sedang Berjalan (Ongoing)
+                            Ongoing Manga
                         @elseif($currentCategory === 'completed')
-                            Manga Tamat (Completed)
+                            Completed Manga
                         @else
-                            Manga Terpopuler
+                            Popular Manga
                         @endif
                     </h2>
-                    <p class="text-xs text-[#6f7e75] mt-0.5">Menampilkan manga pilihan dari MangaDex & scanlation groups</p>
+                    <p class="text-xs text-[#6f7e75] mt-0.5">Showing curated manga from MangaDex & scanlation groups</p>
                 </div>
                 <div class="text-xs text-[#6f7e75]">
-                    Halaman {{ $page }} dari {{ $totalPages }}
+                    Page {{ $page }} of {{ $totalPages }}
                 </div>
             </div>
 
             @if(empty($mangas))
                 <div class="rounded-3xl border border-[#dcd2bd] bg-white p-16 text-center space-y-3">
                     <span class="material-symbols-rounded text-5xl text-[#c1cbbb]">menu_book</span>
-                    <h3 class="text-lg font-bold text-[#172a37]">Tidak ada manga ditemukan</h3>
+                    <h3 class="text-lg font-bold text-[#172a37]">No results found</h3>
                     <p class="text-xs text-[#6f7e75] max-w-md mx-auto">
-                        Coba gunakan kata kunci lain atau pilih kategori lain untuk menemukan komik yang kamu cari.
+                        Try another keyword or choose a different category to find the comic you are looking for.
                     </p>
                     <a href="{{ route('manga.index') }}" class="inline-block mt-3 rounded-full bg-[#0f766e] px-6 py-2 text-xs font-semibold text-white">
-                        Kembali ke Semua Manga
+                        Back to All Manga
                     </a>
                 </div>
             @else
@@ -240,18 +240,18 @@
                         <a href="{{ route('manga.index', array_merge(request()->query(), ['page' => $page - 1])) }}"
                            class="inline-flex items-center gap-1 rounded-full border border-[#dcd2bd] bg-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-[#172a37] transition hover:border-[#0f766e] hover:text-[#0f766e] shadow-sm">
                             <span class="material-symbols-rounded text-base">arrow_back</span>
-                            Sebelumnya
+                            Previous
                         </a>
                     @endif
 
                     <div class="rounded-full border border-[#dcd2bd] bg-white/70 px-4 py-2 text-xs font-semibold text-[#5f6b63]">
-                        Halaman {{ $page }} / {{ $totalPages }}
+                        Page {{ $page }} / {{ $totalPages }}
                     </div>
 
                     @if($page < $totalPages)
                         <a href="{{ route('manga.index', array_merge(request()->query(), ['page' => $page + 1])) }}"
                            class="inline-flex items-center gap-1 rounded-full border border-[#dcd2bd] bg-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-[#172a37] transition hover:border-[#0f766e] hover:text-[#0f766e] shadow-sm">
-                            Selanjutnya
+                            Next
                             <span class="material-symbols-rounded text-base">arrow_forward</span>
                         </a>
                     @endif

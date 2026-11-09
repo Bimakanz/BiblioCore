@@ -346,7 +346,7 @@ class AniListProvider
         $cleanDesc = strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $rawDesc));
         $cleanDesc = html_entity_decode(trim($cleanDesc));
         if ($cleanDesc === '') {
-            $cleanDesc = 'Tidak ada sinopsis.';
+            $cleanDesc = 'No synopsis available.';
         }
 
         // Cover resolution

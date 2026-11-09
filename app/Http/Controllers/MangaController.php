@@ -92,7 +92,7 @@ class MangaController extends Controller
     {
         $manga = $this->mangaService->getDetail($id);
         if (! $manga) {
-            abort(404, 'Manga tidak ditemukan.');
+            abort(404, 'Manga not found.');
         }
 
         $cachedChapters = $this->preloadChapters($id);
@@ -415,7 +415,7 @@ class MangaController extends Controller
         // 1. Fetch image pages ONLY from the specific provider (fast, direct, single-provider)
         $chapterData = $this->mangaService->getChapterPages($chapterId, $source);
         if (! $chapterData || empty($chapterData['pages'])) {
-            abort(404, 'Halaman chapter tidak dapat dimuat atau chapter ini dialihkan ke web eksternal.');
+            abort(404, 'The chapter page could not be loaded, or this chapter redirects to an external site.');
         }
 
         // 2. Fetch manga metadata quickly from cache without re-aggregating

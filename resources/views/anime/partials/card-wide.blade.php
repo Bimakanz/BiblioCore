@@ -19,8 +19,8 @@
         <h3 class="truncate text-sm font-bold text-[#172a37] transition-colors group-hover:text-[#0f766e]" style="font-family: 'Space Grotesk', sans-serif;">{{ $anime['title'] }}</h3>
         <div class="flex items-center gap-2 text-[11px] font-semibold text-[#84948a]">
             @if($anime['year'])<span>{{ $anime['year'] }}</span><span>&middot;</span>@endif
-            @if($anime['episodes'])<span>{{ $anime['episodes'] }} Episode</span><span>&middot;</span>@endif
-            @if($anime['duration'])<span>{{ $anime['duration'] }} mnt/ep</span>@endif
+            @if($anime['episodes'])<span>{{ $anime['episodes'] }} Episodes</span><span>&middot;</span>@endif
+            @if($anime['duration'])<span>{{ $anime['duration'] }} min/ep</span>@endif
         </div>
         @if(!empty($anime['genres']))
             <div class="flex flex-wrap gap-1 pt-0.5">

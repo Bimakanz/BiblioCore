@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Anime\AnimeService;
 use App\Services\Anime\AnimeStreamProvider;
+use App\Services\Anime\SubtitleLanguageDetector;
 use App\Services\Anime\SubtitleTranslator;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -17,6 +18,7 @@ class AnimeController extends Controller
         protected AnimeService $animeService,
         protected AnimeStreamProvider $streamProvider,
         protected SubtitleTranslator $subtitleTranslator,
+        protected SubtitleLanguageDetector $subtitleLanguageDetector,
     ) {}
 
     /** Instant live search for the header search bar (anime mode). */
@@ -96,7 +98,7 @@ class AnimeController extends Controller
     {
         $anime = $this->animeService->getDetail($id);
         if (!$anime) {
-            abort(404, 'Anime tidak ditemukan.');
+            abort(404, 'Anime not found.');
         }
 
         return response()->view('anime.show', [
@@ -200,7 +202,7 @@ class AnimeController extends Controller
     {
         $anime = $this->animeService->getDetail($id);
         if (!$anime) {
-            abort(404, 'Anime tidak ditemukan.');
+            abort(404, 'Anime not found.');
         }
 
         $episodeId = (string) $request->query('ep', '');
@@ -228,7 +230,7 @@ class AnimeController extends Controller
     {
         $episodeId = (string) $request->query('ep', '');
         if ($episodeId === '') {
-            return response()->json(['error' => 'Episode tidak valid'], 400);
+            return response()->json(['error' => 'Invalid episode'], 400);
         }
         $server = $request->query('server');
         $server = is_string($server) && $server !== '' ? $server : null;
@@ -311,7 +313,7 @@ class AnimeController extends Controller
 
         if (!$stream || empty($stream['sources'])) {
             return response()->json([
-                'error' => 'Stream belum tersedia untuk episode ini. Coba server lain atau judul lain.',
+                'error' => 'Stream is not available for this episode. Try another server or title.',
                 'servers' => $this->streamProvider->servers(),
             ], 404)->header('Cache-Control', 'no-store');
         }
@@ -325,7 +327,7 @@ class AnimeController extends Controller
             'playlist' => $stream['sources'][0]['url'],
             'referer' => $stream['referer'],
             'subtitles' => $subtitleUrls,
-        ], 900);
+        ], 21600);
 
         $subtitles = [];
         foreach ($stream['subtitles'] as $i => $sub) {
@@ -340,13 +342,40 @@ class AnimeController extends Controller
         // track, but when a title only has Arabic/Thai/Italian/... the
         // player must not silently show those: add an "English (Auto)"
         // track translated from the best available source instead.
-        $hasEnglish = false;
-        foreach ($subtitles as $sub) {
-            if ($this->subtitleLanguageFromLabel($sub['label']) === 'en') {
-                $hasEnglish = true;
-                break;
+        //
+        // Labels alone are not enough: anikoto tags every track "en" while
+        // the first one is Simplified Chinese. Verify the cue text of each
+        // "English"-labelled track and drop the ones that are actually a
+        // different language, so they can never be picked by default.
+        $englishLabelIndexes = [];
+        foreach ($stream['subtitles'] as $i => $sub) {
+            if ($this->subtitleLanguageFromLabel($sub['label'] ?? null) === 'en') {
+                $englishLabelIndexes[] = $i;
             }
         }
+
+        $hasEnglish = false;
+        if (app()->runningUnitTests()) {
+            // Tests mock the provider; do not hit real CDNs from phpunit.
+            $hasEnglish = !empty($englishLabelIndexes);
+        } else {
+            foreach (array_slice($englishLabelIndexes, 0, 3) as $i) {
+                $detected = $this->subtitleLanguageDetector->detect($stream['subtitles'][$i]['url']);
+                if ($detected === 'sprite') {
+                    unset($subtitles[$i]);
+                    continue;
+                }
+                if ($detected === null || $detected === 'en') {
+                    $hasEnglish = true;
+                    break;
+                }
+                // The label lies (Chinese/Arabic/... content): remove it so
+                // the default selection cannot land on it.
+                unset($subtitles[$i]);
+            }
+            $subtitles = array_values($subtitles);
+        }
+
         if (!$hasEnglish && !empty($stream['subtitles'])) {
             $sourceIdx = $this->pickTranslationSource($stream['subtitles']);
             if ($sourceIdx !== null) {
@@ -436,7 +465,7 @@ class AnimeController extends Controller
         $key = (string) $request->query('k', '');
         $entry = Cache::get('anime_proxy_' . $key);
         if (!$entry || empty($entry['playlist'])) {
-            abort(404, 'Sesi stream tidak ditemukan atau sudah kedaluwarsa. Muat ulang halaman.');
+            abort(404, 'Stream session not found or expired. Reload the page.');
         }
 
         // VOD playlists are static; a 60s server-side cache makes quality
@@ -446,7 +475,7 @@ class AnimeController extends Controller
         if (!is_string($content)) {
             $content = $this->fetchRemote($entry['playlist'], $entry['referer'] ?? null);
             if ($content === null || !str_contains($content, '#EXTM3U')) {
-                abort(502, 'Playlist tidak dapat diambil dari sumber.');
+                abort(502, 'Unable to fetch the playlist from the source.');
             }
             Cache::put($plKey, $content, 60);
         }
@@ -495,7 +524,7 @@ class AnimeController extends Controller
 
         return response(implode("\n", $lines))
             ->header('Content-Type', 'application/vnd.apple.mpegurl')
-            ->header('Cache-Control', 'no-store');
+            ->header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
     }
 
     /** Register a segment/key URL in the server-side registry and return its proxy URL. */
@@ -505,7 +534,7 @@ class AnimeController extends Controller
         Cache::put('anime_segment_' . $segKey, [
             'url' => $absolute,
             'referer' => $referer,
-        ], 900);
+        ], 86400);
 
         return route('anime.proxy.segment', ['k' => $segKey]);
     }
@@ -521,12 +550,12 @@ class AnimeController extends Controller
         $key = (string) $request->query('k', '');
         $entry = Cache::get('anime_segment_' . $key);
         if (!$entry || empty($entry['url'])) {
-            abort(404, 'Segmen tidak ditemukan atau sudah kedaluwarsa. Muat ulang halaman.');
+            abort(404, 'Segment not found or expired. Reload the page.');
         }
 
         $content = $this->fetchRemote($entry['url'], $entry['referer'] ?? null);
         if ($content === null) {
-            abort(502, 'Segmen tidak dapat diambil dari sumber.');
+            abort(502, 'Unable to fetch the segment from the source.');
         }
 
         $ext = strtolower(pathinfo((string) parse_url($entry['url'], PHP_URL_PATH), PATHINFO_EXTENSION));
@@ -534,7 +563,8 @@ class AnimeController extends Controller
 
         return response($content)
             ->header('Content-Type', $type)
-            ->header('Cache-Control', 'public, max-age=3600');
+            ->header('Cache-Control', 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800')
+            ->header('CDN-Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
     }
 
     /** Subtitle proxy (same-origin VTT for the player track elements). */
@@ -545,17 +575,17 @@ class AnimeController extends Controller
         $entry = Cache::get('anime_proxy_' . $key);
         $url = $entry['subtitles'][$idx] ?? null;
         if (!$url) {
-            abort(404, 'Subtitle tidak ditemukan.');
+            abort(404, 'Subtitle not found.');
         }
 
         $content = $this->fetchRemote($url, $entry['referer'] ?? null);
         if ($content === null) {
-            abort(502, 'Subtitle tidak dapat diambil.');
+            abort(502, 'Unable to fetch the subtitle.');
         }
 
         return response($content)
             ->header('Content-Type', 'text/vtt; charset=utf-8')
-            ->header('Cache-Control', 'public, max-age=300');
+            ->header('Cache-Control', 'public, max-age=3600, s-maxage=86400');
     }
 
     /** Indonesian subtitle generated from the English track (cached 30 days). */
@@ -563,7 +593,7 @@ class AnimeController extends Controller
     {
         $episodeId = (string) $request->query('ep', '');
         if ($episodeId === '') {
-            abort(400, 'Episode tidak valid');
+            abort(400, 'Invalid episode');
         }
 
         $stream = $this->streamProvider->getStream($episodeId);
@@ -576,17 +606,17 @@ class AnimeController extends Controller
             }
         }
         if (!$englishUrl) {
-            abort(404, 'Subtitle Inggris tidak tersedia untuk diterjemahkan.');
+            abort(404, 'No English subtitle is available to translate.');
         }
 
         $vtt = $this->subtitleTranslator->indonesianVtt($englishUrl);
         if ($vtt === null) {
-            abort(404, 'Subtitle Indonesia belum dapat dibuat. Gunakan subtitle Inggris.');
+            abort(404, 'The Indonesian subtitle could not be generated. Use the English subtitle.');
         }
 
         return response($vtt)
             ->header('Content-Type', 'text/vtt; charset=utf-8')
-            ->header('Cache-Control', 'public, max-age=86400');
+            ->header('Cache-Control', 'public, max-age=86400, s-maxage=604800');
     }
 
     /**
@@ -602,19 +632,24 @@ class AnimeController extends Controller
         $entry = Cache::get('anime_proxy_' . $key);
         $url = $entry['subtitles'][$idx] ?? null;
         if (!$url) {
-            abort(404, 'Subtitle tidak ditemukan.');
+            abort(404, 'Subtitle not found.');
         }
 
         $vtt = $this->subtitleTranslator->englishVtt($url);
         if ($vtt === null) {
-            // Translation failed: serve the original track so subtitles
-            // still work instead of leaving an empty English track.
-            return redirect()->route('anime.proxy.subtitle', ['k' => $key, 'idx' => $idx]);
+            // Never serve the source track under the English label: that is
+            // how Arabic/Chinese/Indonesian leaked back into the player.
+            // An empty VTT keeps the timeline valid and simply shows no
+            // cues until the translation succeeds on a later request.
+            return response("WEBVTT\n\n")
+                ->header('Content-Type', 'text/vtt; charset=utf-8')
+                ->header('Cache-Control', 'no-store')
+                ->header('X-Subtitle-Translation', 'failed');
         }
 
         return response($vtt)
             ->header('Content-Type', 'text/vtt; charset=utf-8')
-            ->header('Cache-Control', 'public, max-age=86400');
+            ->header('Cache-Control', 'public, max-age=86400, s-maxage=604800');
     }
 
     /**
@@ -632,6 +667,9 @@ class AnimeController extends Controller
             'english' => 'en', 'eng' => 'en', 'en' => 'en',
             'indonesian' => 'id', 'indonesia' => 'id', 'indo' => 'id', 'id' => 'id',
             'arabic' => 'ar', 'ara' => 'ar', 'ar' => 'ar',
+            'chinese' => 'zh', 'mandarin' => 'zh', 'cantonese' => 'zh', 'zho' => 'zh', 'chi' => 'zh', 'zh' => 'zh',
+            'japanese' => 'ja', 'jpn' => 'ja', 'jp' => 'ja', 'ja' => 'ja',
+            'korean' => 'ko', 'kor' => 'ko', 'ko' => 'ko',
             'thai' => 'th', 'tha' => 'th', 'th' => 'th',
             'french' => 'fr', 'fra' => 'fr', 'fre' => 'fr', 'fr' => 'fr',
             'german' => 'de', 'deu' => 'de', 'ger' => 'de', 'de' => 'de',
@@ -643,6 +681,24 @@ class AnimeController extends Controller
             'bengali' => 'bn', 'ben' => 'bn', 'bn' => 'bn',
             'persian' => 'fa', 'farsi' => 'fa', 'fas' => 'fa', 'fa' => 'fa',
             'turkish' => 'tr', 'tur' => 'tr', 'tr' => 'tr',
+            'polish' => 'pl', 'pol' => 'pl', 'pl' => 'pl',
+            'dutch' => 'nl', 'nld' => 'nl', 'dut' => 'nl', 'nl' => 'nl',
+            'ukrainian' => 'uk', 'ukr' => 'uk', 'uk' => 'uk',
+            'romanian' => 'ro', 'ron' => 'ro', 'rum' => 'ro', 'ro' => 'ro',
+            'hungarian' => 'hu', 'hun' => 'hu', 'hu' => 'hu',
+            'czech' => 'cs', 'ces' => 'cs', 'cze' => 'cs', 'cs' => 'cs',
+            'greek' => 'el', 'ell' => 'el', 'gre' => 'el', 'el' => 'el',
+            'hebrew' => 'he', 'heb' => 'he', 'he' => 'he',
+            'swedish' => 'sv', 'swe' => 'sv', 'sv' => 'sv',
+            'danish' => 'da', 'dan' => 'da', 'da' => 'da',
+            'finnish' => 'fi', 'fin' => 'fi', 'fi' => 'fi',
+            'norwegian' => 'no', 'nor' => 'no', 'no' => 'no',
+            'malay' => 'ms', 'msa' => 'ms', 'may' => 'ms', 'ms' => 'ms',
+            'filipino' => 'tl', 'tagalog' => 'tl', 'fil' => 'tl', 'tl' => 'tl',
+            'hindi' => 'hi', 'hin' => 'hi', 'hi' => 'hi',
+            'tamil' => 'ta', 'tam' => 'ta', 'ta' => 'ta',
+            'telugu' => 'te', 'tel' => 'te', 'te' => 'te',
+            'urdu' => 'ur', 'urd' => 'ur', 'ur' => 'ur',
         ];
 
         foreach ($map as $name => $code) {

@@ -75,7 +75,7 @@ test('manga detail page renders without waiting for chapter aggregation', functi
 
     $response->assertStatus(200);
     $response->assertSee('Chainsaw Man');
-    $response->assertSee('Daftar Chapter');
+    $response->assertSee('Chapter List');
     $response->assertHeader('Cache-Control', 'max-age=60, public, s-maxage=300, stale-while-revalidate=86400');
 });
 

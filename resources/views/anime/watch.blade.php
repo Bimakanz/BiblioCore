@@ -28,31 +28,31 @@
 
                     <div id="playerError" class="absolute inset-0 hidden flex-col items-center justify-center gap-3 bg-black/85 p-6 text-center text-white">
                         <span class="material-symbols-rounded text-4xl text-[#f97316]">error</span>
-                        <p id="playerErrorText" class="max-w-md text-sm font-medium">Stream belum tersedia untuk episode ini.</p>
-                        <button type="button" id="retryBtn" class="rounded-full bg-[#f97316] px-5 py-2 text-xs font-bold text-white transition hover:bg-[#ea580c]">Coba Lagi</button>
+                        <p id="playerErrorText" class="max-w-md text-sm font-medium">Stream is not available for this episode.</p>
+                        <button type="button" id="retryBtn" class="rounded-full bg-[#f97316] px-5 py-2 text-xs font-bold text-white transition hover:bg-[#ea580c]">Try Again</button>
                     </div>
 
                     <div id="skipBtns" class="absolute bottom-20 right-4 z-20 flex flex-col items-end gap-2">
                         <button type="button" id="skipIntroBtn" class="hidden rounded-full bg-white/95 px-4 py-2 text-xs font-bold text-[#172a37] shadow-lg transition hover:bg-white">
-                            Lewati Opening &raquo;
+                            Skip Opening &raquo;
                         </button>
                         <button type="button" id="skipOutroBtn" class="hidden rounded-full bg-white/95 px-4 py-2 text-xs font-bold text-[#172a37] shadow-lg transition hover:bg-white">
-                            Lewati Outro &raquo;
+                            Skip Outro &raquo;
                         </button>
                     </div>
 
                     <a id="nextEpOverlay" href="#" class="absolute bottom-20 left-4 hidden items-center gap-2 rounded-full bg-[#f97316] px-4 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-[#ea580c]">
-                        Episode Berikutnya <span class="material-symbols-rounded text-base">skip_next</span>
+                        Next Episode <span class="material-symbols-rounded text-base">skip_next</span>
                     </a>
                 </div>
 
                 {{-- Episode navigation: dedicated row under the player --}}
                 <div class="flex items-center justify-between gap-3">
                     <a id="prevEpBtn" href="#" class="hidden items-center gap-1.5 rounded-full border border-[#dcd2bd] bg-white px-4 py-2 text-xs font-bold text-[#172a37] shadow-sm transition hover:border-[#0f766e]/60 hover:text-[#0f766e]">
-                        <span class="material-symbols-rounded text-base">skip_previous</span> Episode Sebelumnya
+                        <span class="material-symbols-rounded text-base">skip_previous</span> Previous Episode
                     </a>
                     <a id="nextEpBtn" href="#" class="hidden items-center gap-1.5 rounded-full bg-[#0f766e] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#115e59]">
-                        Episode Berikutnya <span class="material-symbols-rounded text-base">skip_next</span>
+                        Next Episode <span class="material-symbols-rounded text-base">skip_next</span>
                     </a>
                 </div>
 
@@ -71,7 +71,7 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
-                        <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Kualitas</span>
+                        <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Quality</span>
                         <div class="relative">
                             <button type="button" id="qualityBtn" class="pill-btn"><span id="qualityBtnLabel">Auto</span></button>
                             <div id="qualityMenu" class="pill-menu hidden">
@@ -82,14 +82,14 @@
                     <div class="flex items-center gap-2">
                         <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Subtitle</span>
                         <div class="relative">
-                            <button type="button" id="subtitleBtn" class="pill-btn"><span id="subtitleBtnLabel">Nonaktif</span></button>
+                            <button type="button" id="subtitleBtn" class="pill-btn"><span id="subtitleBtnLabel">Off</span></button>
                             <div id="subtitleMenu" class="pill-menu pill-menu-right hidden">
-                                <button type="button" class="pill-option is-active" data-value="-1">Nonaktif</button>
+                                <button type="button" class="pill-option is-active" data-value="-1">Off</button>
                             </div>
                         </div>
                     </div>
                     <div class="flex items-center gap-1.5">
-                        <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Geser Sub</span>
+                        <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Subtitle Offset</span>
                         <button type="button" id="subMinus" class="rounded-full border border-[#dcd2bd] bg-white px-2.5 py-1 text-xs font-bold text-[#172a37] transition hover:border-[#0f766e]/50">-0,5s</button>
                         <span id="subOffsetLabel" class="min-w-[38px] text-center text-xs font-bold text-[#0f766e]">0s</span>
                         <button type="button" id="subPlus" class="rounded-full border border-[#dcd2bd] bg-white px-2.5 py-1 text-xs font-bold text-[#172a37] transition hover:border-[#0f766e]/50">+0,5s</button>
@@ -98,7 +98,7 @@
 
                 <div class="rounded-3xl border border-[#e0d9c8] bg-white p-5 shadow-sm">
                     <h1 class="text-lg sm:text-xl font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">{{ $anime['title'] }} — Episode {{ $episodeNumber }}</h1>
-                    <p class="mt-1 text-xs font-semibold text-[#84948a]">{{ $anime['format'] }} &middot; {{ $anime['status'] }} @if($anime['year']) &middot; {{ $anime['year'] }} @endif @if($anime['score']) &middot; Skor {{ $anime['score'] }}/10 @endif</p>
+                    <p class="mt-1 text-xs font-semibold text-[#84948a]">{{ $anime['format'] }} &middot; {{ $anime['status'] }} @if($anime['year']) &middot; {{ $anime['year'] }} @endif @if($anime['score']) &middot; Score {{ $anime['score'] }}/10 @endif</p>
                     <p class="mt-3 text-sm leading-relaxed text-[#4c5b54] line-clamp-3">{{ $anime['description'] }}</p>
                 </div>
             </div>
@@ -106,7 +106,7 @@
             {{-- ===== RIGHT COLUMN: episodes + recommendations ===== --}}
             <div class="space-y-5">
             <aside class="rounded-3xl border border-[#e0d9c8] bg-white p-5 shadow-sm h-fit">
-                <h2 class="mb-3 text-sm font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Daftar Episode</h2>
+                <h2 class="mb-3 text-sm font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Episode List</h2>
                 <div id="epList" class="custom-scroll max-h-[560px] space-y-1.5 overflow-y-auto pr-1">
                     <div class="space-y-1.5">
                         @for($i = 0; $i < 8; $i++)
@@ -117,8 +117,8 @@
             </aside>
 
             <aside class="rounded-3xl border border-[#e0d9c8] bg-white p-5 shadow-sm h-fit">
-                <h2 class="mb-3 text-sm font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Mungkin Kamu Suka</h2>
-                <p class="mb-3 text-[11px] font-medium text-[#84948a]">Berdasarkan genre yang mirip dengan tontonanmu</p>
+                <h2 class="mb-3 text-sm font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">You Might Like</h2>
+                <p class="mb-3 text-[11px] font-medium text-[#84948a]">Based on genres similar to what you watch</p>
                 <div id="recoList" class="space-y-2.5">
                     @for($i = 0; $i < 4; $i++)
                         <div class="flex gap-3">
@@ -280,7 +280,7 @@
 
         function showError(msg) {
             loadingEl.style.display = 'none';
-            errorText.textContent = msg || 'Stream belum tersedia untuk episode ini. Coba server lain.';
+            errorText.textContent = msg || 'Stream is not available for this episode. Try another server.';
             errorEl.style.display = 'flex';
         }
 
@@ -297,16 +297,21 @@
         }
 
         // Some providers mistag almost every subtitle as srclang "en" while
-        // the human label still says what it really is ("Arabic", "Thai",
-        // "Indonesian", ...). The label is far more trustworthy than the
-        // srclang attribute, so read the language from the label first and
-        // only fall back to the tag when the label is not a language name.
+        // the human label still says what it really is ("Arabic", "Chinese",
+        // "Thai", "Indonesian", ...). The label is far more trustworthy than
+        // the srclang attribute, so the label is the ONLY source we trust
+        // whenever it contains text. An unrecognised label is treated as
+        // "unknown" instead of falling back to the provider tag, because that
+        // tag is exactly what made a Chinese track look like English.
         function languageFromLabel(label) {
             const l = String(label || '').trim().toLowerCase();
             if (!l) return null;
             if (/^english\b|^eng$|^en$/.test(l)) return 'en';
             if (/^indonesian\b|^indonesia\b|^indo$|^id$/.test(l)) return 'id';
             if (/^arabic\b|^ara$|^ar$/.test(l)) return 'ar';
+            if (/^chinese\b|^mandarin\b|^cantonese\b|^zho$|^chi$|^zh$/.test(l)) return 'zh';
+            if (/^japanese\b|^jpn$|^jp$|^ja$/.test(l)) return 'ja';
+            if (/^korean\b|^kor$|^ko$/.test(l)) return 'ko';
             if (/^thai\b|^tha$|^th$/.test(l)) return 'th';
             if (/^french\b|^fra$|^fre$|^fr$/.test(l)) return 'fr';
             if (/^german\b|^deu$|^ger$|^de$/.test(l)) return 'de';
@@ -318,12 +323,34 @@
             if (/^bengali\b|^ben$|^bn$/.test(l)) return 'bn';
             if (/^persian\b|^farsi\b|^fas$|^fa$/.test(l)) return 'fa';
             if (/^turkish\b|^tur$|^tr$/.test(l)) return 'tr';
+            if (/^polish\b|^pol$|^pl$/.test(l)) return 'pl';
+            if (/^dutch\b|^nld$|^dut$|^nl$/.test(l)) return 'nl';
+            if (/^ukrainian\b|^ukr$|^uk$/.test(l)) return 'uk';
+            if (/^romanian\b|^ron$|^rum$|^ro$/.test(l)) return 'ro';
+            if (/^hungarian\b|^hun$|^hu$/.test(l)) return 'hu';
+            if (/^czech\b|^ces$|^cze$|^cs$/.test(l)) return 'cs';
+            if (/^greek\b|^ell$|^gre$|^el$/.test(l)) return 'el';
+            if (/^hebrew\b|^heb$|^he$/.test(l)) return 'he';
+            if (/^swedish\b|^swe$|^sv$/.test(l)) return 'sv';
+            if (/^danish\b|^dan$|^da$/.test(l)) return 'da';
+            if (/^finnish\b|^fin$|^fi$/.test(l)) return 'fi';
+            if (/^norwegian\b|^nor$|^no$/.test(l)) return 'no';
+            if (/^malay\b|^msa$|^may$|^ms$/.test(l)) return 'ms';
+            if (/^filipino\b|^tagalog\b|^fil$|^tl$/.test(l)) return 'tl';
+            if (/^hindi\b|^hin$|^hi$/.test(l)) return 'hi';
+            if (/^tamil\b|^tam$|^ta$/.test(l)) return 'ta';
+            if (/^telugu\b|^tel$|^te$/.test(l)) return 'te';
+            if (/^urdu\b|^urd$|^ur$/.test(l)) return 'ur';
             return null;
         }
 
         function subtitleLanguage(sub, idx) {
-            const fromLabel = languageFromLabel(sub.label);
-            return fromLabel || langCode(sub, idx);
+            const label = String(sub.label || '').trim();
+            // A label is present: trust it (or mark unknown). NEVER fall
+            // back to the provider's srclang here, because providers lie
+            // about it (Chinese/Arabic tracks tagged "en").
+            if (label) return languageFromLabel(label) || 'unknown';
+            return langCode(sub, idx);
         }
 
         let currentSubtitles = [];
@@ -352,7 +379,7 @@
             offBtn.type = 'button';
             offBtn.className = 'pill-option';
             offBtn.dataset.value = '-1';
-            offBtn.textContent = 'Nonaktif';
+            offBtn.textContent = 'Off';
             menu.appendChild(offBtn);
             subtitles.forEach((sub, i) => {
                 const track = document.createElement('track');
@@ -368,19 +395,16 @@
                 opt.textContent = sub.label;
                 menu.appendChild(opt);
             });
-            // Default on load is always English (the server guarantees an
+            // Default on load is ALWAYS English (the server guarantees an
             // English track via "English (Auto)" when the provider has
-            // none). Never fall back to the saved preference or the first
-            // track.
-            let def = preferredSubtitleIndex(subtitles);
-            // A viewer who turned CC off keeps it off across refreshes.
-            if (localStorage.getItem('biblioanime_cc') === 'off') def = -1;
+            // none). A previous "CC off" choice never suppresses the
+            // default: only the viewer's current-session click can.
+            const def = preferredSubtitleIndex(subtitles);
             currentSubtitles = subtitles;
             currentSubIdx = def;
             subtitleDropdown.setActive(def);
             // Automatic selection must not overwrite the viewer's saved CC
-            // preference (a title without English would otherwise turn CC
-            // off for every title opened afterwards).
+            // preference.
             applySubtitle(def, false);
         }
 
@@ -478,10 +502,10 @@
             try {
                 const res = await fetch(url);
                 data = await res.json();
-                if (!res.ok || !data.source) throw new Error(data.error || 'Stream tidak tersedia');
+                if (!res.ok || !data.source) throw new Error(data.error || 'Stream unavailable');
             } catch (e) {
                 if (!tryAutoFailover()) {
-                    showError('Semua server sudah dicoba otomatis, belum ada yang bisa memutar episode ini. Coba lagi nanti.');
+                    showError('All servers were tried automatically, but none could play this episode. Please try again later.');
                 }
                 return;
             }
@@ -537,7 +561,19 @@
         function attachSource(src) {
             if (hls) { try { hls.destroy(); } catch (e) {} hls = null; }
             if (window.Hls && Hls.isSupported()) {
-                hls = new Hls({ maxBufferLength: 30, startLevel: -1, capLevelToPlayerSize: true });
+                hls = new Hls({
+                    // Long episodes (40-60 min) need a deep forward buffer so
+                    // a short CDN hiccup never reaches the decoder.
+                    maxBufferLength: 90,
+                    maxMaxBufferLength: 180,
+                    maxBufferSize: 120 * 1024 * 1024,
+                    backBufferLength: 30,
+                    abrEwmaDefaultEstimate: 8000000,
+                    enableWorker: true,
+                    lowLatencyMode: false,
+                    startLevel: -1,
+                    capLevelToPlayerSize: true,
+                });
                 // Never let HLS show subtitles baked into the stream: some
                 // providers embed an Arabic track and hls.js would render it
                 // on top of our own English <track> selection.
@@ -561,15 +597,15 @@
                         return;
                     }
                     if (!tryAutoFailover()) {
-                        showError('Stream terputus dari sumber dan semua server cadangan sudah dicoba otomatis.');
+                        showError('The stream was interrupted and all backup servers were tried automatically.');
                     }
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 qualityDropdown.btn.disabled = true;
-                qualityDropdown.btn.title = 'Kualitas dikelola otomatis oleh browser';
+                qualityDropdown.btn.title = 'Quality is managed automatically by the browser';
                 video.src = src;
             } else {
-                showError('Browser tidak mendukung pemutaran HLS.');
+                showError('This browser does not support HLS playback.');
                 return;
             }
             video.play().catch(function () {});
@@ -594,6 +630,9 @@
         // Attaching a new HLS source resets text track modes in Chrome, so
         // re-assert the selection once playback actually starts as well.
         video.addEventListener('play', function () {
+            if (currentSubIdx >= 0) applySubtitle(currentSubIdx, false);
+        });
+        video.addEventListener('canplay', function () {
             if (currentSubIdx >= 0) applySubtitle(currentSubIdx, false);
         });
         function updateSkipButtons() {
@@ -677,7 +716,7 @@
                 const data = await res.json();
                 const eps = data.episodes || [];
                 if (!eps.length) {
-                    listEl.innerHTML = '<p class="py-6 text-center text-xs font-medium text-[#84948a]">Episode belum tersedia.</p>';
+                    listEl.innerHTML = '<p class="py-6 text-center text-xs font-medium text-[#84948a]">No episodes available yet.</p>';
                     return;
                 }
                 listEl.innerHTML = '';
@@ -705,7 +744,7 @@
                     nextEpisodeUrl = nextBtn.href;
                 }
             } catch (e) {
-                listEl.innerHTML = '<p class="py-6 text-center text-xs font-medium text-[#84948a]">Daftar episode gagal dimuat.</p>';
+                listEl.innerHTML = '<p class="py-6 text-center text-xs font-medium text-[#84948a]">Failed to load the episode list.</p>';
             }
         })();
 
@@ -744,7 +783,7 @@
                 const data = await res.json();
                 const items = data.recommendations || [];
                 if (!items.length) {
-                    recoEl.innerHTML = '<p class="py-4 text-center text-xs font-medium text-[#84948a]">Belum ada rekomendasi.</p>';
+                    recoEl.innerHTML = '<p class="py-4 text-center text-xs font-medium text-[#84948a]">No recommendations yet.</p>';
                     return;
                 }
                 recoEl.innerHTML = '';
@@ -783,7 +822,7 @@
                     recoEl.appendChild(a);
                 });
             } catch (e) {
-                recoEl.innerHTML = '<p class="py-4 text-center text-xs font-medium text-[#84948a]">Rekomendasi tidak tersedia saat ini.</p>';
+                recoEl.innerHTML = '<p class="py-4 text-center text-xs font-medium text-[#84948a]">Recommendations are unavailable right now.</p>';
             }
         }, 1200);
 

@@ -683,7 +683,7 @@ class MangaDexProvider implements MangaProviderInterface
         // Description resolution
         $desc = $attr['description']['id']
             ?? $attr['description']['en']
-            ?? (is_array($attr['description'] ?? null) ? reset($attr['description']) : 'Tidak ada sinopsis.');
+            ?? (is_array($attr['description'] ?? null) ? reset($attr['description']) : 'No synopsis available.');
 
         $desc = strip_tags(preg_replace('/\[(.*?)\]\(.*?\)/', '$1', (string) $desc));
 
