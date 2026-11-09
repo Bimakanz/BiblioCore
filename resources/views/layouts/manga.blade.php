@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+{{-- BUILD_MARKER: 2026-11-09-1 — bump this when only app/ or routes/ change, because Vercel skips those builds. --}}
 <html lang="en">
 <head>
     <meta charset="utf-8">

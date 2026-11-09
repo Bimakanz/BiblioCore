@@ -27,22 +27,9 @@ Route::get('/warm', [MangaController::class, 'warm'])->name('manga.warm');
 Route::get('/warm/diag', [MangaController::class, 'diag'])->name('manga.warm.diag');
 
 // Deployment marker: shows which server-side build is actually live.
-Route::get('/version.json', function (\Illuminate\Http\Request $request) {
+Route::get('/version.json', function () {
     $service = app_path('Services/Manga/MangaService.php');
     $provider = app_path('Services/Manga/Providers/MultiSourceProvider.php');
-
-    if ($request->query('purge') === 'beware') {
-        foreach (['all', 'en', 'id'] as $lang) {
-            \Illuminate\Support\Facades\Cache::forget("aggregated_v10_chapters_al_117540_{$lang}");
-        }
-        foreach (['Beware the Villainess!', 'Beware the Villainess'] as $title) {
-            \Illuminate\Support\Facades\Cache::forget('multisrc_en_v3_'.md5($title));
-            \Illuminate\Support\Facades\Cache::forget('multisrc_en_v2_'.md5($title));
-        }
-        \Illuminate\Support\Facades\Cache::forget('manga_detail_al_117540');
-
-        return response()->json(['purged' => true])->header('Cache-Control', 'no-store');
-    }
 
     return response()->json([
         'cache' => \App\Services\Manga\MangaService::CACHE_VERSION,
