@@ -304,14 +304,19 @@
                 </button>
                 @endif
 
-                <!-- Mode Toggle: di mode Manga tampil A (ke Anime), di mode Anime tampil M (ke Manga) -->
-                @if(request()->is('anime') || request()->is('anime/*'))
-                    <a href="{{ route('manga.index') }}" title="Beralih ke mode Manga" aria-label="Beralih ke mode Manga"
-                       class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#172a37] text-base font-bold text-white shadow-sm transition hover:bg-[#0f766e]" style="font-family: 'Space Grotesk', sans-serif;">M</a>
-                @else
-                    <a href="{{ route('anime.index') }}" title="Beralih ke mode Anime" aria-label="Beralih ke mode Anime"
-                       class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#172a37] text-base font-bold text-white shadow-sm transition hover:bg-[#0f766e]" style="font-family: 'Space Grotesk', sans-serif;">A</a>
-                @endif
+                <!-- Mode Switch: two explicit buttons (Manga / Anime) -->
+                <div class="flex flex-shrink-0 items-center rounded-full border border-[#dcd2bd] bg-[#fbf9f4] p-1" role="group" aria-label="Pilih mode">
+                    <a href="{{ route('manga.index') }}"
+                       @if(!$isAnimeMode) aria-current="page" @endif
+                       class="whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold leading-none transition sm:px-3 sm:py-1.5 sm:text-xs {{ $isAnimeMode ? 'text-[#6f7e75] hover:text-[#172a37]' : 'bg-[#0f766e] text-white shadow-sm' }}">
+                        Manga
+                    </a>
+                    <a href="{{ route('anime.index') }}"
+                       @if($isAnimeMode) aria-current="page" @endif
+                       class="whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold leading-none transition sm:px-3 sm:py-1.5 sm:text-xs {{ $isAnimeMode ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#6f7e75] hover:text-[#172a37]' }}">
+                        Anime
+                    </a>
+                </div>
             </div>
         </div>
 

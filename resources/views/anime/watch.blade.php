@@ -32,11 +32,16 @@
                         <button type="button" id="retryBtn" class="rounded-full bg-[#f97316] px-5 py-2 text-xs font-bold text-white transition hover:bg-[#ea580c]">Coba Lagi</button>
                     </div>
 
-                    <button type="button" id="skipIntroBtn" class="absolute bottom-20 right-4 hidden rounded-full bg-white/95 px-4 py-2 text-xs font-bold text-[#172a37] shadow-lg transition hover:bg-white">
-                        Lewati Intro &raquo;
-                    </button>
+                    <div id="skipBtns" class="absolute bottom-20 right-4 z-20 flex flex-col items-end gap-2">
+                        <button type="button" id="skipIntroBtn" class="hidden rounded-full bg-white/95 px-4 py-2 text-xs font-bold text-[#172a37] shadow-lg transition hover:bg-white">
+                            Lewati Opening &raquo;
+                        </button>
+                        <button type="button" id="skipOutroBtn" class="hidden rounded-full bg-white/95 px-4 py-2 text-xs font-bold text-[#172a37] shadow-lg transition hover:bg-white">
+                            Lewati Outro &raquo;
+                        </button>
+                    </div>
 
-                    <a id="nextEpOverlay" href="#" class="absolute bottom-20 right-4 hidden items-center gap-2 rounded-full bg-[#f97316] px-4 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-[#ea580c]">
+                    <a id="nextEpOverlay" href="#" class="absolute bottom-20 left-4 hidden items-center gap-2 rounded-full bg-[#f97316] px-4 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-[#ea580c]">
                         Episode Berikutnya <span class="material-symbols-rounded text-base">skip_next</span>
                     </a>
                 </div>
@@ -166,6 +171,7 @@
         const EPISODE_NUMBER = {{ (int) $episodeNumber }};
         const STREAM_URL = @json($streamUrl);
         const EPISODES_URL = @json($episodesUrl);
+        const SKIP_TIMES_URL = @json(route('anime.skip-times.json', ['id' => $anime['id']]));
         const URL_T = {{ (int) request()->query('t', 0) }};
         const HISTORY_KEY = 'biblioanime_history';
 
@@ -173,6 +179,9 @@
         const loadingEl = document.getElementById('playerLoading');
         const errorEl = document.getElementById('playerError');
         const errorText = document.getElementById('playerErrorText');
+        const skipIntroBtn = document.getElementById('skipIntroBtn');
+        const skipOutroBtn = document.getElementById('skipOutroBtn');
+        const nextOverlay = document.getElementById('nextEpOverlay');
         let qualityPref = -1;
         try { qualityPref = parseInt(localStorage.getItem('biblioanime_quality') || '-1', 10); if (isNaN(qualityPref)) qualityPref = -1; } catch (e) {}
         let serverValue = '';
@@ -223,11 +232,13 @@
         const subtitleDropdown = setupDropdown('subtitleBtn', 'subtitleMenu', 'subtitleBtnLabel', function (v) {
             applySubtitle(parseInt(v, 10));
         });
-        const skipIntroBtn = document.getElementById('skipIntroBtn');
-        const nextOverlay = document.getElementById('nextEpOverlay');
 
         let hls = null;
         let intro = null;
+        let outro = null;
+        let skipTimesLoaded = false;
+        let nextEpisodeUrl = null;
+        let autoNextDone = false;
         let subOffset = 0;
         let lastSavedAt = 0;
         let resumeApplied = false;
@@ -312,17 +323,15 @@
                 opt.textContent = sub.label;
                 menu.appendChild(opt);
             });
-            // Restore the language chosen in a previous session when this
-            // episode offers it; otherwise fall back to the default ladder:
-            // Indonesia > Indonesia (Auto) > English > first available.
+            // Default ladder: English (the native track, always present and
+            // ready) always wins on load, then the language chosen in a
+            // previous session, then the first available track.
             let def = -1;
+            subtitles.forEach((sub, i) => { if (def === -1 && langCode(sub, i) === 'en') def = i; });
+            const savedLang = localStorage.getItem('biblioanime_sub_lang');
             // A saved 'id-auto' preference comes from the retired translated
             // track: ignore it so the English default applies to everyone.
-            const savedLang = localStorage.getItem('biblioanime_sub_lang');
-            if (savedLang && savedLang !== 'id-auto') subtitles.forEach((sub, i) => { if (def === -1 && (sub.lang || '').toLowerCase() === savedLang) def = i; });
-            // Default ladder: English (the native track, always present and
-            // ready) > first available track.
-            if (def === -1) subtitles.forEach((sub, i) => { if (def === -1 && langCode(sub, i) === 'en') def = i; });
+            if (def === -1 && savedLang && savedLang !== 'id-auto') subtitles.forEach((sub, i) => { if (def === -1 && (sub.lang || '').toLowerCase() === savedLang) def = i; });
             if (def === -1 && subtitles.length) def = 0;
             // A viewer who turned CC off keeps it off across refreshes.
             if (localStorage.getItem('biblioanime_cc') === 'off') def = -1;
@@ -349,8 +358,9 @@
             }
         }
 
-        // 'C' hotkey: toggle closed captions. Turning CC back on restores
-        // the last chosen language (or the best default for this episode).
+        // 'C' hotkey: toggle closed captions. Turning CC back on always
+        // starts from the English track when the episode has one, so the
+        // hotkey never lands on an unexpected language.
         function toggleCC() {
             const tracks = video.querySelectorAll('track');
             if (!tracks.length) return;
@@ -362,9 +372,9 @@
                 return;
             }
             let target = -1;
+            currentSubtitles.forEach((sub, i) => { if (target === -1 && langCode(sub, i) === 'en') target = i; });
             const savedLang = localStorage.getItem('biblioanime_sub_lang');
-            if (savedLang && savedLang !== 'id-auto') currentSubtitles.forEach((sub, i) => { if (target === -1 && (sub.lang || '').toLowerCase() === savedLang) target = i; });
-            if (target === -1) currentSubtitles.forEach((sub, i) => { if (target === -1 && langCode(sub, i) === 'en') target = i; });
+            if (target === -1 && savedLang && savedLang !== 'id-auto') currentSubtitles.forEach((sub, i) => { if (target === -1 && (sub.lang || '').toLowerCase() === savedLang) target = i; });
             if (target === -1 && currentSubtitles.length) target = 0;
             subtitleDropdown.setActive(target);
             applySubtitle(target);
@@ -426,9 +436,24 @@
                 }
                 return;
             }
-            intro = data.intro || null;
+            intro = data.intro || intro;
+            outro = data.outro || outro;
             buildSubtitleOptions(data.subtitles || []);
             attachSource(data.source.url);
+            loadSkipTimes();
+        }
+
+        // Opening/ending markers come from AniSkip (via our own endpoint) and
+        // are fetched separately so a slow third party never delays playback.
+        async function loadSkipTimes() {
+            if (skipTimesLoaded) return;
+            skipTimesLoaded = true;
+            try {
+                const res = await fetch(SKIP_TIMES_URL + '?n=' + encodeURIComponent(EPISODE_NUMBER));
+                const data = await res.json();
+                intro = data.intro || intro;
+                outro = data.outro || null;
+            } catch (e) {}
         }
 
         function buildQualityOptions() {
@@ -507,31 +532,50 @@
                 resumeApplied = true;
             }
         });
+        function updateSkipButtons() {
+            const t = video.currentTime || 0;
+            const inWindow = function (slot) { return !!slot && t >= slot.start && t < slot.end; };
+            skipIntroBtn.classList.toggle('hidden', !inWindow(intro));
+            skipOutroBtn.classList.toggle('hidden', !inWindow(outro));
+        }
+
+        // Auto-advance: when the final second is reached (or the episode ends),
+        // go straight to the next episode when one exists.
+        function maybeAutoNext(force) {
+            if (autoNextDone || !nextEpisodeUrl || !video.duration || isNaN(video.duration)) return;
+            if (!force && video.currentTime < video.duration - 1) return;
+            autoNextDone = true;
+            saveProgress(true);
+            window.location.href = nextEpisodeUrl;
+        }
+
         video.addEventListener('timeupdate', function () {
             const now = Date.now();
             if (now - lastSavedAt >= 5000) {
                 lastSavedAt = now;
                 saveProgress(false);
             }
-            if (intro && video.currentTime >= intro.start && video.currentTime < intro.end) {
-                skipIntroBtn.classList.remove('hidden');
-            } else {
-                skipIntroBtn.classList.add('hidden');
-            }
-            if (video.duration && video.currentTime > video.duration - 15) {
-                const nxt = document.getElementById('nextEpBtn');
-                if (nxt && nxt.href && !nxt.classList.contains('hidden')) {
-                    nextOverlay.href = nxt.href;
+            const t = video.currentTime || 0;
+            updateSkipButtons();
+            if (video.duration && t > video.duration - 15) {
+                if (nextEpisodeUrl) {
+                    nextOverlay.href = nextEpisodeUrl;
                     nextOverlay.classList.remove('hidden');
                     nextOverlay.classList.add('flex');
                 }
+            } else {
+                nextOverlay.classList.add('hidden');
+                nextOverlay.classList.remove('flex');
             }
+            maybeAutoNext(false);
         });
         video.addEventListener('pause', () => saveProgress(false));
-        video.addEventListener('ended', () => saveProgress(true));
+        video.addEventListener('seeked', updateSkipButtons);
+        video.addEventListener('ended', function () { saveProgress(true); maybeAutoNext(true); });
         document.addEventListener('visibilitychange', function () { if (document.hidden) saveProgress(false); });
         window.addEventListener('pagehide', () => saveProgress(false));
         skipIntroBtn.addEventListener('click', function () { if (intro) video.currentTime = intro.end; });
+        skipOutroBtn.addEventListener('click', function () { if (outro) video.currentTime = outro.end; });
 
         // Keyboard controls: F = fullscreen, Left/Right arrows = seek -/+ 5s.
         // Holding an arrow key repeats natively, so seeking is spammable.
@@ -594,6 +638,7 @@
                     nextBtn.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(next.id) + '&n=' + next.number;
                     nextBtn.classList.remove('hidden');
                     nextBtn.classList.add('inline-flex');
+                    nextEpisodeUrl = nextBtn.href;
                 }
             } catch (e) {
                 listEl.innerHTML = '<p class="py-6 text-center text-xs font-medium text-[#84948a]">Daftar episode gagal dimuat.</p>';

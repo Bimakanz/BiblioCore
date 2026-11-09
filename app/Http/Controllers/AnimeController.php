@@ -8,6 +8,7 @@ use App\Services\Anime\SubtitleTranslator;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class AnimeController extends Controller
@@ -348,6 +349,63 @@ class AnimeController extends Controller
             'intro' => $stream['intro'],
             'outro' => $stream['outro'],
         ])->header('Cache-Control', 'public, max-age=300');
+    }
+
+    /**
+     * Opening/ending skip times for the player, resolved through AniSkip
+     * (MyAnimeList id based). Cached for six hours per title+episode so the
+     * player can ask on every load without hitting the third party.
+     */
+    public function skipTimesJson(string $id, Request $request): \Illuminate\Http\JsonResponse
+    {
+        $episode = max(1, (int) $request->query('n', 1));
+        $anime = $this->animeService->getDetail($id);
+        $malId = $anime['malId'] ?? null;
+
+        if (!$malId) {
+            return response()->json(['intro' => null, 'outro' => null]);
+        }
+
+        $data = Cache::remember("aniskip_v2_{$malId}_{$episode}", 21600, function () use ($malId, $episode) {
+            try {
+                $res = Http::timeout(5)
+                    ->acceptJson()
+                    ->get("https://api.aniskip.com/v2/skip-times/{$malId}/{$episode}", [
+                        'types' => ['op', 'ed'],
+                        'episodeLength' => 0,
+                    ]);
+
+                return $res->ok() ? $res->json() : null;
+            } catch (\Throwable $e) {
+                Log::warning("AniSkip failed for MAL {$malId} ep {$episode}: " . $e->getMessage());
+
+                return null;
+            }
+        });
+
+        $intro = null;
+        $outro = null;
+        if (is_array($data) && !empty($data['found']) && is_array($data['results'] ?? null)) {
+            foreach ($data['results'] as $result) {
+                $interval = $result['interval'] ?? null;
+                if (!is_array($interval) || !isset($interval['startTime'], $interval['endTime'])) {
+                    continue;
+                }
+                $slot = [
+                    'start' => (float) $interval['startTime'],
+                    'end' => (float) $interval['endTime'],
+                ];
+                $type = $result['skipType'] ?? '';
+                if ($type === 'op' || $type === 'mixed-op') {
+                    $intro = $slot;
+                } elseif ($type === 'ed' || $type === 'mixed-ed') {
+                    $outro = $slot;
+                }
+            }
+        }
+
+        return response()->json(['intro' => $intro, 'outro' => $outro])
+            ->header('Cache-Control', 'public, max-age=21600');
     }
 
     /** Playlist proxy: rewrites nested playlists through us, segments stay on the CDN. */

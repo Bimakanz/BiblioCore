@@ -42,6 +42,7 @@ Route::get('/anime/subtitle/id.vtt', [AnimeController::class, 'translatedSubtitl
 Route::get('/anime/{id}/episodes.json', [AnimeController::class, 'episodesJson'])->name('anime.episodes.json');
 Route::get('/anime/{id}/recommendations.json', [AnimeController::class, 'recommendationsJson'])->name('anime.recommendations.json');
 Route::get('/anime/{id}/stream.json', [AnimeController::class, 'streamJson'])->name('anime.stream.json');
+Route::get('/anime/{id}/skip-times.json', [AnimeController::class, 'skipTimesJson'])->name('anime.skip-times.json');
 Route::get('/anime/{id}/watch', [AnimeController::class, 'watch'])->name('anime.watch');
 Route::get('/anime/{id}', [AnimeController::class, 'show'])->name('anime.show');
 
