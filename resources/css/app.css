@@ -12,3 +12,28 @@ html {
 section[id] {
     scroll-margin-top: 80px;
 }
+
+/* ===== Global thin teal scrollbar (all scrollable areas) ===== */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: rgba(23, 42, 55, 0.06);
+}
+::-webkit-scrollbar-thumb {
+    background: #0f766e;
+    border-radius: 9999px;
+    border: 2px solid rgba(23, 42, 55, 0);
+    background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #115e59;
+}
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #0f766e rgba(23, 42, 55, 0.06);
+}
