@@ -296,6 +296,36 @@
             return raw.slice(0, 2) || ('s' + idx);
         }
 
+        // Some providers mistag almost every subtitle as srclang "en" while
+        // the human label still says what it really is ("Arabic", "Thai",
+        // "Indonesian", ...). The label is far more trustworthy than the
+        // srclang attribute, so read the language from the label first and
+        // only fall back to the tag when the label is not a language name.
+        function languageFromLabel(label) {
+            const l = String(label || '').trim().toLowerCase();
+            if (!l) return null;
+            if (/^english\b|^eng$|^en$/.test(l)) return 'en';
+            if (/^indonesian\b|^indonesia\b|^indo$|^id$/.test(l)) return 'id';
+            if (/^arabic\b|^ara$|^ar$/.test(l)) return 'ar';
+            if (/^thai\b|^tha$|^th$/.test(l)) return 'th';
+            if (/^french\b|^fra$|^fre$|^fr$/.test(l)) return 'fr';
+            if (/^german\b|^deu$|^ger$|^de$/.test(l)) return 'de';
+            if (/^italian\b|^ita$|^it$/.test(l)) return 'it';
+            if (/^portuguese\b|^por$|^pt$/.test(l)) return 'pt';
+            if (/^russian\b|^rus$|^ru$/.test(l)) return 'ru';
+            if (/^spanish\b|^spa$|^es$/.test(l)) return 'es';
+            if (/^vietnamese\b|^vie$|^vi$/.test(l)) return 'vi';
+            if (/^bengali\b|^ben$|^bn$/.test(l)) return 'bn';
+            if (/^persian\b|^farsi\b|^fas$|^fa$/.test(l)) return 'fa';
+            if (/^turkish\b|^tur$|^tr$/.test(l)) return 'tr';
+            return null;
+        }
+
+        function subtitleLanguage(sub, idx) {
+            const fromLabel = languageFromLabel(sub.label);
+            return fromLabel || langCode(sub, idx);
+        }
+
         let currentSubtitles = [];
         let currentSubIdx = -1;
 
@@ -309,7 +339,7 @@
             let en = -1;
             let id = -1;
             subtitles.forEach((sub, i) => {
-                const code = langCode(sub, i);
+                const code = subtitleLanguage(sub, i);
                 if (en === -1 && code === 'en') en = i;
                 if (id === -1 && code === 'id') id = i;
             });
@@ -330,7 +360,7 @@
                 const track = document.createElement('track');
                 track.kind = 'subtitles';
                 track.label = sub.label;
-                track.srclang = langCode(sub, i);
+                track.srclang = subtitleLanguage(sub, i);
                 track.src = sub.url;
                 video.appendChild(track);
                 const opt = document.createElement('button');
@@ -349,20 +379,26 @@
             currentSubtitles = subtitles;
             currentSubIdx = def;
             subtitleDropdown.setActive(def);
-            applySubtitle(def);
+            // Automatic selection must not overwrite the viewer's saved CC
+            // preference (a title without English would otherwise turn CC
+            // off for every title opened afterwards).
+            applySubtitle(def, false);
         }
 
         // Map through the <track> elements themselves: the order of
         // video.textTracks is NOT guaranteed to match DOM/source order
         // (Chrome re-sorts by browser language), while trackEl.track is
-        // always the exact track for that element.
-        function applySubtitle(idx) {
+        // always the exact track for that element. `persist` is false for
+        // automatic re-application, true for explicit viewer choices.
+        function applySubtitle(idx, persist) {
+            if (persist === undefined) persist = true;
             currentSubIdx = idx;
             video.querySelectorAll('track').forEach((el, i) => {
                 el.track.mode = (i === idx) ? 'showing' : 'disabled';
             });
+            if (!persist) return;
             if (idx >= 0 && currentSubtitles[idx]) {
-                localStorage.setItem('biblioanime_sub_lang', (currentSubtitles[idx].lang || '').toLowerCase());
+                localStorage.setItem('biblioanime_sub_lang', subtitleLanguage(currentSubtitles[idx], idx));
                 localStorage.setItem('biblioanime_cc', 'on');
             } else if (idx === -1) {
                 localStorage.setItem('biblioanime_cc', 'off');
@@ -503,9 +539,18 @@
             if (hls) { try { hls.destroy(); } catch (e) {} hls = null; }
             if (window.Hls && Hls.isSupported()) {
                 hls = new Hls({ maxBufferLength: 30, startLevel: -1, capLevelToPlayerSize: true });
+                // Never let HLS show subtitles baked into the stream: some
+                // providers embed an Arabic track and hls.js would render it
+                // on top of our own English <track> selection.
+                hls.subtitleDisplay = false;
+                hls.subtitleTrack = -1;
                 hls.loadSource(src);
                 hls.attachMedia(video);
+                hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, function () {
+                    hls.subtitleTrack = -1;
+                });
                 hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                    hls.subtitleTrack = -1;
                     loadingEl.style.display = 'none';
                     buildQualityOptions();
                 });
@@ -536,7 +581,7 @@
             // freshly added track to hidden/disabled while its VTT loads,
             // which is why CC vanished after a refresh even though the
             // settings label still showed the right language.
-            if (currentSubIdx >= 0) applySubtitle(currentSubIdx);
+            if (currentSubIdx >= 0) applySubtitle(currentSubIdx, false);
             loadingEl.style.display = 'none';
             if (!resumeApplied) {
                 const target = storedResume();
