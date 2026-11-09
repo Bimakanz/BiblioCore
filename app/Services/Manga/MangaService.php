@@ -16,6 +16,9 @@ use Illuminate\Support\Facades\Log;
 
 class MangaService
 {
+    /** Cache namespace for aggregated chapter lists. Bump after parser changes. */
+    public const CACHE_VERSION = 'v10';
+
     protected AniListProvider $aniListProvider;
     protected MangaDexProvider $mangaDexProvider;
     protected KomikuProvider $komikuProvider;
@@ -195,7 +198,8 @@ class MangaService
     {
         $partial = false;
         $langKey = $language ?: 'all';
-        $cacheKey = "aggregated_v9_chapters_{$id}_{$langKey}";
+        $v = self::CACHE_VERSION;
+        $cacheKey = "aggregated_{$v}_chapters_{$id}_{$langKey}";
 
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && ! empty($cached)) {
@@ -206,7 +210,7 @@ class MangaService
         // from it instead of scraping every provider again. This is what makes
         // the parallel per-language requests on the detail page instant.
         if ($language && in_array($language, ['id', 'en'], true)) {
-            $allCached = Cache::get("aggregated_v9_chapters_{$id}_all");
+            $allCached = Cache::get("aggregated_{$v}_chapters_{$id}_all");
             if (is_array($allCached) && ! empty($allCached)) {
                 $filtered = array_values(array_filter(
                     $allCached,
@@ -418,8 +422,9 @@ class MangaService
             if (! $language) {
                 $indoCh = array_values(array_filter($merged, fn ($c) => ($c['language'] ?? '') === 'id'));
                 $enCh = array_values(array_filter($merged, fn ($c) => ($c['language'] ?? '') === 'en'));
-                Cache::put("aggregated_v9_chapters_{$id}_id", $indoCh, $ttl);
-                Cache::put("aggregated_v9_chapters_{$id}_en", $enCh, $ttl);
+                $v = self::CACHE_VERSION;
+                Cache::put("aggregated_{$v}_chapters_{$id}_id", $indoCh, $ttl);
+                Cache::put("aggregated_{$v}_chapters_{$id}_en", $enCh, $ttl);
             }
 
             // Filter by requested language if specified

@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class MangaController extends Controller
 {
-    public const CHAPTERS_CACHE_VERSION = 'v8';
+    public const CHAPTERS_CACHE_VERSION = MangaService::CACHE_VERSION;
 
     protected MangaService $mangaService;
 
@@ -529,14 +529,6 @@ class MangaController extends Controller
             "aggregated_{$v}_chapters_{$mangaId}_all",
             "aggregated_{$v}_chapters_{$mangaId}_id",
             "aggregated_{$v}_chapters_{$mangaId}_en",
-            "aggregated_v6_chapters_{$mangaId}_{$language}",
-            "aggregated_v6_chapters_{$mangaId}_all",
-            "aggregated_v6_chapters_{$mangaId}_id",
-            "aggregated_v6_chapters_{$mangaId}_en",
-            "aggregated_v5_chapters_{$mangaId}_{$language}",
-            "aggregated_v5_chapters_{$mangaId}_all",
-            "aggregated_v5_chapters_{$mangaId}_id",
-            "aggregated_v5_chapters_{$mangaId}_en",
         ];
 
         // Single round trip instead of up to twelve sequential gets.
@@ -681,12 +673,6 @@ class MangaController extends Controller
             "aggregated_{$v}_chapters_{$mangaId}_id",
             "aggregated_{$v}_chapters_{$mangaId}_all",
             "aggregated_{$v}_chapters_{$mangaId}_en",
-            "aggregated_v6_chapters_{$mangaId}_id",
-            "aggregated_v6_chapters_{$mangaId}_all",
-            "aggregated_v6_chapters_{$mangaId}_en",
-            "aggregated_v5_chapters_{$mangaId}_id",
-            "aggregated_v5_chapters_{$mangaId}_all",
-            "aggregated_v5_chapters_{$mangaId}_en",
         ];
 
         $cachedChapters = \Illuminate\Support\Facades\Cache::many($searchKeys);
