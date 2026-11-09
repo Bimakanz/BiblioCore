@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <title>{{ $title ?? 'BiblioManga — Read Manga Online Without Limits' }}</title>
+    <meta name="description" content="Read manga, manhwa, and manhua online for free on BiblioManga. Trending titles, full chapter lists, and fast updates.">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
