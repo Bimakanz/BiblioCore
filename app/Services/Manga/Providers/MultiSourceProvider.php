@@ -63,7 +63,7 @@ class MultiSourceProvider
      */
     public function getEnglishChapters(string $title, array $altTitles = []): array
     {
-        $cacheKey = 'multisrc_en_v2_' . md5($title);
+        $cacheKey = 'multisrc_en_v3_' . md5($title);
 
         $result = Cache::remember($cacheKey, 43200, function () use ($title, $altTitles) {
             $normalize = fn(string $s) => strtolower(trim(preg_replace('/[^a-z0-9]/', '', $s)));
