@@ -26,6 +26,19 @@ Route::get('/manga/api/live-search', [MangaController::class, 'liveSearch'])->na
 Route::get('/warm', [MangaController::class, 'warm'])->name('manga.warm');
 Route::get('/warm/diag', [MangaController::class, 'diag'])->name('manga.warm.diag');
 
+// Deployment marker: shows which server-side build is actually live.
+Route::get('/version.json', function () {
+    $service = app_path('Services/Manga/MangaService.php');
+    $provider = app_path('Services/Manga/Providers/MultiSourceProvider.php');
+
+    return response()->json([
+        'cache' => \App\Services\Manga\MangaService::CACHE_VERSION,
+        'asura' => class_exists(\App\Services\Manga\Providers\AsuraScansProvider::class),
+        'manga_service_md5' => is_file($service) ? md5_file($service) : null,
+        'multisource_md5' => is_file($provider) ? md5_file($provider) : null,
+    ])->header('Cache-Control', 'no-store');
+})->name('version.json');
+
 // Detail Manga, async chapter list & reader
 Route::get('/manga/{id}/chapters.json', [MangaController::class, 'chaptersJson'])->name('manga.chapters.json');
 Route::get('/manga/{id}/chapter/{chapterId}/pages-json', [MangaController::class, 'chapterPagesJson'])->name('manga.chapter.pages-json');

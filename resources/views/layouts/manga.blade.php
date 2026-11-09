@@ -6,6 +6,7 @@
 
     <title>{{ $title ?? 'BiblioManga — Read Manga Online Without Limits' }}</title>
     <meta name="description" content="Read manga, manhwa, and manhua online for free on BiblioManga. Trending titles, full chapter lists, and fast updates.">
+    <meta name="theme-color" content="#0f766e">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
