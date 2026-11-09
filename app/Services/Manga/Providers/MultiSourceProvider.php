@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Log;
 
 class MultiSourceProvider
 {
+    /** Parser/cache version for English chapter aggregation. */
+    public const PARSER_VERSION = 'v3';
+
     protected array $dnsResolves = [
         'weebcentral.com:443:104.21.32.126',
         'www.mangahere.cc:443:104.21.92.224',
