@@ -41,34 +41,29 @@
                             </button>
                         </div>
 
-                        <!-- Bottom control bar -->
-                        <div class="absolute bottom-0 left-0 right-0 z-30 px-4 pb-6">
-                            <div class="control-bar bg-gradient-to-t from-black/85 via-black/40 to-transparent pt-4 pb-2 backdrop-blur-md border-t border-white/10">
-                                <div class="flex items-center gap-4">
+                        <!-- Bottom control bar (floating rounded panel) -->
+                        <div class="absolute bottom-0 left-0 right-0 z-30 px-2.5 pb-2.5 sm:px-4 sm:pb-4">
+                            <div class="control-bar rounded-2xl bg-black/75 backdrop-blur-md border border-white/10 px-3 py-2.5 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.85)]">
+                                <div class="flex items-center gap-2.5 sm:gap-3">
                                     <!-- Play/pause -->
-                                    <button id="barPlayBtn" class="w-10 h-10 rounded-full bg-[#0f766e] hover:bg-[#115e59] text-white flex items-center justify-center transition-all shadow-lg transform active:scale-95">
+                                    <button id="barPlayBtn" class="h-9 w-9 flex-shrink-0 rounded-full bg-[#0f766e] hover:bg-[#115e59] text-white flex items-center justify-center transition-all shadow-lg transform active:scale-95">
                                         <span class="material-symbols-rounded text-lg">play_arrow</span>
                                     </button>
 
-                                    <!-- Progress bar -->
-                                    <div class="flex-1 min-w-0 mx-4">
-                                        <div class="flex items-center gap-2 text-[10px] text-white/60 mb-1.5 font-mono tabular-nums">
-                                            <span id="barCurrentTime">0:00</span>
-                                            <span>/</span>
-                                            <span id="barDuration">0:00</span>
-                                        </div>
-                                        <div id="progressTrack" class="h-1 w-full rounded-full bg-white/30 cursor-pointer relative group/progress">
-                                            <div id="progressFill" class="h-1 rounded-full bg-[#0f766e] w-0 transition-all duration-100"></div>
-                                            <div id="progressHandle" class="absolute top-1/2 -translate-y-1/2 right-0 w-3 h-3 bg-[#0f766e] rounded-full shadow-md opacity-0 transition-opacity duration-200 group-hover/progress:opacity-100"></div>
-                                        </div>
+                                    <!-- Time + progress -->
+                                    <span id="barCurrentTime" class="flex-shrink-0 text-[11px] font-mono font-semibold text-white/75 tabular-nums">0:00</span>
+                                    <div id="progressTrack" class="flex-1 min-w-0 h-1.5 rounded-full bg-white/25 cursor-pointer relative group/progress">
+                                        <div id="progressFill" class="h-1.5 rounded-full bg-[#0f766e] w-0 transition-all duration-100"></div>
+                                        <div id="progressHandle" class="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-[#0f766e] rounded-full shadow-md opacity-0 transition-opacity duration-200 group-hover/progress:opacity-100"></div>
                                     </div>
+                                    <span id="barDuration" class="flex-shrink-0 text-[11px] font-mono font-semibold text-white/75 tabular-nums">0:00</span>
 
                                     <!-- Volume + Fullscreen -->
-                                    <div class="flex items-center gap-3">
-                                        <button id="barVolumeBtn" class="w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-all backdrop-blur-sm active:scale-95">
+                                    <div class="flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
+                                        <button id="barVolumeBtn" class="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all active:scale-95">
                                             <span class="material-symbols-rounded text-lg">volume_up</span>
                                         </button>
-                                        <button id="barFullscreenBtn" class="w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-all backdrop-blur-sm active:scale-95">
+                                        <button id="barFullscreenBtn" class="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all active:scale-95">
                                             <span class="material-symbols-rounded text-lg">fullscreen</span>
                                         </button>
                                     </div>
@@ -456,6 +451,21 @@
                 track.label = sub.label;
                 track.srclang = subtitleLanguage(sub, i);
                 track.src = sub.url;
+                // Keep the cue text above the floating control bar instead
+                // of pinning it to the very bottom of the video element.
+                const liftCues = function () {
+                    const cues = track.track && track.track.cues;
+                    if (!cues) return;
+                    for (let c = 0; c < cues.length; c++) {
+                        try {
+                            cues[c].snapToLines = false;
+                            cues[c].line = 72;
+                            cues[c].lineAlign = 'end';
+                        } catch (e) {}
+                    }
+                };
+                track.addEventListener('load', liftCues);
+                track.addEventListener('cuechange', liftCues);
                 video.appendChild(track);
                 const opt = document.createElement('button');
                 opt.type = 'button';
