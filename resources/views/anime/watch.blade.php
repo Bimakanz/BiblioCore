@@ -299,6 +299,23 @@
         let currentSubtitles = [];
         let currentSubIdx = -1;
 
+        // English is THE default, unconditionally. Indonesian is the only
+        // accepted fallback when a source has no English track. Any other
+        // language is never chosen automatically: subtitles stay off instead
+        // of silently switching to an unexpected language (Arabic, Spanish,
+        // Vietnamese, ...). A language the viewer picked by hand still works
+        // for the current episode, but the next page load starts at English.
+        function preferredSubtitleIndex(subtitles) {
+            let en = -1;
+            let id = -1;
+            subtitles.forEach((sub, i) => {
+                const code = langCode(sub, i);
+                if (en === -1 && code === 'en') en = i;
+                if (id === -1 && code === 'id') id = i;
+            });
+            return en !== -1 ? en : id;
+        }
+
         function buildSubtitleOptions(subtitles) {
             video.querySelectorAll('track').forEach(t => t.remove());
             const menu = subtitleDropdown.menu;
@@ -323,16 +340,10 @@
                 opt.textContent = sub.label;
                 menu.appendChild(opt);
             });
-            // Default ladder: English (the native track, always present and
-            // ready) always wins on load, then the language chosen in a
-            // previous session, then the first available track.
-            let def = -1;
-            subtitles.forEach((sub, i) => { if (def === -1 && langCode(sub, i) === 'en') def = i; });
-            const savedLang = localStorage.getItem('biblioanime_sub_lang');
-            // A saved 'id-auto' preference comes from the retired translated
-            // track: ignore it so the English default applies to everyone.
-            if (def === -1 && savedLang && savedLang !== 'id-auto') subtitles.forEach((sub, i) => { if (def === -1 && (sub.lang || '').toLowerCase() === savedLang) def = i; });
-            if (def === -1 && subtitles.length) def = 0;
+            // Default on load is always English; Indonesian is the only
+            // fallback. Never fall back to the saved preference or to the
+            // first track.
+            let def = preferredSubtitleIndex(subtitles);
             // A viewer who turned CC off keeps it off across refreshes.
             if (localStorage.getItem('biblioanime_cc') === 'off') def = -1;
             currentSubtitles = subtitles;
@@ -371,11 +382,14 @@
                 applySubtitle(-1);
                 return;
             }
-            let target = -1;
-            currentSubtitles.forEach((sub, i) => { if (target === -1 && langCode(sub, i) === 'en') target = i; });
-            const savedLang = localStorage.getItem('biblioanime_sub_lang');
-            if (target === -1 && savedLang && savedLang !== 'id-auto') currentSubtitles.forEach((sub, i) => { if (target === -1 && (sub.lang || '').toLowerCase() === savedLang) target = i; });
-            if (target === -1 && currentSubtitles.length) target = 0;
+            const target = preferredSubtitleIndex(currentSubtitles);
+            if (target === -1) {
+                // No English/Indonesian track available: stay off instead of
+                // choosing an arbitrary language.
+                subtitleDropdown.setActive(-1);
+                applySubtitle(-1);
+                return;
+            }
             subtitleDropdown.setActive(target);
             applySubtitle(target);
         }
