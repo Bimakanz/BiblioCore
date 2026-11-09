@@ -4,6 +4,7 @@ namespace App\Services\Manga;
 
 use App\Services\Manga\Contracts\MangaProviderInterface;
 use App\Services\Manga\Providers\AniListProvider;
+use App\Services\Manga\Providers\AsuraScansProvider;
 use App\Services\Manga\Providers\MangaDexProvider;
 use App\Services\Manga\Providers\KomikuProvider;
 use App\Services\Manga\Providers\KomikIndoProvider;
@@ -22,6 +23,7 @@ class MangaService
     protected MangaPillProvider $mangaPillProvider;
     protected MangaNatoProvider $mangaNatoProvider;
     protected MultiSourceProvider $multiSourceProvider;
+    protected AsuraScansProvider $asuraScansProvider;
 
     public function __construct(
         ?AniListProvider $aniList = null,
@@ -30,7 +32,8 @@ class MangaService
         ?KomikIndoProvider $komikIndo = null,
         ?MangaPillProvider $mangaPill = null,
         ?MangaNatoProvider $mangaNato = null,
-        ?MultiSourceProvider $multiSource = null
+        ?MultiSourceProvider $multiSource = null,
+        ?AsuraScansProvider $asuraScans = null
     ) {
         $this->aniListProvider = $aniList ?? new AniListProvider();
         $this->mangaDexProvider = $mangaDex ?? new MangaDexProvider();
@@ -39,6 +42,7 @@ class MangaService
         $this->mangaPillProvider = $mangaPill ?? new MangaPillProvider();
         $this->mangaNatoProvider = $mangaNato ?? new MangaNatoProvider();
         $this->multiSourceProvider = $multiSource ?? new MultiSourceProvider();
+        $this->asuraScansProvider = $asuraScans ?? new AsuraScansProvider();
     }
 
     /**
@@ -338,7 +342,17 @@ class MangaService
                     Log::warning("MultiSource EN chapter fetch failed: " . $e->getMessage());
                 }
 
-                // English Source 3: MangaNato (fallback)
+                // English Source 3: Asura Scans (manhwa/manhua catalogue)
+                try {
+                    if ($hasTime() && count($enChapters) + $dexEnCount < $enoughChapters) {
+                        $asura = $this->asuraScansProvider->getChapters($title, $altTitles);
+                        $enChapters = array_merge($enChapters, $asura);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("Asura Scans chapter fetch failed: " . $e->getMessage());
+                }
+
+                // English Source 4: MangaNato (fallback)
                 try {
                     if ($hasTime() && count($enChapters) + $dexEnCount < $enoughChapters) {
                         $nato = $this->mangaNatoProvider->getChapters($title, $altTitles);
@@ -354,12 +368,24 @@ class MangaService
             // Explicitly filter out any legacy MangaHere / foreign chapters
             $all = array_values(array_filter($all, fn ($c) => ($c['provider'] ?? '') !== 'MangaHere' && ! str_starts_with($c['id'] ?? '', 'mh_')));
 
-            // Deduplicate by language + chapter number
+            // Deduplicate by language + chapter number. Labels such as
+            // "Extra 36" and "Chapter 36" are different entries even though
+            // they share a number, so keep the label kind in the key when
+            // they collide.
             $uniqueMap = [];
             foreach ($all as $chap) {
                 $lang = $chap['language'] ?? 'en';
                 $num = (string) ($chap['chapter'] ?? '0');
-                $key = "{$lang}_{$num}";
+                $baseKey = "{$lang}_{$num}";
+                $key = $baseKey;
+
+                $kind = $this->chapterKind($chap['title'] ?? '');
+                if (isset($uniqueMap[$baseKey])) {
+                    $existingKind = $this->chapterKind($uniqueMap[$baseKey]['title'] ?? '');
+                    if ($kind !== '' && $existingKind !== '' && $kind !== $existingKind) {
+                        $key = $baseKey.'_'.$kind;
+                    }
+                }
 
                 if (!isset($uniqueMap[$key])) {
                     $uniqueMap[$key] = $chap;
@@ -421,6 +447,26 @@ class MangaService
     }
 
     /**
+     * Distinguish main chapters from extras/side stories so that
+     * "Chapter 36" and "Extra 36" are not collapsed into one entry.
+     */
+    protected function chapterKind(string $title): string
+    {
+        $label = strtolower(trim($title));
+        if ($label === '') {
+            return 'main';
+        }
+        if (preg_match('/^(extra|side\s*story|special|bonus)\b/', $label)) {
+            return 'extra';
+        }
+        if (preg_match('/^(chapter|ch\.?|episode|ep\.?)\b/', $label)) {
+            return 'main';
+        }
+
+        return '';
+    }
+
+    /**
      * Get chapter pages dynamically based on provider prefix or direct source.
      */
     public function getChapterPages(string $chapterId, ?string $source = null): ?array
@@ -440,6 +486,9 @@ class MangaService
             }
             if (in_array($source, ['WeebCentral', 'MangaHere', 'WestManga', 'Bacakomik', 'Shinigami ID']) || preg_match('/^(wb_|mh_|wm_|bk_|shn_)/', $chapterId)) {
                 return $this->multiSourceProvider->getChapterPages($chapterId);
+            }
+            if ($source === 'Asura Scans' || str_starts_with($chapterId, 'as_')) {
+                return $this->asuraScansProvider->getChapterPages($chapterId);
             }
 
             return $this->mangaDexProvider->getChapterPages($chapterId);

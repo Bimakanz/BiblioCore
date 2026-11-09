@@ -12,9 +12,6 @@ class MangaDexProvider implements MangaProviderInterface
     protected string $apiBase = 'https://api.mangadex.org';
 
     protected array $dnsResolves = [
-        'api.mangadex.org:443:45.129.229.2',
-        'uploads.mangadex.org:443:45.129.229.2',
-        'mangadex.org:443:45.129.229.2',
         'img.komiku.org:443:104.21.40.71',
         'komiku.org:443:104.21.40.71',
         'mangapill.com:443:104.21.5.54',

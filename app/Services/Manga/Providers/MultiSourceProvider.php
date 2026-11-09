@@ -2,6 +2,7 @@
 
 namespace App\Services\Manga\Providers;
 
+use App\Services\Manga\Support\ChapterLabel;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -117,9 +118,8 @@ class MultiSourceProvider
                         foreach ($chapMatches as $cm) {
                             $cId = $cm[1];
                             $chapUrl = "https://weebcentral.com/chapters/{$cId}";
-                            $cText = trim(preg_replace('/\s+/', ' ', strip_tags($cm[2])));
-                            preg_match('/(?:Chapter|Ch\.)\s*([0-9\.]+)/i', $cText, $num);
-                            $chNum = ! empty($num[1]) ? (string) $num[1] : '0';
+                            $cText = ChapterLabel::clean($cm[2]);
+                            $chNum = ChapterLabel::number($cText, count($chapters) + 1);
 
                             $chapters[] = [
                                 'id' => 'wb_'.$cId,
@@ -224,9 +224,8 @@ class MultiSourceProvider
         $chapters = [];
         foreach ($matches as $m) {
             $chapUrl = $m[1];
-            $text = trim(strip_tags($m[2]));
-            preg_match('/(?:Chapter|Ch\.)\s*([0-9\.]+)/i', $text, $num);
-            $chNum = ! empty($num[1]) ? (string) $num[1] : '0';
+            $text = ChapterLabel::clean($m[2]);
+            $chNum = ChapterLabel::number($text, count($chapters) + 1);
 
             $cid = $prefix.'_'.md5($chapUrl);
 
