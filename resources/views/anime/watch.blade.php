@@ -60,7 +60,7 @@
 
                 {{-- Control bar --}}
                 <div class="flex flex-wrap items-center gap-3 rounded-3xl border border-[#e0d9c8] bg-white p-4 shadow-sm">
-                    <div class="flex items-center gap-2">
+                    <div id="audioWrap" class="hidden items-center gap-2">
                         <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Audio</span>
                         <div id="audioToggle" class="flex items-center gap-1 rounded-full border border-[#dcd2bd] bg-[#fbf9f4] p-1">
                             <button type="button" id="audioSubBtn" data-audio="sub"
@@ -228,7 +228,14 @@
         function paintAudioButtons() {
             const subBtn = document.getElementById('audioSubBtn');
             const dubBtn = document.getElementById('audioDubBtn');
+            const wrap = document.getElementById('audioWrap');
             if (!subBtn || !dubBtn) return;
+            // The whole control only exists for titles that actually ship a
+            // dub track; otherwise there is nothing to choose.
+            if (wrap) {
+                wrap.classList.toggle('hidden', !dubAvailable);
+                wrap.classList.toggle('flex', dubAvailable);
+            }
             const active = audioValue === 'dub' ? dubBtn : subBtn;
             const idle = audioValue === 'dub' ? subBtn : dubBtn;
             active.classList.remove.apply(active.classList, AUDIO_OFF);
