@@ -401,6 +401,39 @@ $headers = ['Accept: application/json'];
         return ['sub' => false, 'dub' => false];
     }
 
+    /**
+     * Cheap dub probe for the server-rendered watch page: two priority
+     * providers, short timeout. Unknown/unreachable is treated as "no dub"
+     * on purpose — the toggle must never appear just to raise hopes.
+     */
+    public function dubAvailable(int $anilistId): bool
+    {
+        if ($anilistId <= 0) {
+            return false;
+        }
+
+        $cached = Cache::get("anivexa_audio_{$anilistId}");
+        if (is_array($cached)) {
+            return ! empty($cached['dub']);
+        }
+
+        $urls = [];
+        foreach ($this->bases() as $base) {
+            foreach (array_slice($this->priority, 0, 2) as $name) {
+                $urls[$name] = $base . "/episodes/{$name}/{$anilistId}";
+            }
+            break;
+        }
+
+        $results = $urls ? $this->getJsonMulti($urls, 3000) : [];
+        $available = $this->audioAvailabilityFrom($results);
+        if (! empty($results)) {
+            Cache::put("anivexa_audio_{$anilistId}", $available, 21600);
+        }
+
+        return ! empty($available['dub']);
+    }
+
     /** Watch path anatomy: watch/{provider}/{anilistId}/{audio}/{provider}-{number} */
     protected function parseWatchPath(string $watchPath): ?array
     {

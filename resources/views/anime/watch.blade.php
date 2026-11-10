@@ -60,7 +60,8 @@
 
                 {{-- Control bar --}}
                 <div class="flex flex-wrap items-center gap-3 rounded-3xl border border-[#e0d9c8] bg-white p-4 shadow-sm">
-                    <div id="audioWrap" class="hidden items-center gap-2">
+                    @if($dubAvailable)
+                    <div id="audioWrap" class="flex items-center gap-2">
                         <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Audio</span>
                         <div id="audioToggle" class="flex items-center gap-1 rounded-full border border-[#dcd2bd] bg-[#fbf9f4] p-1">
                             <button type="button" id="audioSubBtn" data-audio="sub"
@@ -69,6 +70,7 @@
                                     class="rounded-full px-3.5 py-1 text-xs font-bold text-[#4c5b54] transition hover:text-[#0f766e] disabled:cursor-not-allowed disabled:opacity-40">Dub</button>
                         </div>
                     </div>
+                    @endif
                     <div class="flex items-center gap-2">
                         <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Quality</span>
                         <div class="relative">
@@ -185,7 +187,7 @@
         let qualityPref = -1;
         try { qualityPref = parseInt(localStorage.getItem('biblioanime_quality') || '-1', 10); if (isNaN(qualityPref)) qualityPref = -1; } catch (e) {}
         let audioValue = @js($audio) === 'dub' ? 'dub' : 'sub';
-        let dubAvailable = false;
+        let dubAvailable = @js($dubAvailable);
 
         // Custom pill dropdowns: button + menu panel (no native <select>).
         function setupDropdown(btnId, menuId, labelId, onPick) {
@@ -228,14 +230,7 @@
         function paintAudioButtons() {
             const subBtn = document.getElementById('audioSubBtn');
             const dubBtn = document.getElementById('audioDubBtn');
-            const wrap = document.getElementById('audioWrap');
             if (!subBtn || !dubBtn) return;
-            // The whole control only exists for titles that actually ship a
-            // dub track; otherwise there is nothing to choose.
-            if (wrap) {
-                wrap.classList.toggle('hidden', !dubAvailable);
-                wrap.classList.toggle('flex', dubAvailable);
-            }
             const active = audioValue === 'dub' ? dubBtn : subBtn;
             const idle = audioValue === 'dub' ? subBtn : dubBtn;
             active.classList.remove.apply(active.classList, AUDIO_OFF);
@@ -794,8 +789,6 @@
                 const res = await fetch(EPISODES_URL + '?audio=' + encodeURIComponent(audioValue));
                 const data = await res.json();
                 const eps = data.episodes || [];
-                const available = data.audioAvailable || {};
-                dubAvailable = !!available.dub;
                 paintAudioButtons();
                 if (!eps.length) {
                     listEl.innerHTML = '<p class="py-6 text-center text-xs font-medium text-[#84948a]">No episodes available yet.</p>';

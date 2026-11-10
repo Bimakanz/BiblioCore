@@ -237,6 +237,7 @@ class AnimeController extends Controller
             'episodeId' => $episodeId,
             'episodeNumber' => max(1, (int) $request->query('n', 1)),
             'audio' => $request->query('audio') === 'dub' ? 'dub' : 'sub',
+            'dubAvailable' => $this->streamProvider->dubAvailable((int) preg_replace('/[^0-9]/', '', $id)),
             'streamUrl' => route('anime.stream.json', ['id' => $id]) . '?ep=' . urlencode($episodeId),
             'episodesUrl' => route('anime.episodes.json', ['id' => $id]),
             'subtitleIdUrl' => route('anime.subtitle.id') . '?ep=' . urlencode($episodeId),
