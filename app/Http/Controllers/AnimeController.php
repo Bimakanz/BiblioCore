@@ -108,21 +108,24 @@ class AnimeController extends Controller
     }
 
     /** Async episode list (AniList id -> streaming provider slug -> episodes). */
-    public function episodesJson(string $id): \Illuminate\Http\JsonResponse
+    public function episodesJson(string $id, Request $request): \Illuminate\Http\JsonResponse
     {
         $anime = $this->animeService->getDetail($id);
         if (!$anime) {
             return response()->json(['episodes' => [], 'total' => 0], 404);
         }
 
+        $audio = $request->query('audio') === 'dub' ? 'dub' : 'sub';
         $providerId = null;
         $providers = [];
+        $audioAvailable = ['sub' => false, 'dub' => false];
         try {
             $numericId = (int) preg_replace('/[^0-9]/', '', $id);
-            $data = $this->streamProvider->getEpisodes($numericId, $this->airedEpisodes($anime));
+            $data = $this->streamProvider->getEpisodes($numericId, $this->airedEpisodes($anime), $audio, $anime);
             $episodes = $data['episodes'] ?? [];
             $providerId = $data['provider'] ?? null;
             $providers = $data['providers'] ?? [];
+            $audioAvailable = $data['audioAvailable'] ?? $audioAvailable;
         } catch (\Throwable $e) {
             Log::error("episodesJson failed for {$id}: " . $e->getMessage());
             $episodes = [];
@@ -137,6 +140,8 @@ class AnimeController extends Controller
             'providers' => $providers,
             'episodes' => $episodes,
             'total' => count($episodes),
+            'audio' => $audio,
+            'audioAvailable' => $audioAvailable,
         ])->header('Cache-Control', $cacheControl);
     }
 
@@ -231,10 +236,10 @@ class AnimeController extends Controller
             'anime' => $anime,
             'episodeId' => $episodeId,
             'episodeNumber' => max(1, (int) $request->query('n', 1)),
+            'audio' => $request->query('audio') === 'dub' ? 'dub' : 'sub',
             'streamUrl' => route('anime.stream.json', ['id' => $id]) . '?ep=' . urlencode($episodeId),
             'episodesUrl' => route('anime.episodes.json', ['id' => $id]),
             'subtitleIdUrl' => route('anime.subtitle.id') . '?ep=' . urlencode($episodeId),
-            'servers' => $this->streamProvider->servers(),
         ])->header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600');
     }
 

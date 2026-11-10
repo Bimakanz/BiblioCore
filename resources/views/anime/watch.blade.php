@@ -61,15 +61,12 @@
                 {{-- Control bar --}}
                 <div class="flex flex-wrap items-center gap-3 rounded-3xl border border-[#e0d9c8] bg-white p-4 shadow-sm">
                     <div class="flex items-center gap-2">
-                        <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Server</span>
-                        <div class="relative">
-                            <button type="button" id="serverBtn" class="pill-btn"><span id="serverBtnLabel">Auto</span></button>
-                            <div id="serverMenu" class="pill-menu hidden">
-                                <button type="button" class="pill-option is-active" data-value="">Auto</button>
-                                @foreach($servers as $srv)
-                                    <button type="button" class="pill-option" data-value="{{ $srv }}">{{ ucfirst($srv) }}</button>
-                                @endforeach
-                            </div>
+                        <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Audio</span>
+                        <div id="audioToggle" class="flex items-center gap-1 rounded-full border border-[#dcd2bd] bg-[#fbf9f4] p-1">
+                            <button type="button" id="audioSubBtn" data-audio="sub"
+                                    class="rounded-full px-3.5 py-1 text-xs font-bold transition bg-[#0f766e] text-white shadow-sm">Sub</button>
+                            <button type="button" id="audioDubBtn" data-audio="dub"
+                                    class="rounded-full px-3.5 py-1 text-xs font-bold text-[#4c5b54] transition hover:text-[#0f766e] disabled:cursor-not-allowed disabled:opacity-40">Dub</button>
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
@@ -187,7 +184,8 @@
         const nextOverlay = document.getElementById('nextEpOverlay');
         let qualityPref = -1;
         try { qualityPref = parseInt(localStorage.getItem('biblioanime_quality') || '-1', 10); if (isNaN(qualityPref)) qualityPref = -1; } catch (e) {}
-        let serverValue = '';
+        let audioValue = @js($audio) === 'dub' ? 'dub' : 'sub';
+        let dubAvailable = false;
 
         // Custom pill dropdowns: button + menu panel (no native <select>).
         function setupDropdown(btnId, menuId, labelId, onPick) {
@@ -222,10 +220,60 @@
             return { setActive: setActive, menu: menu, btn: btn };
         }
 
-        const serverDropdown = setupDropdown('serverBtn', 'serverMenu', 'serverBtnLabel', function (v) {
-            serverValue = v;
-            loadStream();
-        });
+        // Audio (sub/dub) replaces the old server picker: the resolver always
+        // chooses the source automatically, the user only picks the track.
+        const AUDIO_ON = ['bg-[#0f766e]', 'text-white', 'shadow-sm'];
+        const AUDIO_OFF = ['text-[#4c5b54]', 'hover:text-[#0f766e]'];
+
+        function paintAudioButtons() {
+            const subBtn = document.getElementById('audioSubBtn');
+            const dubBtn = document.getElementById('audioDubBtn');
+            if (!subBtn || !dubBtn) return;
+            const active = audioValue === 'dub' ? dubBtn : subBtn;
+            const idle = audioValue === 'dub' ? subBtn : dubBtn;
+            active.classList.remove.apply(active.classList, AUDIO_OFF);
+            active.classList.add.apply(active.classList, AUDIO_ON);
+            idle.classList.remove.apply(idle.classList, AUDIO_ON);
+            idle.classList.add.apply(idle.classList, AUDIO_OFF);
+            dubBtn.disabled = !dubAvailable && audioValue !== 'dub';
+            dubBtn.title = dubBtn.disabled ? 'Dub belum tersedia untuk judul ini' : '';
+        }
+
+        function pickAudio(next) {
+            if (next === audioValue) return;
+            if (next === 'dub' && !dubAvailable) return;
+            audioValue = next;
+            try { localStorage.setItem('biblioanime_audio', next); } catch (e) {}
+            paintAudioButtons();
+            goToAudio();
+        }
+
+        // Switching audio means switching episode ids (providers expose
+        // separate sub/dub entries), so keep the number and reload the page
+        // with the matching id.
+        async function goToAudio() {
+            try {
+                const res = await fetch(EPISODES_URL + '?audio=' + encodeURIComponent(audioValue));
+                const data = await res.json();
+                const eps = data.episodes || [];
+                const match = eps.find(function (ep) { return Number(ep.number) === Number(EPISODE_NUMBER); });
+                if (!match) {
+                    showError('Versi ' + (audioValue === 'dub' ? 'Dub' : 'Sub') + ' untuk episode ini belum tersedia.');
+                    audioValue = audioValue === 'dub' ? 'sub' : 'dub';
+                    paintAudioButtons();
+                    return;
+                }
+                location.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(match.id) + '&n=' + match.number + '&audio=' + audioValue;
+            } catch (e) {
+                showError('Gagal memuat versi ' + (audioValue === 'dub' ? 'Dub' : 'Sub') + '.'); 
+            }
+        }
+
+        const audioSubBtn = document.getElementById('audioSubBtn');
+        const audioDubBtn = document.getElementById('audioDubBtn');
+        if (audioSubBtn) audioSubBtn.addEventListener('click', function () { pickAudio('sub'); });
+        if (audioDubBtn) audioDubBtn.addEventListener('click', function () { pickAudio('dub'); });
+        paintAudioButtons();
         const qualityDropdown = setupDropdown('qualityBtn', 'qualityMenu', 'qualityBtnLabel', function (v) {
             qualityPref = parseInt(v, 10);
             if (isNaN(qualityPref)) qualityPref = -1;
@@ -489,42 +537,23 @@
         document.getElementById('subMinus').addEventListener('click', () => shiftSubtitles(-0.5));
         document.getElementById('subPlus').addEventListener('click', () => shiftSubtitles(0.5));
 
-        // Automatic server failover: when a source cannot be loaded or dies
-        // mid-playback, the player walks the server list by itself instead
-        // of leaving the user on an error screen.
-        let triedServers = new Set();
+        // Automatic source failover: the backend walks every provider for us
+        // (and the same episode in the chosen audio), so the player no longer
+        // exposes a server picker. A failed manifest gets one cheap retry in
+        // case a flaky provider is behind the first response.
         let fatalRecoveries = 0;
 
-        function tryAutoFailover() {
-            const candidates = Array.from(serverDropdown.menu.querySelectorAll('.pill-option')).map(o => o.dataset.value);
-            const next = candidates.find(v => !triedServers.has(v));
-            if (next === undefined) {
-                return false;
-            }
-            triedServers.add(next);
-            serverValue = next;
-            serverDropdown.setActive(next);
-            loadStream(true);
-            return true;
-        }
-
-        async function loadStream(auto = false) {
+        async function loadStream() {
             hideOverlays();
             if (video.currentTime > 5) resumeOverride = Math.floor(video.currentTime);
             resumeApplied = false;
-            fatalRecoveries = 0;
-            const server = serverValue;
-            if (!auto) triedServers = new Set([server]);
-            const url = STREAM_URL + (server ? '&server=' + encodeURIComponent(server) : '');
             let data = null;
             try {
-                const res = await fetch(url);
+                const res = await fetch(STREAM_URL);
                 data = await res.json();
                 if (!res.ok || !data.source) throw new Error(data.error || 'Stream unavailable');
             } catch (e) {
-                if (!tryAutoFailover()) {
-                    showError('All servers were tried automatically, but none could play this episode. Please try again later.');
-                }
+                showError('All servers were tried automatically, but none could play this episode. Please try again later.');
                 return;
             }
             intro = data.intro || intro;
@@ -614,9 +643,12 @@
                         try { hls.recoverMediaError(); } catch (e) {}
                         return;
                     }
-                    if (!tryAutoFailover()) {
-                        showError('The stream was interrupted and all backup servers were tried automatically.');
+                    if (fatalRecoveries < 1) {
+                        fatalRecoveries++;
+                        loadStream();
+                        return;
                     }
+                    showError('The stream was interrupted and no backup source was available.');
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 qualityDropdown.btn.disabled = true;
@@ -752,9 +784,12 @@
         (async function () {
             const listEl = document.getElementById('epList');
             try {
-                const res = await fetch(EPISODES_URL);
+                const res = await fetch(EPISODES_URL + '?audio=' + encodeURIComponent(audioValue));
                 const data = await res.json();
                 const eps = data.episodes || [];
+                const available = data.audioAvailable || {};
+                dubAvailable = !!available.dub;
+                paintAudioButtons();
                 if (!eps.length) {
                     listEl.innerHTML = '<p class="py-6 text-center text-xs font-medium text-[#84948a]">No episodes available yet.</p>';
                     return;
@@ -773,12 +808,12 @@
                 const prevBtn = document.getElementById('prevEpBtn');
                 const nextBtn = document.getElementById('nextEpBtn');
                 if (prev) {
-                    prevBtn.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(prev.id) + '&n=' + prev.number;
+                    prevBtn.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(prev.id) + '&n=' + prev.number + '&audio=' + audioValue;
                     prevBtn.classList.remove('hidden');
                     prevBtn.classList.add('inline-flex');
                 }
                 if (next) {
-                    nextBtn.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(next.id) + '&n=' + next.number;
+                    nextBtn.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(next.id) + '&n=' + next.number + '&audio=' + audioValue;
                     nextBtn.classList.remove('hidden');
                     nextBtn.classList.add('inline-flex');
                     nextEpisodeUrl = nextBtn.href;
@@ -877,14 +912,18 @@
 
 
         // Keyboard shortcuts: C = subtitles, arrows = seek, F = fullscreen (existing listener above).
-        // Space added here for play/pause.
+        // Space = play/pause, but only when the native player is NOT focused:
+        // a focused <video controls> already handles Space itself, and doing
+        // both toggled twice (pause then instant play).
         document.addEventListener('keydown', function (e) {
-            const tag = (e.target && e.target.tagName) || '';
+            if (e.code !== 'Space' || e.repeat) return;
+            const target = e.target;
+            const tag = (target && target.tagName) || '';
             if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-            if (e.code === 'Space') {
-                e.preventDefault();
-                togglePlay();
-            }
+            if (target && target.closest && target.closest('button, a, [contenteditable="true"]')) return;
+            if (document.activeElement === video) return;
+            e.preventDefault();
+            togglePlay();
         });
 
         loadStream();

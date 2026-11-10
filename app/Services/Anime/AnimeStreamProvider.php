@@ -32,6 +32,9 @@ class AnimeStreamProvider
     /** Shared secret for keyed resolver instances (ANIME_API_KEY), sent as x-api-key. */
     protected ?string $apiKey = null;
 
+    /** Optional secondary sources (HiAnime, Consumet, ARM). */
+    protected AnimeExtraSources $extra;
+
     /** Provider priority: proven HLS + subtitle sources first. */
     protected array $priority = [
         'anikoto', 'aniwaves', 'animedunya', 'anizone', 'anipm', 'animenosub',
@@ -49,6 +52,7 @@ class AnimeStreamProvider
         $this->fallbacks = $urls->slice(1)->all();
         $key = env('ANIME_API_KEY');
         $this->apiKey = is_string($key) && $key !== '' ? $key : null;
+        $this->extra = new AnimeExtraSources();
     }
 
     /**
@@ -259,30 +263,44 @@ $headers = ['Accept: application/json'];
      * background, so a later call may succeed where the first was partial.
      *
      * @param  int|null  $expected  episodes that already aired, when known
+     * @param  string  $audio  'sub' or 'dub'
      */
-    public function getEpisodes(int $anilistId, ?int $expected = null): array
+    public function getEpisodes(int $anilistId, ?int $expected = null, string $audio = 'sub', ?array $anime = null): array
     {
-        $empty = ['provider' => null, 'providers' => [], 'episodes' => []];
+        $audio = $audio === 'dub' ? 'dub' : 'sub';
+        $empty = ['provider' => null, 'providers' => [], 'episodes' => [], 'audio' => $audio, 'audioAvailable' => ['sub' => false, 'dub' => false]];
         if ($anilistId <= 0) {
             return $empty;
         }
 
-        $cached = Cache::get("anivexa_episodes_{$anilistId}");
+        $cacheKey = "anivexa_episodes_{$anilistId}_{$audio}";
+        $cached = Cache::get($cacheKey);
         if (is_array($cached) && !empty($cached['episodes'])
             && ($expected === null || $expected <= 0 || count($cached['episodes']) >= $expected)) {
             return $cached;
         }
 
         $responses = $this->fetchProviderEpisodes($anilistId, $expected);
+
+        // Audio availability comes from the same response: providers expose
+        // separate `episodes.sub` / `episodes.dub` arrays, so a title can
+        // have 12 sub episodes and 3 dub episodes (or none at all).
+        $audioAvailable = $this->audioAvailabilityFrom($responses);
+        if (!empty($responses)) {
+            Cache::put("anivexa_audio_{$anilistId}", $audioAvailable, 21600);
+        } else {
+            $audioAvailable = $this->audioAvailability($anilistId);
+        }
+
         if (empty($responses)) {
-            return is_array($cached) && !empty($cached['episodes']) ? $cached : $empty;
+            $audioAvailable = $this->audioAvailability($anilistId);
         }
 
         $byProvider = [];
         $byNumber = [];
         foreach ($this->providerOrder(array_keys($responses)) as $name) {
             $block = $responses[$name] ?? null;
-            $list = $block['episodes']['sub'] ?? $block['episodes']['dub'] ?? [];
+            $list = $block['episodes'][$audio] ?? [];
             if (!is_array($list) || empty($list)) {
                 continue;
             }
@@ -311,11 +329,38 @@ $headers = ['Accept: application/json'];
             }
         }
 
-        if (empty($byProvider)) {
-            return is_array($cached) && !empty($cached['episodes']) ? $cached : $empty;
+        // Secondary sources: only pay for them when the primary list is
+        // short or the requested track is missing entirely (fresh cours and
+        // dub tracks are exactly where Anivexa lags).
+        $needsExtra = empty($byNumber)
+            || ($expected !== null && $expected > 0 && count($byNumber) < max(1, $expected - 2))
+            || ($audio === 'dub' && empty($audioAvailable['dub']));
+        if ($needsExtra) {
+            foreach (['hianime', 'consumet'] as $source) {
+                $list = $source === 'hianime'
+                    ? $this->extra->hianimeEpisodes($anime ?? [], $audio)
+                    : $this->extra->consumetEpisodes($anime ?? [], $audio);
+                foreach ($list as $ep) {
+                    if (! isset($byNumber[$ep['number']])) {
+                        $byNumber[$ep['number']] = $ep;
+                    }
+                }
+                if (! empty($list)) {
+                    $audioAvailable[$audio] = true;
+                }
+            }
         }
 
-        Cache::put("anivexa_episodes_by_provider_{$anilistId}", $byProvider, 21600);
+        if (empty($byProvider) && empty($byNumber)) {
+            return is_array($cached) && !empty($cached['episodes'])
+                ? $cached
+                : array_merge($empty, ['audioAvailable' => $audioAvailable]);
+        }
+
+        if (! empty($byProvider)) {
+            Cache::put("anivexa_episodes_by_provider_{$anilistId}_{$audio}", $byProvider, 21600);
+        }
+        Cache::put("anivexa_audio_{$anilistId}", $audioAvailable, 21600);
 
         ksort($byNumber);
         $primary = array_key_first($byProvider);
@@ -323,9 +368,37 @@ $headers = ['Accept: application/json'];
             'provider' => $primary,
             'providers' => array_keys($byProvider),
             'episodes' => array_values($byNumber),
+            'audio' => $audio,
+            'audioAvailable' => $audioAvailable,
         ];
-        Cache::put("anivexa_episodes_{$anilistId}", $result, 21600);
+        Cache::put($cacheKey, $result, 21600);
         return $result;
+    }
+
+    /** Which audio tracks the resolver reports for a title. */
+    protected function audioAvailabilityFrom(array $responses): array
+    {
+        $available = ['sub' => false, 'dub' => false];
+        foreach ($responses as $block) {
+            foreach (['sub', 'dub'] as $audio) {
+                if (!empty($block['episodes'][$audio]) && is_array($block['episodes'][$audio])) {
+                    $available[$audio] = true;
+                }
+            }
+        }
+        return $available;
+    }
+
+    public function audioAvailability(int $anilistId): array
+    {
+        $cached = Cache::get("anivexa_audio_{$anilistId}");
+        if (is_array($cached)) {
+            return [
+                'sub' => !empty($cached['sub']),
+                'dub' => !empty($cached['dub']),
+            ];
+        }
+        return ['sub' => false, 'dub' => false];
     }
 
     /** Watch path anatomy: watch/{provider}/{anilistId}/{audio}/{provider}-{number} */
@@ -338,12 +411,14 @@ $headers = ['Accept: application/json'];
     }
 
     /** Find the watch path of the same episode number on another provider. */
-    protected function alternativePath(int $anilistId, float $number, string $provider): ?string
+    protected function alternativePath(int $anilistId, float $number, string $provider, string $audio = 'sub'): ?string
     {
-        $byProvider = Cache::get("anivexa_episodes_by_provider_{$anilistId}");
+        $audio = $audio === 'dub' ? 'dub' : 'sub';
+        $cacheKey = "anivexa_episodes_by_provider_{$anilistId}_{$audio}";
+        $byProvider = Cache::get($cacheKey);
         if (!is_array($byProvider)) {
-            $this->getEpisodes($anilistId);
-            $byProvider = Cache::get("anivexa_episodes_by_provider_{$anilistId}");
+            $this->getEpisodes($anilistId, null, $audio);
+            $byProvider = Cache::get($cacheKey);
         }
         foreach (($byProvider[$provider] ?? []) as $ep) {
             if ((float) $ep['number'] === $number) {
@@ -359,12 +434,46 @@ $headers = ['Accept: application/json'];
      * number is streamed from that provider instead (player failover).
      * A failed primary path also fails over across up to 2 other providers.
      */
+    /** Route an episode reference that came from a secondary source. */
+    protected function extraStream(string $reference): ?array
+    {
+        if (! str_contains($reference, '|')) {
+            return null;
+        }
+        if (! str_starts_with($reference, 'hn|') && ! str_starts_with($reference, 'cs|')) {
+            return null;
+        }
+
+        $cacheKey = 'anime_extra_stream_' . md5($reference);
+        $cached = Cache::get($cacheKey);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $stream = str_starts_with($reference, 'hn|')
+            ? $this->extra->hianimeStream($reference, 'sub')
+            : $this->extra->consumetStream($reference);
+
+        if ($stream) {
+            Cache::put($cacheKey, $stream, 3600);
+        }
+
+        return $stream;
+    }
+
     public function getStream(string $watchPath, ?string $providerOverride = null): ?array
     {
+        // Episodes that came from a secondary source route back to it.
+        $extraStream = $this->extraStream($watchPath);
+        if ($extraStream !== null) {
+            return $extraStream;
+        }
+
         $parsed = $this->parseWatchPath($watchPath);
+        $audio = $parsed['audio'] ?? 'sub';
 
         if ($providerOverride && $parsed && $providerOverride !== $parsed['provider']) {
-            $alt = $this->alternativePath($parsed['anilistId'], $parsed['number'], $providerOverride);
+            $alt = $this->alternativePath($parsed['anilistId'], $parsed['number'], $providerOverride, $audio);
             if ($alt) {
                 $watchPath = $alt;
                 $parsed = $this->parseWatchPath($watchPath);
@@ -383,7 +492,7 @@ $headers = ['Accept: application/json'];
         // priority order (providers the resolver added beyond our list count
         // too, otherwise a working source can be skipped).
         if (!$stream && $parsed) {
-            $byProvider = Cache::get("anivexa_episodes_by_provider_{$parsed['anilistId']}");
+            $byProvider = Cache::get("anivexa_episodes_by_provider_{$parsed['anilistId']}_{$audio}");
             $order = is_array($byProvider) && !empty($byProvider)
                 ? $this->providerOrder(array_keys($byProvider))
                 : $this->priority;
@@ -391,7 +500,7 @@ $headers = ['Accept: application/json'];
                 if ($name === $parsed['provider']) {
                     continue;
                 }
-                $alt = $this->alternativePath($parsed['anilistId'], $parsed['number'], $name);
+                $alt = $this->alternativePath($parsed['anilistId'], $parsed['number'], $name, $audio);
                 if (!$alt) {
                     continue;
                 }
@@ -409,6 +518,49 @@ $headers = ['Accept: application/json'];
         return $stream;
     }
 
+    /**
+     * Normalise the stream list of a watch response. Anivexa historically
+     * answered with `streams` entries carrying `type: hls`; newer builds and
+     * Miruro-style resolvers answer with consumet-shaped `sources` (`file`,
+     * `isM3U8`), sometimes wrapped in `data`. All of them are accepted so a
+     * resolver upgrade never turns into "every server failed".
+     */
+    protected function extractStreams(array $data): array
+    {
+        $out = [];
+        foreach (['streams', 'sources'] as $key) {
+            if (!empty($data[$key]) && is_array($data[$key])) {
+                foreach ($data[$key] as $entry) {
+                    if (is_array($entry)) {
+                        $out[] = $entry;
+                    }
+                }
+            }
+        }
+        if (empty($out) && isset($data['data']) && is_array($data['data'])) {
+            return $this->extractStreams($data['data']);
+        }
+        return $out;
+    }
+
+    protected function streamUrl(array $stream): string
+    {
+        foreach (['url', 'file', 'link', 'src'] as $key) {
+            if (!empty($stream[$key]) && is_string($stream[$key])) {
+                return $stream[$key];
+            }
+        }
+        return '';
+    }
+
+    protected function isHlsStream(array $stream, string $url): bool
+    {
+        $type = strtolower((string) ($stream['type'] ?? ''));
+        return $type === 'hls' || $type === 'm3u8'
+            || str_contains($url, '.m3u8')
+            || !empty($stream['isM3U8']);
+    }
+
     protected function fetchStream(string $watchPath): ?array
     {
         $data = null;
@@ -418,22 +570,36 @@ $headers = ['Accept: application/json'];
                 break;
             }
         }
-        if (!$data || empty($data['streams']) || !is_array($data['streams'])) {
+        if (!$data) {
+            return null;
+        }
+
+        $streams = $this->extractStreams($data);
+        if (empty($streams)) {
+            // Keep a breadcrumb: an unexpected payload shape used to look
+            // exactly like "provider has no stream" in the player.
+            Log::debug('anivexa watch payload without streams', [
+                'path' => $watchPath,
+                'keys' => array_keys($data),
+            ]);
             return null;
         }
 
         $chosen = null;
-        foreach ($data['streams'] as $s) {
-            if (empty($s['url'])) {
+        foreach ($streams as $s) {
+            $url = $this->streamUrl($s);
+            if ($url === '') {
                 continue;
             }
-            $isHls = ($s['type'] ?? '') === 'hls' || str_contains($s['url'], '.m3u8');
-            if ($isHls && ($s['isActive'] ?? true)) {
+            $isHls = $this->isHlsStream($s, $url);
+            if ($isHls && ($s['isActive'] ?? $s['active'] ?? true)) {
                 $chosen = $s;
+                $chosen['url'] = $url;
                 break;
             }
             if ($isHls && $chosen === null) {
                 $chosen = $s;
+                $chosen['url'] = $url;
             }
         }
         if (!$chosen) {
@@ -441,11 +607,13 @@ $headers = ['Accept: application/json'];
         }
 
         $subtitles = [];
-        foreach (($chosen['subtitles'] ?? []) as $sub) {
-            if (empty($sub['url'])) {
+        $tracks = $chosen['subtitles'] ?? $chosen['tracks'] ?? $data['subtitles'] ?? $data['tracks'] ?? [];
+        foreach ((is_array($tracks) ? $tracks : []) as $sub) {
+            $subUrl = (string) ($sub['url'] ?? $sub['file'] ?? $sub['src'] ?? '');
+            if ($subUrl === '') {
                 continue;
             }
-            $lang = strtolower((string) ($sub['srclang'] ?? $sub['label'] ?? 'en'));
+            $lang = strtolower((string) ($sub['srclang'] ?? $sub['lang'] ?? $sub['label'] ?? 'en'));
             $subtitles[] = [
                 'lang' => $lang,
                 'label' => (string) ($sub['label'] ?? strtoupper($lang)),

@@ -37,6 +37,43 @@ class AnimeTest extends TestCase
         $response->assertNotFound();
     }
 
+    public function test_episodes_json_honours_the_dub_audio_track(): void
+    {
+        $this->mock(\App\Services\Anime\AnimeService::class, function ($mock) {
+            $mock->shouldReceive('getDetail')->andReturn([
+                'id' => 'al_1',
+                'anilistId' => 1,
+                'malId' => 1,
+                'title' => 'Test Anime',
+                'titles' => [],
+                'altTitles' => [],
+                'episodes' => 12,
+            ]);
+        });
+
+        $this->mock(\App\Services\Anime\AnimeStreamProvider::class, function ($mock) {
+            $mock->shouldReceive('getEpisodes')
+                ->once()
+                ->with(1, 12, 'dub', \Mockery::type('array'))
+                ->andReturn([
+                    'provider' => 'kaa',
+                    'providers' => ['kaa'],
+                    'audio' => 'dub',
+                    'audioAvailable' => ['sub' => true, 'dub' => true],
+                    'episodes' => [
+                        ['id' => 'watch/kaa/1/dub/kaa-1', 'number' => 1],
+                    ],
+                ]);
+        });
+
+        $response = $this->getJson('/anime/al_1/episodes.json?audio=dub');
+
+        $response->assertOk()
+            ->assertJsonPath('audio', 'dub')
+            ->assertJsonPath('audioAvailable.dub', true)
+            ->assertJsonPath('episodes.0.id', 'watch/kaa/1/dub/kaa-1');
+    }
+
     public function test_playlist_proxy_rejects_unknown_key(): void
     {
         $response = $this->get('/anime/proxy/playlist?k=unknownkey');
