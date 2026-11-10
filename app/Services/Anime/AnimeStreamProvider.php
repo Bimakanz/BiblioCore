@@ -87,13 +87,18 @@ $headers = ['Accept: application/json'];
     /**
      * Fetch episode lists per provider in parallel waves (curl_multi).
      * Returns a map of provider name => raw provider block. Wave 1 is the
-     * five highest-priority providers; wave 2 only runs when wave 1
-     * produced nothing. The aggregate /episodes/{id} endpoint is NOT used:
-     * for long-running titles it returns ~11 MB and needs >30 s (33.8 s
-     * measured for One Piece), which always exceeded the timeout and
-     * silently produced an empty episode list.
+     * two proven-fastest providers; the wider waves keep running while the
+     * best list found so far is still shorter than $expected (episodes that
+     * already aired), so a slow provider holding a complete catalogue is
+     * never skipped just because a fast one returned a single episode.
+     * The aggregate /episodes/{id} endpoint is NOT used: for long-running
+     * titles it returns ~11 MB and needs >30 s (33.8 s measured for One
+     * Piece), which always exceeded the timeout and silently produced an
+     * empty episode list.
+     *
+     * @param  int|null  $expected  episodes that already aired, when known
      */
-    protected function fetchProviderEpisodes(int $anilistId): array
+    protected function fetchProviderEpisodes(int $anilistId, ?int $expected = null): array
     {
         // Narrow first wave: the two proven-fastest HLS providers. A wave
         // waits for its slowest member, so keeping wave 1 tiny keeps the
@@ -105,6 +110,12 @@ $headers = ['Accept: application/json'];
         ];
         $blocks = [];
         foreach ($waves as $wave) {
+            if ($this->episodeBlocksSatisfied($blocks, $expected)) {
+                break;
+            }
+            if (empty($wave)) {
+                continue;
+            }
             $results = [];
             foreach ($this->bases() as $base) {
                 $urls = [];
@@ -122,11 +133,37 @@ $headers = ['Accept: application/json'];
                     $blocks[$name] = $block;
                 }
             }
-            if (!empty($blocks)) {
-                break;
-            }
         }
         return $blocks;
+    }
+
+    /**
+     * Whether the blocks collected so far are good enough to stop asking.
+     * With no expectation, any non-empty result is enough (legacy behaviour);
+     * otherwise the longest list must cover the episodes that already aired.
+     */
+    protected function episodeBlocksSatisfied(array $blocks, ?int $expected): bool
+    {
+        if (empty($blocks)) {
+            return false;
+        }
+        if ($expected === null || $expected <= 0) {
+            return true;
+        }
+
+        $longest = 0;
+        foreach ($blocks as $block) {
+            $list = $block['episodes']['sub'] ?? $block['episodes']['dub'] ?? [];
+            if (is_array($list)) {
+                $longest = max($longest, count($list));
+            }
+        }
+
+        // Providers routinely lag one or two episodes behind the broadcast
+        // (raw uploads, numbering quirks). Chasing that last gap would make
+        // every request pay for all three waves, so treat a list that is
+        // within two episodes as complete.
+        return $longest >= max(1, $expected - 2);
     }
 
     /** Parallel version of getJson(): map of key => decoded JSON array. */
@@ -214,10 +251,16 @@ $headers = ['Accept: application/json'];
      * Normalized per-provider episode lists for an AniList id.
      * Returns ['provider' => primaryName, 'providers' => [names...],
      *          'episodes' => [ ['id' => watchPath, 'number', 'title', 'image', 'duration'] ]]
+     * The episode list is the union of every provider that answered: the
+     * earliest provider in the priority list wins each episode number, and
+     * later providers fill the gaps (a fast provider often lags behind on
+     * freshly airing shows while another already has the full catalogue).
      * Empty results are NOT cached: Anivexa refreshes providers in the
      * background, so a later call may succeed where the first was partial.
+     *
+     * @param  int|null  $expected  episodes that already aired, when known
      */
-    public function getEpisodes(int $anilistId): array
+    public function getEpisodes(int $anilistId, ?int $expected = null): array
     {
         $empty = ['provider' => null, 'providers' => [], 'episodes' => []];
         if ($anilistId <= 0) {
@@ -225,16 +268,18 @@ $headers = ['Accept: application/json'];
         }
 
         $cached = Cache::get("anivexa_episodes_{$anilistId}");
-        if (is_array($cached) && !empty($cached['episodes'])) {
+        if (is_array($cached) && !empty($cached['episodes'])
+            && ($expected === null || $expected <= 0 || count($cached['episodes']) >= $expected)) {
             return $cached;
         }
 
-        $responses = $this->fetchProviderEpisodes($anilistId);
+        $responses = $this->fetchProviderEpisodes($anilistId, $expected);
         if (empty($responses)) {
-            return $empty;
+            return is_array($cached) && !empty($cached['episodes']) ? $cached : $empty;
         }
 
         $byProvider = [];
+        $byNumber = [];
         foreach ($this->priority as $name) {
             $block = $responses[$name] ?? null;
             $list = $block['episodes']['sub'] ?? $block['episodes']['dub'] ?? [];
@@ -254,23 +299,30 @@ $headers = ['Accept: application/json'];
                     'duration' => $ep['duration'] ?? null,
                 ];
             }
-            if (!empty($normalized)) {
-                usort($normalized, fn ($a, $b) => $a['number'] <=> $b['number']);
-                $byProvider[$name] = $normalized;
+            if (empty($normalized)) {
+                continue;
+            }
+            usort($normalized, fn ($a, $b) => $a['number'] <=> $b['number']);
+            $byProvider[$name] = $normalized;
+            foreach ($normalized as $ep) {
+                if (!isset($byNumber[$ep['number']])) {
+                    $byNumber[$ep['number']] = $ep;
+                }
             }
         }
 
         if (empty($byProvider)) {
-            return $empty;
+            return is_array($cached) && !empty($cached['episodes']) ? $cached : $empty;
         }
 
         Cache::put("anivexa_episodes_by_provider_{$anilistId}", $byProvider, 21600);
 
+        ksort($byNumber);
         $primary = array_key_first($byProvider);
         $result = [
             'provider' => $primary,
             'providers' => array_keys($byProvider),
-            'episodes' => $byProvider[$primary],
+            'episodes' => array_values($byNumber),
         ];
         Cache::put("anivexa_episodes_{$anilistId}", $result, 21600);
         return $result;

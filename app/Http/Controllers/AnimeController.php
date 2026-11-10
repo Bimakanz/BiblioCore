@@ -119,7 +119,7 @@ class AnimeController extends Controller
         $providers = [];
         try {
             $numericId = (int) preg_replace('/[^0-9]/', '', $id);
-            $data = $this->streamProvider->getEpisodes($numericId);
+            $data = $this->streamProvider->getEpisodes($numericId, $this->airedEpisodes($anime));
             $episodes = $data['episodes'] ?? [];
             $providerId = $data['provider'] ?? null;
             $providers = $data['providers'] ?? [];
@@ -138,6 +138,23 @@ class AnimeController extends Controller
             'episodes' => $episodes,
             'total' => count($episodes),
         ])->header('Cache-Control', $cacheControl);
+    }
+
+    /**
+     * How many episodes have already aired, straight from AniList metadata.
+     * Used only as a completeness hint when picking streaming providers:
+     * a provider that only lists 1 of 7 aired episodes is not good enough,
+     * so the resolver keeps asking the next wave of providers.
+     */
+    protected function airedEpisodes(array $anime): ?int
+    {
+        $next = $anime['nextAiring']['episode'] ?? null;
+        if (is_numeric($next) && (int) $next > 0) {
+            return max(0, (int) $next - 1);
+        }
+
+        $total = $anime['episodes'] ?? null;
+        return is_numeric($total) && (int) $total > 0 ? (int) $total : null;
     }
 
     /** Watch page shell. Stream resolution happens async via streamJson. */
