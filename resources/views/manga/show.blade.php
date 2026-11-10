@@ -84,12 +84,25 @@
                     setTimeout(() => this.fetchChapters(true), 5000 * this.retries);
                 }
             },
+            chapterKind(title) {
+                const text = String(title || '').trim().toLowerCase();
+                if (text === '') {
+                    return 'main';
+                }
+                if (/^(extra|side\s*story|special|bonus)\b/.test(text)) {
+                    return 'extra';
+                }
+                if (/^(chapter|ch\.?|episode|ep\.?)\b/.test(text)) {
+                    return 'main';
+                }
+                return '';
+            },
             mergePayloads(payloads) {
                 const seen = new Set();
                 const chapters = [];
                 for (const payload of payloads) {
                     for (const chapter of (payload.chapters || [])) {
-                        const key = (chapter.language || 'en') + '_' + (chapter.chapter || '0');
+                        const key = (chapter.language || 'en') + '_' + (chapter.chapter || '0') + '_' + this.chapterKind(chapter.title);
                         if (seen.has(key)) {
                             continue;
                         }
@@ -106,7 +119,17 @@
                     return nb - na;
                 });
                 const counts = { all: 0, id: 0, en: 0 };
+                for (const chapter of chapters) {
+                    if (chapter.language === 'id') {
+                        counts.id += 1;
+                    } else if (chapter.language === 'en') {
+                        counts.en += 1;
+                    }
+                }
                 for (const payload of payloads) {
+                    if (!payload.truncated) {
+                        continue;
+                    }
                     counts.id = Math.max(counts.id, (payload.counts && payload.counts.id) || 0);
                     counts.en = Math.max(counts.en, (payload.counts && payload.counts.en) || 0);
                 }
