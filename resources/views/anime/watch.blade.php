@@ -14,7 +14,7 @@
             {{-- ===== PLAYER COLUMN ===== --}}
             <div class="space-y-4 lg:col-span-2">
                 <div id="playerWrap" class="relative overflow-hidden rounded-[1.75rem] bg-black shadow-[0_25px_60px_-25px_rgba(0,0,0,0.7)] group">
-                    <video id="player" class="aspect-video w-full bg-black" crossorigin="anonymous" playsinline
+                    <video id="player" class="aspect-video w-full bg-black" crossorigin="anonymous" playsinline controls
                            poster="{{ $anime['bannerUrl'] ?: $anime['coverUrl'] }}"></video>
 
                     <div id="playerLoading" class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 text-white backdrop-blur-[2px] z-40">
@@ -32,45 +32,6 @@
                         <button type="button" id="retryBtn" class="rounded-full bg-[#f97316] px-5 py-2 text-xs font-bold text-white transition hover:bg-[#ea580c]">Try Again</button>
                     </div>
 
-                    <!-- Custom dark green player controls -->
-                    <div id="playerControls" class="absolute inset-0 flex flex-col z-20 opacity-0 transition-opacity duration-300 pointer-events-none">
-                        <!-- Center play/pause overlay -->
-                        <div id="playerCenterPlay" class="flex items-center justify-center z-30">
-                            <button id="centerPlayBtn" class="w-16 h-16 rounded-full bg-black/55 hover:bg-black/75 text-white flex items-center justify-center transition-all backdrop-blur-sm shadow-xl">
-                                <span class="material-symbols-rounded text-3xl">play_arrow</span>
-                            </button>
-                        </div>
-
-                        <!-- Bottom control bar (floating rounded panel) -->
-                        <div class="absolute bottom-0 left-0 right-0 z-30 px-2.5 pb-2.5 sm:px-4 sm:pb-4">
-                            <div class="control-bar rounded-2xl bg-black/75 backdrop-blur-md border border-white/10 px-3 py-2.5 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.85)]">
-                                <div class="flex items-center gap-2.5 sm:gap-3">
-                                    <!-- Play/pause -->
-                                    <button id="barPlayBtn" class="h-9 w-9 flex-shrink-0 rounded-full bg-[#0f766e] hover:bg-[#115e59] text-white flex items-center justify-center transition-all shadow-lg transform active:scale-95">
-                                        <span class="material-symbols-rounded text-lg">play_arrow</span>
-                                    </button>
-
-                                    <!-- Time + progress -->
-                                    <span id="barCurrentTime" class="flex-shrink-0 text-[11px] font-mono font-semibold text-white/75 tabular-nums">0:00</span>
-                                    <div id="progressTrack" class="flex-1 min-w-0 h-1.5 rounded-full bg-white/25 cursor-pointer relative group/progress">
-                                        <div id="progressFill" class="h-1.5 rounded-full bg-[#0f766e] w-0 transition-all duration-100"></div>
-                                        <div id="progressHandle" class="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-[#0f766e] rounded-full shadow-md opacity-0 transition-opacity duration-200 group-hover/progress:opacity-100"></div>
-                                    </div>
-                                    <span id="barDuration" class="flex-shrink-0 text-[11px] font-mono font-semibold text-white/75 tabular-nums">0:00</span>
-
-                                    <!-- Volume + Fullscreen -->
-                                    <div class="flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
-                                        <button id="barVolumeBtn" class="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all active:scale-95">
-                                            <span class="material-symbols-rounded text-lg">volume_up</span>
-                                        </button>
-                                        <button id="barFullscreenBtn" class="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all active:scale-95">
-                                            <span class="material-symbols-rounded text-lg">fullscreen</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
                     <div id="skipBtns" class="absolute bottom-32 right-4 z-30 flex flex-col items-end gap-2">
                         <button type="button" id="skipIntroBtn" class="hidden rounded-full bg-[#0f766e] px-3.5 py-1.5 text-xs font-bold text-white shadow-lg transition hover:bg-[#115e59]">
@@ -195,29 +156,6 @@
         .pill-option.is-active::after { content: 'check'; font-family: 'Material Symbols Rounded'; font-size: 15px; line-height: 1; }
         @media (max-width: 640px) { .pill-menu-right { left: auto; right: 0; } }
         #playerWrap.hide-ui { cursor: none; }
-        #playerWrap.hide-ui video::-webkit-media-controls-panel { opacity: 0; transition: opacity 0.3s; }
-        #playerWrap video::-webkit-media-controls-panel { transition: opacity 0.3s; }
-
-        /* ===== Custom dark green video player controls ===== */
-        video { background: #000; }
-
-        /* Hide native controls entirely */
-        video::-webkit-media-controls { display: none !important; }
-        video::-webkit-media-controls-panel { display: none !important; }
-        video::-webkit-media-controls-enclosure { display: none !important; }
-        video::-webkit-media-controls-start-playback-button { display: none !important; }
-
-        /* Controls visibility */
-        #playerControls { opacity: 0; pointer-events: none; }
-        #playerControls.controls-visible { opacity: 1; pointer-events: auto; }
-
-        /* Hide center play button when video is playing */
-        #playerWrap.playing #playerCenterPlay { opacity: 0; pointer-events: none; }
-        #playerWrap:not(.playing) #playerCenterPlay { opacity: 1; pointer-events: auto; }
-
-        /* Progress bar hover effects */
-        #progressTrack:hover #progressFill { opacity: 0.9; }
-        #progressTrack:hover #progressHandle { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
 
         /* Skip buttons glow */
         #skipBtns button { box-shadow: 0 0 15px rgba(15, 118, 110, 0.35); }
@@ -905,135 +843,15 @@
             }
         }, 1200);
 
-        // ===== Custom dark green player controls =====
+        // Basic native player controls: the browser renders its own control bar,
+        // so only the helpers still used elsewhere on the page are kept here.
         const playerWrap = document.getElementById('playerWrap');
-        const playerControls = document.getElementById('playerControls');
-        const centerPlayBtn = document.getElementById('centerPlayBtn');
-        const barPlayBtn = document.getElementById('barPlayBtn');
-        const progressTrack = document.getElementById('progressTrack');
-        const progressFill = document.getElementById('progressFill');
-        const progressHandle = document.getElementById('progressHandle');
-        const barCurrentTime = document.getElementById('barCurrentTime');
-        const barDuration = document.getElementById('barDuration');
-        const barVolumeBtn = document.getElementById('barVolumeBtn');
-        const barFullscreenBtn = document.getElementById('barFullscreenBtn');
-
-        let controlsTimer = null;
-        let isDragging = false;
-
-        function formatTime(sec) {
-            if (!sec || isNaN(sec)) return '0:00';
-            const m = Math.floor(sec / 60);
-            const s = Math.floor(sec % 60).toString().padStart(2, '0');
-            return m + ':' + s;
-        }
 
         function togglePlay() {
             if (video.paused || video.ended) video.play().catch(function () {});
             else video.pause();
         }
 
-        function updatePlayBtn() {
-            const icon = video.paused ? 'play_arrow' : 'pause';
-            barPlayBtn.innerHTML = '<span class="material-symbols-rounded text-lg">' + icon + '</span>';
-            centerPlayBtn.innerHTML = '<span class="material-symbols-rounded text-3xl">' + icon + '</span>';
-            if (video.paused || video.ended) {
-                playerWrap.classList.remove('playing');
-            } else {
-                playerWrap.classList.add('playing');
-            }
-        }
-
-        function showControls() {
-            playerControls.classList.add('controls-visible');
-            if (controlsTimer) clearTimeout(controlsTimer);
-            if (!document.fullscreenElement) {
-                controlsTimer = setTimeout(function () {
-                    if (!video.paused && !isDragging) playerControls.classList.remove('controls-visible');
-                }, 3000);
-            }
-        }
-
-        function hideControls() {
-            if (controlsTimer) clearTimeout(controlsTimer);
-            if (!video.paused && !isDragging) playerControls.classList.remove('controls-visible');
-        }
-
-        function updateProgress() {
-            if (isDragging) return;
-            const duration = video.duration || 0;
-            const current = video.currentTime || 0;
-            const pct = duration > 0 ? Math.min(100, (current / duration) * 100) : 0;
-            progressFill.style.width = pct + '%';
-            progressHandle.style.right = 'auto';
-            progressHandle.style.left = pct + '%';
-            barCurrentTime.textContent = formatTime(current);
-            barDuration.textContent = formatTime(duration);
-        }
-
-        function seekFromEvent(e) {
-            if (!video.duration || isNaN(video.duration)) return;
-            const rect = progressTrack.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const pct = Math.min(100, Math.max(0, (x / rect.width) * 100));
-            progressFill.style.width = pct + '%';
-            video.currentTime = (pct / 100) * video.duration;
-        }
-
-        // Play/pause
-        barPlayBtn.addEventListener('click', function (e) { e.stopPropagation(); togglePlay(); });
-        centerPlayBtn.addEventListener('click', function (e) { e.stopPropagation(); togglePlay(); });
-        video.addEventListener('click', function () { togglePlay(); });
-
-        // Progress: click to seek
-        progressTrack.addEventListener('click', seekFromEvent);
-        progressTrack.addEventListener('mousedown', function (e) {
-            isDragging = true;
-            seekFromEvent(e);
-            document.addEventListener('mousemove', seekFromEvent);
-            document.addEventListener('mouseup', function () {
-                isDragging = false;
-                document.removeEventListener('mousemove', seekFromEvent);
-                showControls();
-            });
-        });
-
-        // Time update
-        video.addEventListener('timeupdate', updateProgress);
-        video.addEventListener('play', function () { updatePlayBtn(); showControls(); });
-        video.addEventListener('pause', function () { updatePlayBtn(); showControls(); });
-        video.addEventListener('ended', function () { updatePlayBtn(); showControls(); });
-
-        // Show/hide controls on interaction
-        playerWrap.addEventListener('mousemove', showControls);
-        playerWrap.addEventListener('click', showControls);
-        playerWrap.addEventListener('mouseleave', hideControls);
-
-        // Volume toggle
-        barVolumeBtn.addEventListener('click', function () {
-            video.muted = !video.muted;
-            barVolumeBtn.innerHTML = '<span class="material-symbols-rounded text-lg">' + (video.muted ? 'volume_off' : 'volume_up') + '</span>';
-            showControls();
-        });
-
-        // Fullscreen
-        barFullscreenBtn.addEventListener('click', function () {
-            if (document.fullscreenElement) {
-                document.exitFullscreen().catch(function () {});
-            } else if (playerWrap.requestFullscreen) {
-                playerWrap.requestFullscreen().catch(function () {});
-            }
-        });
-
-        // Fullscreen native event: keep custom controls visible (our CSS handles fullscreen)
-        document.addEventListener('fullscreenchange', function () {
-            if (document.fullscreenElement === playerWrap) {
-                playerWrap.classList.add('fs');
-            } else {
-                playerWrap.classList.remove('fs');
-            }
-            showControls();
-        });
 
         // Keyboard shortcuts: C = subtitles, arrows = seek, F = fullscreen (existing listener above).
         // Space added here for play/pause.
