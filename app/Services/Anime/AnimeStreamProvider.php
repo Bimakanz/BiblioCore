@@ -280,7 +280,7 @@ $headers = ['Accept: application/json'];
 
         $byProvider = [];
         $byNumber = [];
-        foreach ($this->priority as $name) {
+        foreach ($this->providerOrder(array_keys($responses)) as $name) {
             $block = $responses[$name] ?? null;
             $list = $block['episodes']['sub'] ?? $block['episodes']['dub'] ?? [];
             if (!is_array($list) || empty($list)) {
@@ -379,9 +379,15 @@ $headers = ['Accept: application/json'];
 
         $stream = $this->fetchStream($watchPath);
 
-        // Failover: try up to two other providers for the same episode.
+        // Failover: try every provider that actually lists this episode, in
+        // priority order (providers the resolver added beyond our list count
+        // too, otherwise a working source can be skipped).
         if (!$stream && $parsed) {
-            foreach ($this->priority as $name) {
+            $byProvider = Cache::get("anivexa_episodes_by_provider_{$parsed['anilistId']}");
+            $order = is_array($byProvider) && !empty($byProvider)
+                ? $this->providerOrder(array_keys($byProvider))
+                : $this->priority;
+            foreach ($order as $name) {
                 if ($name === $parsed['provider']) {
                     continue;
                 }
@@ -462,6 +468,25 @@ $headers = ['Accept: application/json'];
             'provider' => $parsed['provider'] ?? null,
             'server' => $chosen['server'] ?? null,
         ];
+    }
+
+    /**
+     * Priority-first ordering of the provider names a resolver actually
+     * returned. The list above used to be the ONLY providers ever read, so a
+     * resolver that ships a newer provider (allmanga, anineko, animetsu, ...)
+     * had those episodes fetched and then thrown away, leaving titles
+     * unplayable even though a working source was sitting in the response.
+     */
+    protected function providerOrder(array $names): array
+    {
+        $names = array_values(array_unique(array_map(fn ($n) => strtolower((string) $n), $names)));
+        $ordered = array_values(array_filter($this->priority, fn ($n) => in_array($n, $names, true)));
+        foreach ($names as $name) {
+            if ($name !== '' && !in_array($name, $ordered, true)) {
+                $ordered[] = $name;
+            }
+        }
+        return $ordered;
     }
 
     /** Provider names offered in the player as failover choices. */

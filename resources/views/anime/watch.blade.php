@@ -30,6 +30,7 @@
                         <span class="material-symbols-rounded text-4xl text-[#f97316]">error</span>
                         <p id="playerErrorText" class="max-w-md text-sm font-medium">Stream is not available for this episode.</p>
                         <button type="button" id="retryBtn" class="rounded-full bg-[#f97316] px-5 py-2 text-xs font-bold text-white transition hover:bg-[#ea580c]">Try Again</button>
+                        <button type="button" id="embedBtn" class="rounded-full border border-white/25 bg-white/10 px-5 py-2 text-xs font-bold text-white transition hover:bg-white/20">Coba Server Cadangan</button>
                     </div>
 
 
@@ -724,6 +725,28 @@
             }
         });
         document.getElementById('retryBtn').addEventListener('click', loadStream);
+
+        // Last-resort embed player. Every HLS server can be dead for a very
+        // fresh cour (providers lag), so offer a hosted player keyed by the
+        // AniList id we already have instead of leaving a dead black frame.
+        function playEmbed() {
+            errorEl.style.display = 'none';
+            loadingEl.style.display = 'none';
+            const wrap = document.getElementById('playerWrap');
+            if (!wrap) return;
+            let frame = document.getElementById('embedFrame');
+            if (!frame) {
+                frame = document.createElement('iframe');
+                frame.id = 'embedFrame';
+                frame.className = 'absolute inset-0 z-30 h-full w-full border-0 bg-black';
+                frame.setAttribute('allowfullscreen', 'true');
+                frame.setAttribute('allow', 'autoplay; fullscreen; encrypted-media; picture-in-picture');
+                frame.setAttribute('referrerpolicy', 'origin');
+                wrap.appendChild(frame);
+            }
+            frame.src = 'https://player.vidplus.to/embed/anime/' + encodeURIComponent(ANIME.id) + '/' + EPISODE_NUMBER + '?dub=false';
+        }
+        document.getElementById('embedBtn').addEventListener('click', playEmbed);
 
         // Episode list sidebar + prev/next
         (async function () {
