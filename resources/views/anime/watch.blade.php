@@ -156,6 +156,13 @@
         .pill-option.is-active::after { content: 'check'; font-family: 'Material Symbols Rounded'; font-size: 15px; line-height: 1; }
         @media (max-width: 640px) { .pill-menu-right { left: auto; right: 0; } }
         #playerWrap.hide-ui { cursor: none; }
+        /* Idle state in fullscreen: also get the native control bar and our
+           own overlays out of the picture, not just the cursor. */
+        #playerWrap.hide-ui video::-webkit-media-controls-panel,
+        #playerWrap.hide-ui video::-webkit-media-controls { opacity: 0; transition: opacity 0.3s; }
+        #playerWrap.hide-ui #skipBtns,
+        #playerWrap.hide-ui #nextEpOverlay,
+        #playerWrap.hide-ui #embedFrame { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
 
         /* Skip buttons glow */
         #skipBtns button { box-shadow: 0 0 15px rgba(15, 118, 110, 0.35); }
@@ -547,6 +554,8 @@
 
         async function loadStream() {
             hideOverlays();
+            const oldFrame = document.getElementById('embedFrame');
+            if (oldFrame) oldFrame.remove();
             if (video.currentTime > 5) resumeOverride = Math.floor(video.currentTime);
             resumeApplied = false;
             let data = null;
@@ -830,22 +839,38 @@
             const wrap = document.getElementById('playerWrap');
             if (!wrap) return;
             let idleTimer = null;
-            function armIdleHide() {
+            function inFullscreen() {
+                const fs = document.fullscreenElement || document.webkitFullscreenElement;
+                return !!fs && (fs === wrap || fs === video || wrap.contains(fs));
+            }
+            function clearHide() {
                 wrap.classList.remove('hide-ui');
                 if (idleTimer) clearTimeout(idleTimer);
-                if (document.fullscreenElement === wrap) {
+                idleTimer = null;
+            }
+            function armIdleHide() {
+                clearHide();
+                // Paused playback keeps the native bar up on purpose: that is
+                // when the user is actually reaching for it.
+                if (inFullscreen() && !video.paused) {
                     idleTimer = setTimeout(function () { wrap.classList.add('hide-ui'); }, 2500);
                 }
             }
             wrap.addEventListener('mousemove', armIdleHide);
+            wrap.addEventListener('touchstart', armIdleHide, { passive: true });
+            video.addEventListener('play', armIdleHide);
+            video.addEventListener('pause', clearHide);
             document.addEventListener('fullscreenchange', function () {
-                if (document.fullscreenElement === wrap) {
+                if (inFullscreen()) {
                     armIdleHide();
                 } else {
-                    wrap.classList.remove('hide-ui');
-                    if (idleTimer) clearTimeout(idleTimer);
+                    clearHide();
                 }
             });
+            // Native controls fullscreen the <video>, which does not always
+            // fire a bubbling event; listen on the element too.
+            video.addEventListener('webkitbeginfullscreen', armIdleHide);
+            video.addEventListener('webkitendfullscreen', clearHide);
         })();
 
         // Recommendations: fetched lazily AFTER the stream starts loading so
