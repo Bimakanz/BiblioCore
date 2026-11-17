@@ -177,6 +177,10 @@
             title: @json($anime['title']),
             coverUrl: @json($anime['coverUrl']),
             bannerUrl: @json($anime['bannerUrl']),
+            // AniList stores the runtime in minutes. Embed players do not
+            // expose their timeline, so this is the duration used for the
+            // saved progress of embed-only sources.
+            durationSec: {{ max(0, (int) ($anime['duration'] ?? 0)) * 60 }},
         };
         const EPISODE_ID = @json($episodeId);
         const EPISODE_NUMBER = {{ (int) $episodeNumber }};
@@ -305,13 +309,50 @@
         let lastSavedAt = 0;
         let resumeApplied = false;
         let resumeOverride = 0;
+        // 'hls' (our own player, real timeline) or 'embed' (third-party
+        // iframe, timeline not readable from JS). For embeds the elapsed
+        // watch time is counted locally so history still gets seconds,
+        // minutes and hours instead of being skipped entirely.
+        let playMode = 'hls';
+        let embedWatchSeconds = 0;
+        let embedClock = null;
 
         function readHistory() {
             try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch (e) { return []; }
         }
 
+        function watchedSeconds() {
+            return playMode === 'embed'
+                ? Math.floor(embedWatchSeconds || 0)
+                : Math.floor(video.currentTime || 0);
+        }
+
+        function watchedDuration() {
+            if (playMode !== 'embed' && video.duration && !isNaN(video.duration) && video.duration > 0) {
+                return Math.floor(video.duration);
+            }
+            return Math.floor(ANIME.durationSec || 0);
+        }
+
         function saveProgress(finished) {
-            if (!video.duration || isNaN(video.duration)) return;
+            const duration = watchedDuration();
+            let position = finished ? duration : watchedSeconds();
+            if (!position && !duration) {
+                // Nothing meaningful yet, but still record the episode so
+                // "last watched" appears the moment the page opens.
+                position = 0;
+            }
+
+            const previous = readHistory().find(h => h.id === ANIME.id);
+            // Never let an early page-load save rewind a real position:
+            // storedResume() reads this same entry right before playback.
+            if (!finished && previous && previous.episodeId === EPISODE_ID
+                && Number(previous.positionSec) > position + 5
+                && Number(previous.durationSec) > 0
+                && Number(previous.positionSec) < Number(previous.durationSec) - 30) {
+                position = Number(previous.positionSec);
+            }
+
             const entry = {
                 id: ANIME.id,
                 title: ANIME.title,
@@ -319,15 +360,37 @@
                 bannerUrl: ANIME.bannerUrl,
                 episodeId: EPISODE_ID,
                 episodeNumber: EPISODE_NUMBER,
-                positionSec: finished ? 0 : Math.floor(video.currentTime || 0),
-                durationSec: Math.floor(video.duration || 0),
-                watchedAt: new Date().toLocaleDateString('id-ID'),
-                updatedAt: Date.now()
+                positionSec: Math.max(0, Math.floor(position)),
+                durationSec: Math.max(0, duration),
+                finished: !!finished,
+                updatedAt: Date.now(),
+                watchedAt: new Date().toISOString(),
             };
             let list = readHistory().filter(h => h.id !== ANIME.id);
             list.unshift(entry);
             list = list.slice(0, 30);
             try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list)); } catch (e) {}
+        }
+
+        // Embed pages never fire timeupdate on our <video>, so count the
+        // seconds ourselves while the tab is actually visible. Persisting
+        // every few seconds keeps the entry current even if the tab is
+        // closed without a final event.
+        function startEmbedClock() {
+            stopEmbedClock();
+            embedWatchSeconds = 0;
+            embedClock = setInterval(function () {
+                if (document.hidden) return;
+                embedWatchSeconds++;
+                if (embedWatchSeconds % 5 === 0) saveProgress(false);
+            }, 1000);
+        }
+
+        function stopEmbedClock() {
+            if (embedClock) {
+                clearInterval(embedClock);
+                embedClock = null;
+            }
         }
 
         function storedResume() {
@@ -631,6 +694,8 @@
 
         function attachSource(src) {
             if (hls) { try { hls.destroy(); } catch (e) {} hls = null; }
+            playMode = 'hls';
+            stopEmbedClock();
             const oldFrame = document.getElementById('embedFrame');
             if (oldFrame) oldFrame.remove();
             video.style.visibility = '';
@@ -806,6 +871,9 @@
             frame.src = src || ('https://player.vidplus.to/embed/anime/' + encodeURIComponent(ANIME.id) + '/' + EPISODE_NUMBER + '?dub=false');
             try { video.pause(); } catch (e) {}
             video.style.visibility = 'hidden';
+            playMode = 'embed';
+            startEmbedClock();
+            saveProgress(false);
         }
         document.getElementById('embedBtn').addEventListener('click', function () { playEmbed(); });
 
@@ -968,6 +1036,12 @@
             e.preventDefault();
             togglePlay();
         });
+
+        // Record the episode immediately so "Continue Watching" is populated
+        // even if the viewer leaves before the first timeupdate, then keep
+        // refreshing it every few seconds for both HLS and embed playback.
+        saveProgress(false);
+        setInterval(() => saveProgress(false), 5000);
 
         loadStream();
     })();

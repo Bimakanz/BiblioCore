@@ -46,12 +46,14 @@
                     @endif
 
                     {{-- Resume (client-side, from biblioanime_history) --}}
-                    <div x-data="{ entry: (JSON.parse(localStorage.getItem('biblioanime_history') || '[]')).find(h => h.id === '{{ $anime['id'] }}') || null }" x-cloak>
+                    <div x-data="{ entry: (JSON.parse(localStorage.getItem('biblioanime_history') || '[]')).find(h => h.id === '{{ $anime['id'] }}') || null, fmt(s) { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = String(s % 60).padStart(2, '0'); return h > 0 ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; }, rel(ts) { const d = Number(ts) || (ts ? Date.parse(ts) : 0); if (!d) return 'baru saja'; const diff = Math.max(0, Date.now() - d); const m = Math.floor(diff / 60000); if (m < 1) return 'baru saja'; if (m < 60) return m + ' menit lalu'; const h = Math.floor(m / 60); if (h < 24) return h + ' jam lalu'; return Math.floor(h / 24) + ' hari lalu'; } }" x-cloak>
                         <template x-if="entry">
                             <a :href="'/anime/{{ $anime['id'] }}/watch?ep=' + encodeURIComponent(entry.episodeId || '') + '&n=' + encodeURIComponent(entry.episodeNumber || 1) + '&t=' + Math.max(0, Math.floor((entry.positionSec || 0) - 5))"
-                               class="inline-flex items-center gap-2 rounded-full bg-[#f97316] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#ea580c]">
+                               class="inline-flex flex-wrap items-center gap-2 rounded-full bg-[#f97316] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#ea580c]">
                                 <span class="material-symbols-rounded">resume</span>
                                 Resume Episode <span x-text="entry.episodeNumber"></span>
+                                <span class="text-[11px] font-semibold text-white/80" x-text="entry.durationSec > 0 ? fmt(entry.positionSec) + ' / ' + fmt(entry.durationSec) : ''"></span>
+                                <span class="text-[11px] font-semibold text-white/80" x-text="rel(entry.updatedAt || entry.watchedAt)"></span>
                             </a>
                         </template>
                     </div>

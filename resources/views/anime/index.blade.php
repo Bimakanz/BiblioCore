@@ -43,7 +43,7 @@
             @endif
 
             {{-- ===== CONTINUE WATCHING (localStorage) ===== --}}
-            <section x-data="{ items: JSON.parse(localStorage.getItem('biblioanime_history') || '[]'), fmt(s) { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = String(s % 60).padStart(2, '0'); return h > 0 ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; } }" x-show="items.length > 0" x-cloak>
+            <section x-data="{ items: JSON.parse(localStorage.getItem('biblioanime_history') || '[]'), fmt(s) { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = String(s % 60).padStart(2, '0'); return h > 0 ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; }, rel(ts) { const d = Number(ts) || (ts ? Date.parse(ts) : 0); if (!d) return 'baru saja'; const diff = Math.max(0, Date.now() - d); const m = Math.floor(diff / 60000); if (m < 1) return 'baru saja'; if (m < 60) return m + ' menit lalu'; const h = Math.floor(m / 60); if (h < 24) return h + ' jam lalu'; return Math.floor(h / 24) + ' hari lalu'; } }" x-show="items.length > 0" x-cloak>
                 <div class="mb-4 flex items-end justify-between">
                     <h2 class="text-xl sm:text-2xl font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Continue Watching</h2>
                     <span class="text-xs font-semibold text-[#84948a]">Your last position is saved automatically</span>
@@ -62,8 +62,8 @@
                             <div class="space-y-2 p-4">
                                 <h3 class="truncate text-sm font-bold text-[#172a37]" x-text="item.title"></h3>
                                 <div class="flex items-center justify-between text-[11px] font-semibold text-[#84948a]">
-                                    <span>Episode <span x-text="item.episodeNumber"></span></span>
-                                    <span x-text="item.durationSec > 0 ? Math.round(100 * (item.positionSec || 0) / item.durationSec) + '% watched' : ''"></span>
+                                    <span>Episode <span x-text="item.episodeNumber"></span> &middot; <span x-text="rel(item.updatedAt || item.watchedAt)"></span></span>
+                                    <span x-text="item.durationSec > 0 ? Math.round(100 * (item.positionSec || 0) / item.durationSec) + '%' : ''"></span>
                                 </div>
                                 <div class="h-1.5 w-full rounded-full bg-[#eaddc2] overflow-hidden">
                                     <div class="h-full rounded-full bg-[#f97316]" :style="'width: ' + (item.durationSec > 0 ? Math.min(100, Math.round(100 * (item.positionSec || 0) / item.durationSec)) : 0) + '%'"></div>
