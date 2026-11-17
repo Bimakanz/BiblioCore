@@ -34,23 +34,41 @@
         currentChapter: @js($currentChapter),
         prevChapter: @js($prevChapter),
         nextChapter: @js($nextChapter),
+        chapters: @js($sameLangChapters),
         latestChapNum: {{ !empty($sameLangChapters[0]['chapter']) ? (int)$sameLangChapters[0]['chapter'] : (count($sameLangChapters) ?: 1) }},
         prefetchedNextChapter: null,
         prefetchedPrevChapter: null,
         progress: 0,
         showMenu: false,
+        showChapterList: false,
+        chapterLimit: 60,
+        autoNextArmed: false,
+        autoNextDone: false,
+        bottomSince: 0,
         isFullscreen: false,
         toastOpen: false,
         toastMsg: '',
         
         init() {
             this.totalPages = this.pages.length;
+            this.fillAdjacentFromList();
             this.saveHistory();
             this.preloadUpcomingPages();
             // Silently prefetch next chapter in background for 0-delay instant reading
             setTimeout(() => {
                 this.prefetchAdjacentChapters();
             }, 600);
+        },
+
+        // Some cached chapter sets arrive without prev/next metadata. Derive
+        // them from the embedded chapter list so tap/scroll mode can always
+        // advance to the next chapter.
+        fillAdjacentFromList() {
+            if (!Array.isArray(this.chapters) || !this.chapters.length) return;
+            const idx = this.chapters.findIndex(c => c.id === this.currentChapter.id);
+            if (idx < 0) return;
+            if (!this.nextChapter && idx > 0) this.nextChapter = this.chapters[idx - 1];
+            if (!this.prevChapter && idx < this.chapters.length - 1) this.prevChapter = this.chapters[idx + 1];
         },
 
         saveHistory() {
@@ -119,11 +137,37 @@
         },
 
         updateProgress() {
-            const h = document.documentElement, 
+            const h = document.documentElement,
                   b = document.body,
                   st = 'scrollTop',
                   sh = 'scrollHeight';
-            this.progress = Math.min(100, Math.round(((h[st]||b[st]) / ((h[sh]||b[sh]) - h.clientHeight)) * 100)) || 0;
+            const top = (h[st] || b[st]) || 0;
+            const height = (h[sh] || b[sh]) || 0;
+            this.progress = Math.min(100, Math.round((top / (height - h.clientHeight)) * 100)) || 0;
+
+            // Webtoon mode: reaching the bottom means the chapter is done.
+            // Arm only after the reader has scrolled a little, then require
+            // the bottom to stay visible for a moment so a fast fling does
+            // not skip the final panels.
+            if (this.mode !== 'webtoon' || this.autoNextDone || !this.nextChapter) {
+                this.bottomSince = 0;
+                return;
+            }
+            const nearBottom = top + h.clientHeight >= height - 80;
+            if (!nearBottom) {
+                this.bottomSince = 0;
+                if (this.progress > 5) this.autoNextArmed = true;
+                return;
+            }
+            if (!this.autoNextArmed) return;
+            if (!this.bottomSince) {
+                this.bottomSince = Date.now();
+                return;
+            }
+            if (Date.now() - this.bottomSince >= 700) {
+                this.autoNextDone = true;
+                this.goToNextChapter();
+            }
         },
 
         // Background Preload next 2-3 images for zero-delay page turning
@@ -172,10 +216,16 @@
             this.currentChapter = data.currentChapter;
             this.nextChapter = data.nextChapter;
             this.prevChapter = data.prevChapter;
+            this.fillAdjacentFromList();
             if (data.latestChapNum) {
                 this.latestChapNum = data.latestChapNum;
             }
             this.prefetchedNextChapter = null;
+            this.showChapterList = false;
+            // Re-arm the end-of-chapter trigger for the new chapter.
+            this.autoNextArmed = false;
+            this.autoNextDone = false;
+            this.bottomSince = 0;
 
             // Push state URL
             const newUrl = this.buildReadUrl(this.currentChapter);
@@ -244,6 +294,36 @@
             } catch(e) {}
 
             window.location.href = this.buildReadUrl(this.prevChapter);
+        },
+
+        // Jump to any chapter from the in-reader chapter list. Uses the same
+        // zero-delay in-place swap as next/prev when the pages endpoint
+        // responds, otherwise falls back to a normal navigation.
+        async goToChapter(chap) {
+            if (!chap) return;
+            if (chap.id === this.currentChapter.id) {
+                this.showChapterList = false;
+                return;
+            }
+            if (this.nextChapter && chap.id === this.nextChapter.id && this.prefetchedNextChapter) {
+                this.applyChapterData(this.prefetchedNextChapter);
+                return;
+            }
+            try {
+                let url = '/manga/' + this.mangaId + '/chapter/' + chap.id + '/pages-json?ch=' + encodeURIComponent(chap.chapter || '0') + '&source=' + encodeURIComponent(chap.provider || 'MangaDex');
+                if (chap.readPath) {
+                    try {
+                        url += '&p=' + encodeURIComponent(btoa(chap.readPath));
+                    } catch(e) {}
+                }
+                const res = await fetch(url);
+                if (res.ok) {
+                    const data = await res.json();
+                    this.applyChapterData(data);
+                    return;
+                }
+            } catch(e) {}
+            window.location.href = this.buildReadUrl(chap);
         },
 
         nextPage() {
@@ -369,6 +449,14 @@
             </span>
         </button>
 
+        <!-- Tombol Chapter List (in-reader, tanpa pindah halaman) -->
+        <button type="button"
+                @click.stop="showChapterList = true"
+                :title="'Chapter List (' + chapters.length + ')'"
+                class="flex h-10 w-10 items-center justify-center rounded-xl text-white/80 hover:bg-white/15 hover:text-white transition">
+            <span class="material-symbols-rounded text-2xl">toc</span>
+        </button>
+
         <!-- Tombol Kembali ke Detail Manga / Chapter List -->
         <a href="{{ route('manga.show', $manga['id']) }}"
            @click.stop
@@ -385,6 +473,52 @@
             <span class="material-symbols-rounded text-2xl" x-text="isFullscreen ? 'fullscreen_exit' : 'fullscreen'">fullscreen</span>
         </button>
 
+    </div>
+
+    <!-- 3. In-Reader Chapter List Drawer -->
+    <div x-show="showChapterList" x-cloak class="fixed inset-0 z-[70]">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showChapterList = false"></div>
+        <aside class="absolute right-0 top-0 flex h-full w-full max-w-sm flex-col border-l border-white/10 bg-[#14171d] shadow-2xl"
+               x-transition:enter="transition ease-out duration-200"
+               x-transition:enter-start="translate-x-full"
+               x-transition:enter-end="translate-x-0"
+               x-transition:leave="transition ease-in duration-150"
+               x-transition:leave-start="translate-x-0"
+               x-transition:leave-end="translate-x-full">
+            <div class="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+                <div class="min-w-0">
+                    <h2 class="text-sm font-bold text-white" style="font-family: 'Space Grotesk', sans-serif;">Chapter List</h2>
+                    <p class="mt-0.5 text-[11px] font-medium text-white/50">
+                        Now reading Ch. <span x-text="currentChapter.chapter"></span>
+                        &middot; <span x-text="chapters.length"></span> chapters
+                    </p>
+                </div>
+                <button type="button" @click="showChapterList = false"
+                        class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl text-white/70 transition hover:bg-white/10 hover:text-white"
+                        title="Close">
+                    <span class="material-symbols-rounded text-xl">close</span>
+                </button>
+            </div>
+            <div id="readerChapterList" class="flex-1 space-y-1.5 overflow-y-auto px-3 py-3"
+                 @scroll="if (chapterLimit < chapters.length && $el.scrollTop + $el.clientHeight >= $el.scrollHeight - 200) chapterLimit += 60">
+                <template x-for="chap in chapters.slice(0, chapterLimit)" :key="chap.id">
+                    <button type="button" @click="goToChapter(chap)"
+                            class="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition"
+                            :class="chap.id === currentChapter.id ? 'bg-[#0f766e] text-white' : 'bg-white/5 text-white/80 hover:bg-white/10 hover:text-white'">
+                        <span class="min-w-0">
+                            <span class="block text-sm font-bold">Chapter <span x-text="chap.chapter"></span></span>
+                            <span x-show="chap.title" class="block truncate text-[11px] font-medium opacity-60" x-text="chap.title"></span>
+                        </span>
+                        <span class="flex-shrink-0 text-[10px] font-bold uppercase tracking-wider opacity-60"
+                              x-text="chap.id === currentChapter.id ? 'Reading' : (chap.publishAt || '')"></span>
+                    </button>
+                </template>
+                <button type="button" x-show="chapterLimit < chapters.length" @click="chapterLimit += 60"
+                        class="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-[#2dd4bf] transition hover:bg-white/10">
+                    Show more chapters
+                </button>
+            </div>
+        </aside>
     </div>
 
     <!-- Reader Canvas -->
@@ -457,6 +591,22 @@
 
                     </div>
                 </template>
+            </div>
+
+            {{-- End of chapter: explicit next-chapter action in scroll mode --}}
+            <div class="w-full px-4 pb-12 pt-6 text-center">
+                <button type="button" x-show="nextChapter" @click.stop="goToNextChapter()"
+                        class="inline-flex items-center gap-2 rounded-full bg-[#0f766e] px-6 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-[#115e59]">
+                    Next Chapter
+                    <span class="text-white/70">Ch. <span x-text="nextChapter ? nextChapter.chapter : ''"></span></span>
+                    <span class="material-symbols-rounded text-lg">arrow_forward</span>
+                </button>
+                <p x-show="!nextChapter" class="text-sm font-semibold text-white/50">
+                    You have reached the latest chapter.
+                </p>
+                <p x-show="nextChapter" class="mt-2 text-[11px] font-medium text-white/35">
+                    Keep scrolling to continue automatically.
+                </p>
             </div>
 
         </div>
@@ -539,6 +689,19 @@
                         </div>
                     </div>
                 </template>
+            </div>
+
+            {{-- End of chapter: tap-friendly next-chapter action on the last page --}}
+            <div class="fixed bottom-16 left-1/2 z-30 -translate-x-1/2 text-center" x-show="currentPage >= totalPages" x-cloak>
+                <button type="button" x-show="nextChapter" @click.stop="goToNextChapter()"
+                        class="inline-flex items-center gap-2 rounded-full bg-[#0f766e] px-5 py-2.5 text-sm font-bold text-white shadow-xl transition hover:bg-[#115e59]">
+                    Next Chapter
+                    <span class="text-white/70">Ch. <span x-text="nextChapter ? nextChapter.chapter : ''"></span></span>
+                    <span class="material-symbols-rounded text-lg">arrow_forward</span>
+                </button>
+                <p x-show="!nextChapter" class="rounded-full bg-black/70 px-4 py-2 text-xs font-semibold text-white/70">
+                    You have reached the latest chapter.
+                </p>
             </div>
         </div>
 
