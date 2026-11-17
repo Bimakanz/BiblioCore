@@ -258,80 +258,15 @@ class AnimeController extends Controller
         $server = $request->query('server');
         $server = is_string($server) && $server !== '' ? $server : null;
 
-        // Automatic playable-source search: a provider API returning a URL
-        // does not prove the CDN actually serves it. Verify the playlist is
-        // fetchable (and really is an M3U8) before handing it to the player;
-        // if not, automatically try the next provider (max 4 candidates).
+        // Resolve the episode. getStream() already walks the episode's own
+        // provider plus one alternate and falls back from dub to sub, so the
+        // controller must not fan out again: every watch call costs 10-15 s
+        // upstream and the request budget is 60 s.
         $stream = null;
-        $candidates = [];
-        if ($server !== null) {
-            $candidates[] = $server;
-        }
-        $candidates[] = null; // the episode's own provider
-        foreach ($this->streamProvider->servers() as $name) {
-            if (!in_array($name, $candidates, true)) {
-                $candidates[] = $name;
-            }
-        }
-        // An explicitly requested server is only verified, never silently
-        // swapped: if it plays, it is served as-is.
-        if ($server !== null) {
-            try {
-                $explicit = $this->streamProvider->getStream($episodeId, $server);
-            } catch (\Throwable $e) {
-                Log::error("streamJson failed for {$episodeId}: " . $e->getMessage());
-                $explicit = null;
-            }
-            if ($explicit && !empty($explicit['sources'])) {
-                $vKey = 'anime_verified_' . md5($episodeId . '|' . ($explicit['provider'] ?? $server));
-                if (Cache::get($vKey)) {
-                    $stream = $explicit;
-                } else {
-                    $check = $this->fetchRemote($explicit['sources'][0]['url'], $explicit['referer'] ?? null);
-                    if ($check !== null && str_contains($check, '#EXTM3U')) {
-                        Cache::put($vKey, 1, 3600);
-                        $stream = $explicit;
-                    }
-                }
-            }
-        }
-        // Automatic mode: collect up to 3 candidate streams, then serve the
-        // one whose playlist downloads fastest (parallel speed test). The
-        // same host serves the segments, so playlist speed predicts segment
-        // speed; the default provider's CDN measured ~1.5s per segment.
-        if (!$stream) {
-            $collected = [];
-            foreach ($candidates as $candidate) {
-                if ($candidate !== null && $candidate === $server) {
-                    continue; // already tried above
-                }
-                if (count($collected) >= 3) {
-                    break;
-                }
-                try {
-                    $tryStream = $this->streamProvider->getStream($episodeId, $candidate);
-                } catch (\Throwable $e) {
-                    Log::error("streamJson failed for {$episodeId}: " . $e->getMessage());
-                    continue;
-                }
-                if (!$tryStream || empty($tryStream['sources'])) {
-                    continue;
-                }
-                // Verified within the last hour: serve immediately, no test.
-                $vKey = 'anime_verified_' . md5($episodeId . '|' . ($tryStream['provider'] ?? $candidate ?? 'default'));
-                if (Cache::get($vKey)) {
-                    $stream = $tryStream;
-                    break;
-                }
-                $collected[] = $tryStream;
-            }
-            if (!$stream && $collected) {
-                $winner = $this->fastestPlayable($collected);
-                if ($winner) {
-                    $stream = $winner;
-                    Cache::put('anime_verified_' . md5($episodeId . '|' . ($stream['provider'] ?? 'default')), 1, 3600);
-                }
-            }
+        try {
+            $stream = $this->streamProvider->getStream($episodeId, $server);
+        } catch (\Throwable $e) {
+            Log::error("streamJson failed for {$episodeId}: " . $e->getMessage());
         }
 
         if (!$stream || empty($stream['sources'])) {
@@ -339,6 +274,34 @@ class AnimeController extends Controller
                 'error' => 'Stream is not available for this episode. Try another server or title.',
                 'servers' => $this->streamProvider->servers(),
             ], 404)->header('Cache-Control', 'no-store');
+        }
+
+        // Embed sources (Megaplay/VidWish) are rendered in a sandboxed
+        // iframe by the player. They cannot be verified or proxied, so the
+        // HLS pipeline below is skipped entirely.
+        if (($stream['kind'] ?? 'hls') === 'embed') {
+            return $this->embedResponse($stream, $server);
+        }
+
+        // HLS: a provider returning a URL does not prove the CDN serves it.
+        // Verify the playlist once per hour; a dead manifest is reported as
+        // unavailable instead of leaving the player on a black screen.
+        $vKey = 'anime_verified_' . md5($episodeId . '|' . ($stream['provider'] ?? $server ?? 'default'));
+        if (!Cache::get($vKey)) {
+            $check = $this->fetchRemote($stream['sources'][0]['url'], $stream['referer'] ?? null);
+            if ($check === null || !str_contains($check, '#EXTM3U')) {
+                // The HLS host is dead or hotlink-blocked. If the resolver
+                // also listed an embed page for the same episode, play that
+                // instead of failing outright.
+                if (!empty($stream['embed'])) {
+                    return $this->embedResponse($stream, $server);
+                }
+                return response()->json([
+                    'error' => 'Stream is not available for this episode. Try another server or title.',
+                    'servers' => $this->streamProvider->servers(),
+                ], 404)->header('Cache-Control', 'no-store');
+            }
+            Cache::put($vKey, 1, 3600);
         }
 
         // Server-side proxy registry: the browser only ever receives OUR
@@ -415,11 +378,34 @@ class AnimeController extends Controller
             'source' => [
                 'url' => route('anime.proxy.playlist', ['k' => $proxyKey]),
                 'quality' => $stream['sources'][0]['quality'] ?? 'auto',
+                'type' => 'hls',
             ],
             'subtitles' => $subtitles,
             'servers' => $this->streamProvider->servers(),
             'activeServer' => $stream['provider'] ?? $server,
             'provider' => $stream['provider'] ?? null,
+            'audioFallback' => $stream['audio_fallback'] ?? null,
+            'intro' => $stream['intro'],
+            'outro' => $stream['outro'],
+        ])->header('Cache-Control', 'public, max-age=300');
+    }
+
+    /**
+     * JSON payload for an embed-only source. The player mounts the URL in a
+     * sandboxed iframe; no proxying or subtitle injection is possible there.
+     */
+    protected function embedResponse(array $stream, ?string $server): \Illuminate\Http\JsonResponse
+    {
+        return response()->json([
+            'source' => [
+                'url' => $stream['embed'] ?? $stream['sources'][0]['url'],
+                'type' => 'embed',
+            ],
+            'subtitles' => [],
+            'servers' => $this->streamProvider->servers(),
+            'activeServer' => $stream['provider'] ?? $server,
+            'provider' => $stream['provider'] ?? null,
+            'audioFallback' => $stream['audio_fallback'] ?? null,
             'intro' => $stream['intro'],
             'outro' => $stream['outro'],
         ])->header('Cache-Control', 'public, max-age=300');

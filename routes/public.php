@@ -46,7 +46,7 @@ Route::get('/manga/{id}/chapter/{chapterId}/pages-json', [MangaController::class
 Route::get('/manga/{id}/chapter/{chapterId}', [MangaController::class, 'read'])->name('manga.read');
 Route::get('/manga/{id}', [MangaController::class, 'show'])->name('manga.show');
 
-// Anime mode (AniList catalogue + own HLS player, no embeds)
+// Anime mode (AniList catalogue + own HLS player, embed fallback)
 Route::get('/anime', [AnimeController::class, 'index'])->name('anime.index');
 Route::get('/anime/api/live-search', [AnimeController::class, 'liveSearch'])->name('anime.api.live-search');
 Route::get('/anime/proxy/playlist', [AnimeController::class, 'playlistProxy'])->name('anime.proxy.playlist');

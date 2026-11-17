@@ -23,7 +23,7 @@
                             <img src="{{ asset('images/loading/loading-2.webp') }}" alt="" fetchpriority="high" class="loader-img loader-img-2">
                         </div>
                         <p class="text-sm font-semibold">Loading wait a damn minute wontcha?</p>
-                        <p class="text-xs text-white/60">Sumber langsung tanpa embed &amp; tanpa iklan</p>
+                        <p class="text-xs text-white/60">Sumber langsung tanpa iklan</p>
                     </div>
 
                     <div id="playerError" class="absolute inset-0 hidden flex-col items-center justify-center gap-3 bg-black/85 p-6 text-center text-white z-40">
@@ -58,9 +58,12 @@
                     </a>
                 </div>
 
+                <p id="audioNotice" class="hidden rounded-2xl border border-[#f5c99b] bg-[#fff7ed] px-4 py-2 text-xs font-semibold text-[#9a3412]">
+                    Versi Dub untuk episode ini belum tersedia — memutar versi Sub.
+                </p>
+
                 {{-- Control bar --}}
                 <div class="flex flex-wrap items-center gap-3 rounded-3xl border border-[#e0d9c8] bg-white p-4 shadow-sm">
-                    @if($dubAvailable)
                     <div id="audioWrap" class="flex items-center gap-2">
                         <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Audio</span>
                         <div id="audioToggle" class="flex items-center gap-1 rounded-full border border-[#dcd2bd] bg-[#fbf9f4] p-1">
@@ -70,7 +73,6 @@
                                     class="rounded-full px-3.5 py-1 text-xs font-bold text-[#4c5b54] transition hover:text-[#0f766e] disabled:cursor-not-allowed disabled:opacity-40">Dub</button>
                         </div>
                     </div>
-                    @endif
                     <div class="flex items-center gap-2">
                         <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Quality</span>
                         <div class="relative">
@@ -569,6 +571,17 @@
             }
             intro = data.intro || intro;
             outro = data.outro || outro;
+            const notice = document.getElementById('audioNotice');
+            if (notice) notice.classList.toggle('hidden', data.audioFallback !== 'sub');
+            // Some providers only ship an embed page. The API marks those
+            // explicitly so the player can mount a sandboxed iframe instead
+            // of asking hls.js to parse an HTML page.
+            if (data.source.type === 'embed') {
+                buildSubtitleOptions([]);
+                playEmbed(data.source.url);
+                loadingEl.style.display = 'none';
+                return;
+            }
             buildSubtitleOptions(data.subtitles || []);
             attachSource(data.source.url);
             loadSkipTimes();
@@ -618,6 +631,9 @@
 
         function attachSource(src) {
             if (hls) { try { hls.destroy(); } catch (e) {} hls = null; }
+            const oldFrame = document.getElementById('embedFrame');
+            if (oldFrame) oldFrame.remove();
+            video.style.visibility = '';
             if (window.Hls && Hls.isSupported()) {
                 hls = new Hls({
                     // Long episodes (40-60 min) need a deep forward buffer so
@@ -769,10 +785,10 @@
         });
         document.getElementById('retryBtn').addEventListener('click', loadStream);
 
-        // Last-resort embed player. Every HLS server can be dead for a very
-        // fresh cour (providers lag), so offer a hosted player keyed by the
-        // AniList id we already have instead of leaving a dead black frame.
-        function playEmbed() {
+        // Embed player: providers such as anikoto only expose hosted embed
+        // pages (Megaplay/VidWish) for some titles. Mount their URL in a
+        // sandboxed iframe; HLS still wins whenever a direct manifest exists.
+        function playEmbed(src) {
             errorEl.style.display = 'none';
             loadingEl.style.display = 'none';
             const wrap = document.getElementById('playerWrap');
@@ -787,9 +803,11 @@
                 frame.setAttribute('referrerpolicy', 'origin');
                 wrap.appendChild(frame);
             }
-            frame.src = 'https://player.vidplus.to/embed/anime/' + encodeURIComponent(ANIME.id) + '/' + EPISODE_NUMBER + '?dub=false';
+            frame.src = src || ('https://player.vidplus.to/embed/anime/' + encodeURIComponent(ANIME.id) + '/' + EPISODE_NUMBER + '?dub=false');
+            try { video.pause(); } catch (e) {}
+            video.style.visibility = 'hidden';
         }
-        document.getElementById('embedBtn').addEventListener('click', playEmbed);
+        document.getElementById('embedBtn').addEventListener('click', function () { playEmbed(); });
 
         // Episode list sidebar + prev/next
         (async function () {
@@ -806,7 +824,7 @@
                 listEl.innerHTML = '';
                 eps.forEach(function (ep) {
                     const a = document.createElement('a');
-                    a.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(ep.id) + '&n=' + ep.number;
+                    a.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(ep.id) + '&n=' + ep.number + '&audio=' + encodeURIComponent(audioValue);
                     a.className = 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ' + (ep.number === EPISODE_NUMBER ? 'bg-[#0f766e] font-bold text-white' : 'font-semibold text-[#4c5b54] hover:bg-[#f6f1e8]');
                     a.innerHTML = '<span class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ' + (ep.number === EPISODE_NUMBER ? 'bg-white/20' : 'bg-[#172a37] text-white') + '"><span class="material-symbols-rounded text-sm">play_arrow</span></span><span class="min-w-0"><span class="block">Episode ' + ep.number + '</span>' + (ep.title ? '<span class="block truncate text-[11px] font-medium opacity-70">' + ep.title.replace(/</g, '&lt;') + '</span>' : '') + '</span>';
                     listEl.appendChild(a);

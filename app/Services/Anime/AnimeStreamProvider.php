@@ -41,18 +41,37 @@ class AnimeStreamProvider
         'animeonsen', 'reanime', 'animegg', 'senshi', 'mkissa', 'kaa',
     ];
 
+    /** Public resolver instances used when ANIME_API_URL is not configured. */
+    protected const DEFAULT_BASES = [
+        'https://anivexa-api-nine.vercel.app',
+    ];
+
     public function __construct()
     {
-        $urls = collect(explode(',', (string) env('ANIME_API_URL', env('CONSUMET_API_URL', 'http://127.0.0.1:4000'))))
+        $configured = collect(explode(',', (string) env('ANIME_API_URL', env('CONSUMET_API_URL', ''))))
             ->map(fn ($u) => rtrim(trim($u), '/'))
             ->filter()
+            ->reject(fn ($u) => $this->isLocalHost($u))
             ->unique()
             ->values();
-        $this->base = $urls->first() ?: 'http://127.0.0.1:4000';
+
+        // A fresh Vercel project has no ANIME_API_URL. Falling back to
+        // 127.0.0.1:4000 made every episode list silently empty there.
+        $urls = $configured->isNotEmpty() ? $configured : collect(self::DEFAULT_BASES);
+
+        $this->base = $urls->first() ?: self::DEFAULT_BASES[0];
         $this->fallbacks = $urls->slice(1)->all();
         $key = env('ANIME_API_KEY');
         $this->apiKey = is_string($key) && $key !== '' ? $key : null;
         $this->extra = new AnimeExtraSources();
+    }
+
+    /** Localhost resolvers can never work on Vercel. */
+    protected function isLocalHost(string $url): bool
+    {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+
+        return in_array($host, ['127.0.0.1', 'localhost', '::1', '0.0.0.0'], true);
     }
 
     /**
@@ -89,85 +108,47 @@ $headers = ['Accept: application/json'];
     }
 
     /**
-     * Fetch episode lists per provider in parallel waves (curl_multi).
-     * Returns a map of provider name => raw provider block. Wave 1 is the
-     * two proven-fastest providers; the wider waves keep running while the
-     * best list found so far is still shorter than $expected (episodes that
-     * already aired), so a slow provider holding a complete catalogue is
-     * never skipped just because a fast one returned a single episode.
-     * The aggregate /episodes/{id} endpoint is NOT used: for long-running
-     * titles it returns ~11 MB and needs >30 s (33.8 s measured for One
-     * Piece), which always exceeded the timeout and silently produced an
-     * empty episode list.
+     * Fetch the resolver's episode aggregate for a title.
      *
-     * @param  int|null  $expected  episodes that already aired, when known
+     * Anivexa 2.x only exposes /episodes/{anilistId}. The per-provider
+     * /episodes/{provider}/{id} route does not exist there and silently
+     * answers with the API banner, which is why every episode list used to
+     * be empty. The aggregate returns one block per provider:
+     *
+     *   { "anikoto": { "episodes": { "sub": [...], "dub": [...] } }, ... }
+     *
+     * It is slow for long-running titles (~30 s), so callers that already
+     * know the aired episode count build a synthetic list instead and never
+     * wait for it.
      */
-    protected function fetchProviderEpisodes(int $anilistId, ?int $expected = null): array
+    protected function fetchProviderEpisodes(int $anilistId): array
     {
-        // Narrow first wave: the two proven-fastest HLS providers. A wave
-        // waits for its slowest member, so keeping wave 1 tiny keeps the
-        // common case fast; wider waves only run when needed.
-        $waves = [
-            array_slice($this->priority, 0, 2),
-            array_slice($this->priority, 2, 3),
-            array_slice($this->priority, 5),
-        ];
+        $results = $this->getJsonMulti([
+            'aggregate' => $this->base . "/episodes/{$anilistId}",
+        ], 20000);
+
+        $data = $results['aggregate'] ?? null;
+        if (!is_array($data)) {
+            return [];
+        }
+
+        // Some builds nest the provider blocks under "providers".
+        if (isset($data['providers']) && is_array($data['providers'])) {
+            $data = $data['providers'];
+        }
+
         $blocks = [];
-        foreach ($waves as $wave) {
-            if ($this->episodeBlocksSatisfied($blocks, $expected)) {
-                break;
-            }
-            if (empty($wave)) {
+        foreach ($data as $name => $block) {
+            if (!is_array($block) || !isset($block['episodes']) || !is_array($block['episodes'])) {
                 continue;
             }
-            $results = [];
-            foreach ($this->bases() as $base) {
-                $urls = [];
-                foreach ($wave as $name) {
-                    $urls[$name] = $base . "/episodes/{$name}/{$anilistId}";
-                }
-                $results = $this->getJsonMulti($urls, 8000);
-                if (!empty($results)) {
-                    break;
-                }
+            if (empty($block['episodes']['sub']) && empty($block['episodes']['dub'])) {
+                continue;
             }
-            foreach ($results as $name => $data) {
-                $block = $data[$name] ?? null;
-                if (is_array($block)) {
-                    $blocks[$name] = $block;
-                }
-            }
+            $blocks[strtolower((string) $name)] = $block;
         }
+
         return $blocks;
-    }
-
-    /**
-     * Whether the blocks collected so far are good enough to stop asking.
-     * With no expectation, any non-empty result is enough (legacy behaviour);
-     * otherwise the longest list must cover the episodes that already aired.
-     */
-    protected function episodeBlocksSatisfied(array $blocks, ?int $expected): bool
-    {
-        if (empty($blocks)) {
-            return false;
-        }
-        if ($expected === null || $expected <= 0) {
-            return true;
-        }
-
-        $longest = 0;
-        foreach ($blocks as $block) {
-            $list = $block['episodes']['sub'] ?? $block['episodes']['dub'] ?? [];
-            if (is_array($list)) {
-                $longest = max($longest, count($list));
-            }
-        }
-
-        // Providers routinely lag one or two episodes behind the broadcast
-        // (raw uploads, numbering quirks). Chasing that last gap would make
-        // every request pay for all three waves, so treat a list that is
-        // within two episodes as complete.
-        return $longest >= max(1, $expected - 2);
     }
 
     /** Parallel version of getJson(): map of key => decoded JSON array. */
@@ -280,20 +261,26 @@ $headers = ['Accept: application/json'];
             return $cached;
         }
 
-        $responses = $this->fetchProviderEpisodes($anilistId, $expected);
+        // AniList already tells us how many episodes aired. The resolver's
+        // aggregate endpoint needs ~30 s for that same information (and even
+        // longer for long-running titles), so the numbered list is built
+        // locally and playback resolves each episode on demand through the
+        // deterministic watch path. Only titles with an unknown count ask
+        // the resolver for its aggregate.
+        $responses = $expected === null ? $this->fetchProviderEpisodes($anilistId) : [];
 
         // Audio availability comes from the same response: providers expose
         // separate `episodes.sub` / `episodes.dub` arrays, so a title can
         // have 12 sub episodes and 3 dub episodes (or none at all).
-        $audioAvailable = $this->audioAvailabilityFrom($responses);
         if (!empty($responses)) {
+            $audioAvailable = $this->audioAvailabilityFrom($responses);
             Cache::put("anivexa_audio_{$anilistId}", $audioAvailable, 21600);
         } else {
             $audioAvailable = $this->audioAvailability($anilistId);
-        }
-
-        if (empty($responses)) {
-            $audioAvailable = $this->audioAvailability($anilistId);
+            // No aggregate to inspect: assume the requested track exists so
+            // the toggle is usable. getStream() falls back to sub if the
+            // provider has no dub track for that episode.
+            $audioAvailable[$audio] = true;
         }
 
         $byProvider = [];
@@ -329,12 +316,11 @@ $headers = ['Accept: application/json'];
             }
         }
 
-        // Secondary sources: only pay for them when the primary list is
-        // short or the requested track is missing entirely (fresh cours and
-        // dub tracks are exactly where Anivexa lags).
-        $needsExtra = empty($byNumber)
-            || ($expected !== null && $expected > 0 && count($byNumber) < max(1, $expected - 2))
-            || ($audio === 'dub' && empty($audioAvailable['dub']));
+        // Secondary sources are only worth their latency when the resolver
+        // aggregate is unknown/empty. With a known AniList count the local
+        // episode list already covers every aired episode.
+        $needsExtra = $expected === null && (empty($byNumber)
+            || ($audio === 'dub' && empty($audioAvailable['dub'])));
         if ($needsExtra) {
             foreach (['hianime', 'consumet'] as $source) {
                 $list = $source === 'hianime'
@@ -352,9 +338,26 @@ $headers = ['Accept: application/json'];
         }
 
         if (empty($byProvider) && empty($byNumber)) {
-            return is_array($cached) && !empty($cached['episodes'])
-                ? $cached
-                : array_merge($empty, ['audioAvailable' => $audioAvailable]);
+            if (is_array($cached) && !empty($cached['episodes'])) {
+                return $cached;
+            }
+
+            $synthetic = $this->syntheticEpisodes($anilistId, $expected, $audio);
+            if (!empty($synthetic)) {
+                $result = [
+                    'provider' => $this->priority[0] ?? 'anikoto',
+                    'providers' => $this->priority,
+                    'episodes' => $synthetic,
+                    'audio' => $audio,
+                    'audioAvailable' => array_merge($audioAvailable, [$audio => true]),
+                    'synthetic' => true,
+                ];
+                Cache::put($cacheKey, $result, 3600);
+
+                return $result;
+            }
+
+            return array_merge($empty, ['audioAvailable' => $audioAvailable]);
         }
 
         if (! empty($byProvider)) {
@@ -373,6 +376,33 @@ $headers = ['Accept: application/json'];
         ];
         Cache::put($cacheKey, $result, 21600);
         return $result;
+    }
+
+    /**
+     * Build an AniList-driven episode list when the resolver returns none.
+     * Watch paths are deterministic, so playback can still resolve an
+     * episode by number on demand.
+     */
+    protected function syntheticEpisodes(int $anilistId, ?int $expected, string $audio): array
+    {
+        $count = (int) ($expected ?? 0);
+        if ($count < 1) {
+            return [];
+        }
+
+        $provider = $this->priority[0] ?? 'anikoto';
+        $episodes = [];
+        for ($number = 1; $number <= $count; $number++) {
+            $episodes[] = [
+                'id' => 'watch/' . $provider . '/' . $anilistId . '/' . $audio . '/' . $provider . '-' . $number,
+                'number' => $number,
+                'title' => '',
+                'image' => null,
+                'duration' => null,
+            ];
+        }
+
+        return $episodes;
     }
 
     /** Which audio tracks the resolver reports for a title. */
@@ -402,9 +432,14 @@ $headers = ['Accept: application/json'];
     }
 
     /**
-     * Cheap dub probe for the server-rendered watch page: two priority
-     * providers, short timeout. Unknown/unreachable is treated as "no dub"
-     * on purpose — the toggle must never appear just to raise hopes.
+     * Whether the Dub toggle should be offered.
+     *
+     * A real probe costs 10-15 s per title (the resolver resolves the dub
+     * stream before answering), which is far too much for a page render.
+     * The toggle is therefore optimistic: when availability is unknown we
+     * show it, and getStream() silently falls back to the sub track if the
+     * provider has no dub for that episode. A cached "no dub" answer still
+     * hides it.
      */
     public function dubAvailable(int $anilistId): bool
     {
@@ -413,25 +448,8 @@ $headers = ['Accept: application/json'];
         }
 
         $cached = Cache::get("anivexa_audio_{$anilistId}");
-        if (is_array($cached)) {
-            return ! empty($cached['dub']);
-        }
 
-        $urls = [];
-        foreach ($this->bases() as $base) {
-            foreach (array_slice($this->priority, 0, 2) as $name) {
-                $urls[$name] = $base . "/episodes/{$name}/{$anilistId}";
-            }
-            break;
-        }
-
-        $results = $urls ? $this->getJsonMulti($urls, 3000) : [];
-        $available = $this->audioAvailabilityFrom($results);
-        if (! empty($results)) {
-            Cache::put("anivexa_audio_{$anilistId}", $available, 21600);
-        }
-
-        return ! empty($available['dub']);
+        return is_array($cached) ? ! empty($cached['dub']) : true;
     }
 
     /** Watch path anatomy: watch/{provider}/{anilistId}/{audio}/{provider}-{number} */
@@ -447,11 +465,11 @@ $headers = ['Accept: application/json'];
     protected function alternativePath(int $anilistId, float $number, string $provider, string $audio = 'sub'): ?string
     {
         $audio = $audio === 'dub' ? 'dub' : 'sub';
-        $cacheKey = "anivexa_episodes_by_provider_{$anilistId}_{$audio}";
-        $byProvider = Cache::get($cacheKey);
+        // Read-only on purpose: calling getEpisodes() here would pull the
+        // slow aggregate endpoint inside a playback failover.
+        $byProvider = Cache::get("anivexa_episodes_by_provider_{$anilistId}_{$audio}");
         if (!is_array($byProvider)) {
-            $this->getEpisodes($anilistId, null, $audio);
-            $byProvider = Cache::get($cacheKey);
+            return null;
         }
         foreach (($byProvider[$provider] ?? []) as $ep) {
             if ((float) $ep['number'] === $number) {
@@ -521,27 +539,47 @@ $headers = ['Accept: application/json'];
 
         $stream = $this->fetchStream($watchPath);
 
-        // Failover: try every provider that actually lists this episode, in
-        // priority order (providers the resolver added beyond our list count
-        // too, otherwise a working source can be skipped).
+        // Failover: after the episode's own provider, try one alternate.
+        // Every watch call costs 10-15 s upstream, so walking the complete
+        // provider list would blow the request budget long before it ends.
         if (!$stream && $parsed) {
             $byProvider = Cache::get("anivexa_episodes_by_provider_{$parsed['anilistId']}_{$audio}");
             $order = is_array($byProvider) && !empty($byProvider)
                 ? $this->providerOrder(array_keys($byProvider))
                 : $this->priority;
+            $tried = 0;
             foreach ($order as $name) {
                 if ($name === $parsed['provider']) {
                     continue;
                 }
-                $alt = $this->alternativePath($parsed['anilistId'], $parsed['number'], $name, $audio);
-                if (!$alt) {
-                    continue;
+                if ($tried++ >= 1) {
+                    break;
                 }
+                $number = $parsed['number'] == (int) $parsed['number']
+                    ? (string) (int) $parsed['number']
+                    : (string) $parsed['number'];
+                $alt = $this->alternativePath($parsed['anilistId'], $parsed['number'], $name, $audio)
+                    ?: 'watch/' . $name . '/' . $parsed['anilistId'] . '/' . $audio . '/' . $name . '-' . $number;
                 $stream = $this->fetchStream($alt);
                 if ($stream) {
                     $stream['provider'] = $name;
                     break;
                 }
+            }
+        }
+
+        // Dub requested but no provider carries it: play the sub version of
+        // the same episode instead of ending on an error screen. The player
+        // shows a small note when audio_fallback is set.
+        if (!$stream && $parsed && $audio === 'dub') {
+            $number = $parsed['number'] == (int) $parsed['number']
+                ? (string) (int) $parsed['number']
+                : (string) $parsed['number'];
+            $subPath = 'watch/' . $parsed['provider'] . '/' . $parsed['anilistId'] . '/sub/' . $parsed['provider'] . '-' . $number;
+            $stream = $this->fetchStream($subPath);
+            if ($stream) {
+                $stream['audio_fallback'] = 'sub';
+                Cache::put("anivexa_audio_{$parsed['anilistId']}", ['sub' => true, 'dub' => false], 3600);
             }
         }
 
@@ -561,6 +599,13 @@ $headers = ['Accept: application/json'];
     protected function extractStreams(array $data): array
     {
         $out = [];
+        // API 2.x wraps the playable block in a key such as "ssub"/"sdub".
+        foreach ($data as $value) {
+            if (is_array($value) && (isset($value['streams']) || isset($value['sources']))) {
+                $data = array_merge($data, $value);
+                break;
+            }
+        }
         foreach (['streams', 'sources'] as $key) {
             if (!empty($data[$key]) && is_array($data[$key])) {
                 foreach ($data[$key] as $entry) {
@@ -607,6 +652,16 @@ $headers = ['Accept: application/json'];
             return null;
         }
 
+        // API 2.x returns { "ssub": { "streams": [...], "subtitles": [...] } }
+        // or the same block under "sdub"; lift it to the top level so the
+        // normaliser below sees streams and subtitles in one place.
+        foreach ($data as $value) {
+            if (is_array($value) && (isset($value['streams']) || isset($value['sources']))) {
+                $data = array_merge($data, $value);
+                break;
+            }
+        }
+
         $streams = $this->extractStreams($data);
         if (empty($streams)) {
             // Keep a breadcrumb: an unexpected payload shape used to look
@@ -618,26 +673,41 @@ $headers = ['Accept: application/json'];
             return null;
         }
 
-        $chosen = null;
+        $hls = null;
+        $embed = null;
         foreach ($streams as $s) {
             $url = $this->streamUrl($s);
             if ($url === '') {
                 continue;
             }
-            $isHls = $this->isHlsStream($s, $url);
-            if ($isHls && ($s['isActive'] ?? $s['active'] ?? true)) {
-                $chosen = $s;
-                $chosen['url'] = $url;
-                break;
+            if ($this->isHlsStream($s, $url)) {
+                if (($s['isActive'] ?? $s['active'] ?? true)) {
+                    $hls = $s;
+                    $hls['url'] = $url;
+                    break;
+                }
+                if ($hls === null) {
+                    $hls = $s;
+                    $hls['url'] = $url;
+                }
+                continue;
             }
-            if ($isHls && $chosen === null) {
-                $chosen = $s;
-                $chosen['url'] = $url;
+            // Some providers only expose an embed page (Megaplay, VidWish,
+            // ...). Previously these were dropped, so a title with a working
+            // anikoto source still showed "stream unavailable". Keep the
+            // highest-priority embed as a last resort and let the player
+            // render it in a sandboxed iframe.
+            if ($embed === null) {
+                $embed = $s;
+                $embed['url'] = $url;
             }
         }
+
+        $chosen = $hls ?? $embed;
         if (!$chosen) {
             return null;
         }
+        $isEmbed = $hls === null;
 
         $subtitles = [];
         $tracks = $chosen['subtitles'] ?? $chosen['tracks'] ?? $data['subtitles'] ?? $data['tracks'] ?? [];
@@ -646,11 +716,19 @@ $headers = ['Accept: application/json'];
             if ($subUrl === '') {
                 continue;
             }
-            $lang = strtolower((string) ($sub['srclang'] ?? $sub['lang'] ?? $sub['label'] ?? 'en'));
+            $kind = strtolower((string) ($sub['kind'] ?? ''));
+            $label = trim((string) ($sub['label'] ?? ''));
+            if ($kind === 'thumbnails' || ($label === '' && str_contains($subUrl, 'thumbnail'))) {
+                continue;
+            }
+            $lang = strtolower((string) ($sub['language'] ?? $sub['srclang'] ?? $sub['lang'] ?? ''));
+            if ($lang === '') {
+                $lang = strtolower($label);
+            }
             $subtitles[] = [
                 'lang' => $lang,
-                'label' => (string) ($sub['label'] ?? strtoupper($lang)),
-                'url' => $sub['url'],
+                'label' => $label !== '' ? $label : strtoupper($lang ?: 'EN'),
+                'url' => $subUrl,
             ];
         }
 
@@ -660,9 +738,14 @@ $headers = ['Accept: application/json'];
             'sources' => [[
                 'url' => $chosen['url'],
                 'quality' => 'auto',
-                'isM3U8' => true,
+                'isM3U8' => ! $isEmbed,
             ]],
-            'subtitles' => $subtitles,
+            'subtitles' => $isEmbed ? [] : $subtitles,
+            'kind' => $isEmbed ? 'embed' : 'hls',
+            // When an HLS manifest and an embed page are both listed, keep
+            // the embed URL here so the controller can fall back to it when
+            // the CDN refuses the manifest (dead host, hotlink block, ...).
+            'embed' => $isEmbed ? null : ($embed['url'] ?? null),
             'referer' => $chosen['referer'] ?? null,
             'intro' => null,
             'outro' => null,
