@@ -134,7 +134,10 @@
                     counts.en = Math.max(counts.en, (payload.counts && payload.counts.en) || 0);
                 }
                 counts.all = counts.id + counts.en;
-                const visible = chapters.slice(0, 400);
+                // Keep every chapter the server sent. Truncating here to 400
+                // is what made long series stop at the newest few hundred
+                // entries even though the counter showed the real total.
+                const visible = chapters;
                 let first = null;
                 let latest = null;
                 for (const payload of payloads) {
@@ -157,7 +160,7 @@
                     counts: counts,
                     first: first || (chapters.length ? chapters[chapters.length - 1] : null),
                     latest: latest || (chapters.length ? chapters[0] : null),
-                    truncated: chapters.length > visible.length,
+                    truncated: false,
                     partial: payloads.some(payload => payload.partial),
                 };
             },
@@ -362,7 +365,8 @@
             </div>
 
             <!-- Chapter Table / List -->
-            <div class="space-y-2 max-h-[600px] overflow-y-auto pr-1 custom-scroll">
+            <div class="space-y-2 max-h-[600px] overflow-y-auto pr-1 custom-scroll"
+                 @scroll="if (visibleLimit < filteredCount && $el.scrollTop + $el.clientHeight >= $el.scrollHeight - 250) visibleLimit += 100">
 
                 <!-- Skeleton while the async endpoint aggregates sources -->
                 <div x-show="loading" x-cloak class="space-y-2">

@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Log;
 class MangaService
 {
     /** Cache namespace for aggregated chapter lists. Bump after parser changes. */
-    public const CACHE_VERSION = 'v10';
+    public const CACHE_VERSION = 'v11';
 
     protected AniListProvider $aniListProvider;
     protected MangaDexProvider $mangaDexProvider;

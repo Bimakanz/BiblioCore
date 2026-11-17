@@ -347,9 +347,12 @@ class MangaController extends Controller
             }
         }
 
-        // Keep the payload small: the 400 newest chapters are enough for the
-        // UI, while "first chapter" is still resolved from the full list.
-        $visible = $total > 400 ? array_slice($chapters, 0, 400) : $chapters;
+        // Return the complete list. The old 400-entry cap made long series
+        // (1000+ chapters) impossible to browse past the newest ~400 entries:
+        // the counter showed the real total while the list stopped mid-series.
+        // The payload is fetched asynchronously and edge-cached, so size is
+        // not on the critical path.
+        $visible = $chapters;
 
         return [
             'mangaId' => $mangaId,
@@ -361,7 +364,7 @@ class MangaController extends Controller
             ],
             'first' => $total > 0 ? $this->chapterSummary(end($chapters)) : null,
             'latest' => $total > 0 ? $this->chapterSummary(reset($chapters)) : null,
-            'truncated' => $total > count($visible),
+            'truncated' => false,
         ];
     }
 
