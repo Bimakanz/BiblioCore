@@ -31,6 +31,10 @@
                         <p id="playerErrorText" class="max-w-md text-sm font-medium">Stream is not available for this episode.</p>
                         <button type="button" id="retryBtn" class="rounded-full bg-[#f97316] px-5 py-2 text-xs font-bold text-white transition hover:bg-[#ea580c]">Try Again</button>
                         <button type="button" id="embedBtn" class="rounded-full border border-white/25 bg-white/10 px-5 py-2 text-xs font-bold text-white transition hover:bg-white/20">Coba Server Cadangan</button>
+                        <a id="backToAnimeBtn" href="{{ route('anime.show', ['id' => $anime['id']]) }}"
+                           class="hidden rounded-full bg-[#0f766e] px-5 py-2 text-xs font-bold text-white transition hover:bg-[#115e59]">
+                            Kembali ke detail anime
+                        </a>
                     </div>
 
 
@@ -407,6 +411,27 @@
             loadingEl.style.display = 'none';
             errorText.textContent = msg || 'Stream is not available for this episode. Try another server.';
             errorEl.style.display = 'flex';
+            const retry = document.getElementById('retryBtn');
+            const backup = document.getElementById('embedBtn');
+            const back = document.getElementById('backToAnimeBtn');
+            if (retry) retry.classList.remove('hidden');
+            if (backup) backup.classList.remove('hidden');
+            if (back) back.classList.add('hidden');
+        }
+
+        // Terminal state: the backend confirmed NO provider carries this
+        // title. Offering "try another server" here would just loop forever,
+        // so send the visitor back to the detail page instead.
+        function showUnavailable(msg) {
+            loadingEl.style.display = 'none';
+            errorText.textContent = msg || 'Judul ini belum punya sumber video di penyedia mana pun.';
+            errorEl.style.display = 'flex';
+            const retry = document.getElementById('retryBtn');
+            const backup = document.getElementById('embedBtn');
+            const back = document.getElementById('backToAnimeBtn');
+            if (retry) retry.classList.add('hidden');
+            if (backup) backup.classList.add('hidden');
+            if (back) back.classList.remove('hidden');
         }
 
         function hideOverlays() {
@@ -627,9 +652,16 @@
             try {
                 const res = await fetch(STREAM_URL);
                 data = await res.json();
-                if (!res.ok || !data.source) throw new Error(data.error || 'Stream unavailable');
             } catch (e) {
-                showError('All servers were tried automatically, but none could play this episode. Please try again later.');
+                showError('Tidak bisa menghubungi layanan streaming. Periksa koneksi lalu coba lagi.');
+                return;
+            }
+            if (!data || !data.source) {
+                if (data && data.unavailable) {
+                    showUnavailable(data.error || 'Judul ini belum punya sumber video di penyedia mana pun.');
+                } else {
+                    showError((data && data.error) || 'All servers were tried automatically, but none could play this episode. Please try again later.');
+                }
                 return;
             }
             intro = data.intro || intro;

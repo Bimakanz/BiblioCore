@@ -46,6 +46,7 @@
                     @endif
 
                     {{-- Resume (client-side, from biblioanime_history) --}}
+                    @if($available)
                     <div x-data="{ entry: (JSON.parse(localStorage.getItem('biblioanime_history') || '[]')).find(h => h.id === '{{ $anime['id'] }}') || null, fmt(s) { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = String(s % 60).padStart(2, '0'); return h > 0 ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; }, rel(ts) { const d = Number(ts) || (ts ? Date.parse(ts) : 0); if (!d) return 'baru saja'; const diff = Math.max(0, Date.now() - d); const m = Math.floor(diff / 60000); if (m < 1) return 'baru saja'; if (m < 60) return m + ' menit lalu'; const h = Math.floor(m / 60); if (h < 24) return h + ' jam lalu'; return Math.floor(h / 24) + ' hari lalu'; } }" x-cloak>
                         <template x-if="entry">
                             <a :href="'/anime/{{ $anime['id'] }}/watch?ep=' + encodeURIComponent(entry.episodeId || '') + '&n=' + encodeURIComponent(entry.episodeNumber || 1) + '&t=' + Math.max(0, Math.floor((entry.positionSec || 0) - 5))"
@@ -57,6 +58,17 @@
                             </a>
                         </template>
                     </div>
+                    @else
+                    <div class="w-full max-w-2xl rounded-2xl border border-[#f0d9b5] bg-[#fff8ec] px-5 py-4 text-left">
+                        <p class="flex items-center gap-2 text-sm font-bold text-[#b45309]">
+                            <span class="material-symbols-rounded text-base">info</span>
+                            Belum tersedia untuk ditonton
+                        </p>
+                        <p class="mt-1 text-xs leading-relaxed text-[#8a6d3b]">
+                            {{ request('unavailable') ? 'Tidak ada server yang bisa memutar judul ini saat ini.' : 'Judul ini belum punya rilis digital, jadi belum ada sumber video yang bisa diputar. Judul tanpa video tidak ditampilkan lagi di pencarian maupun katalog.' }}
+                        </p>
+                    </div>
+                    @endif
                 </div>
             </div>
 
@@ -100,6 +112,7 @@
             </section>
 
             {{-- Episodes (async) --}}
+            @if($available)
             <section class="mt-6 mb-14 rounded-3xl border border-[#e0d9c8] bg-white p-6 shadow-sm"
                      x-data="{
                         loading: true,
@@ -203,6 +216,21 @@
                     </template>
                 </div>
             </section>
+            @else
+            <section class="mt-6 mb-14 rounded-3xl border border-[#e0d9c8] bg-white p-8 text-center shadow-sm">
+                <span class="material-symbols-rounded text-4xl text-[#c1cbbb]">tv_off</span>
+                <p class="mt-2 text-sm font-bold text-[#172a37]">Episode list tidak ditampilkan</p>
+                <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-[#6f7e75]">
+                    Judul ini belum punya sumber video di penyedia mana pun. Supaya tidak
+                    menyesatkan, daftar episode dan tombol putar disembunyikan sampai
+                    ada rilis digital yang bisa diputar.
+                </p>
+                <a href="{{ route('anime.index') }}" class="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#0f766e] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#115e59]">
+                    <span class="material-symbols-rounded text-base">arrow_back</span>
+                    Kembali ke katalog anime
+                </a>
+            </section>
+            @endif
         </div>
     </div>
 </x-manga-layout>

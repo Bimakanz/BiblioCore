@@ -103,6 +103,7 @@ class AnimeController extends Controller
 
         return response()->view('anime.show', [
             'anime' => $anime,
+            'available' => ! $this->animeService->isUnplayable($anime),
             'episodesUrl' => route('anime.episodes.json', ['id' => $id]),
         ])->header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400');
     }
@@ -113,6 +114,20 @@ class AnimeController extends Controller
         $anime = $this->animeService->getDetail($id);
         if (!$anime) {
             return response()->json(['episodes' => [], 'total' => 0], 404);
+        }
+
+        // A title the catalogue already knows is unplayable: never hand the
+        // player a synthetic episode list that is guaranteed to fail.
+        if ($this->animeService->isUnplayable($anime)) {
+            return response()->json([
+                'providerId' => null,
+                'providers' => [],
+                'episodes' => [],
+                'total' => 0,
+                'audio' => $request->query('audio') === 'dub' ? 'dub' : 'sub',
+                'audioAvailable' => ['sub' => false, 'dub' => false],
+                'available' => false,
+            ])->header('Cache-Control', 'no-store');
         }
 
         $audio = $request->query('audio') === 'dub' ? 'dub' : 'sub';
@@ -232,6 +247,13 @@ class AnimeController extends Controller
             return redirect()->route('anime.show', ['id' => $id]);
         }
 
+        // Known-dead title: send the visitor back to the detail page, which
+        // now explains that it has no digital release instead of mounting a
+        // player that can never load.
+        if ($this->animeService->isUnplayable($anime)) {
+            return redirect()->route('anime.show', ['id' => $id, 'unavailable' => 1]);
+        }
+
         return response()->view('anime.watch', [
             'anime' => $anime,
             'episodeId' => $episodeId,
@@ -270,9 +292,11 @@ class AnimeController extends Controller
         }
 
         if (!$stream || empty($stream['sources'])) {
+            $this->markUnavailableWhenNoEpisodes($id);
             return response()->json([
-                'error' => 'Stream is not available for this episode. Try another server or title.',
-                'servers' => $this->streamProvider->servers(),
+                'error' => 'This episode is not available on any provider yet.',
+                'unavailable' => true,
+                'reason' => 'no_stream',
             ], 404)->header('Cache-Control', 'no-store');
         }
 
@@ -280,6 +304,7 @@ class AnimeController extends Controller
         // iframe by the player. They cannot be verified or proxied, so the
         // HLS pipeline below is skipped entirely.
         if (($stream['kind'] ?? 'hls') === 'embed') {
+            $this->animeService->markAvailable((int) preg_replace('/[^0-9]/', '', $id));
             return $this->embedResponse($stream, $server);
         }
 
@@ -294,15 +319,20 @@ class AnimeController extends Controller
                 // also listed an embed page for the same episode, play that
                 // instead of failing outright.
                 if (!empty($stream['embed'])) {
+                    $this->animeService->markAvailable((int) preg_replace('/[^0-9]/', '', $id));
                     return $this->embedResponse($stream, $server);
                 }
+                $this->markUnavailableWhenNoEpisodes($id);
                 return response()->json([
-                    'error' => 'Stream is not available for this episode. Try another server or title.',
-                    'servers' => $this->streamProvider->servers(),
+                    'error' => 'This episode is not available on any provider yet.',
+                    'unavailable' => true,
+                    'reason' => 'dead_manifest',
                 ], 404)->header('Cache-Control', 'no-store');
             }
             Cache::put($vKey, 1, 3600);
         }
+
+        $this->animeService->markAvailable((int) preg_replace('/[^0-9]/', '', $id));
 
         // Server-side proxy registry: the browser only ever receives OUR
         // URLs; the proxy will only fetch URLs stored here, never arbitrary
@@ -388,6 +418,23 @@ class AnimeController extends Controller
             'intro' => $stream['intro'],
             'outro' => $stream['outro'],
         ])->header('Cache-Control', 'public, max-age=300');
+    }
+
+    /**
+     * Only flag a title as globally unplayable when it has at most one
+     * episode (a film / single-episode special). A single broken episode of
+     * a long series must never hide the whole series from the catalogue.
+     */
+    protected function markUnavailableWhenNoEpisodes(string $id): void
+    {
+        $anime = $this->animeService->getDetail($id);
+        if (!$anime) {
+            return;
+        }
+        $count = (int) ($anime['episodes'] ?? 0);
+        if ($count <= 1 || ($anime['format'] ?? '') === 'MOVIE') {
+            $this->animeService->markUnavailable((int) ($anime['anilistId'] ?? 0));
+        }
     }
 
     /**

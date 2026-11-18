@@ -77,7 +77,7 @@ class AnimeService
     public function getPopular(int $page = 1, int $limit = 24, ?string $category = 'popular', ?string $genre = null): array
     {
         $category = in_array($category, ['popular', 'trending', 'season', 'top', 'ongoing', 'completed', 'upcoming'], true) ? $category : 'popular';
-        $cacheKey = "anilist_anime_catalog_{$category}_{$page}_{$limit}_" . md5((string) $genre);
+        $cacheKey = "anilist_anime_catalog_v2_{$category}_{$page}_{$limit}_" . md5((string) $genre);
 
         return Cache::remember($cacheKey, 21600, function () use ($page, $limit, $category, $genre) {
             $variables = ['page' => $page, 'perPage' => $limit, 'type' => 'ANIME'];
@@ -117,13 +117,16 @@ class AnimeService
 
             return $this->fetchPage($variables);
         });
+        $result['data'] = $this->filterPlayable($result['data'] ?? []);
+
+        return $result;
     }
 
     public function search(string $query, int $page = 1, int $limit = 24, ?string $genre = null): array
     {
-        $cacheKey = 'anilist_anime_search_' . md5("{$query}_{$page}_{$limit}_{$genre}");
+        $cacheKey = 'anilist_anime_search_v2_' . md5("{$query}_{$page}_{$limit}_{$genre}");
 
-        return Cache::remember($cacheKey, 3600, function () use ($query, $page, $limit, $genre) {
+        $result = Cache::remember($cacheKey, 3600, function () use ($query, $page, $limit, $genre) {
             $variables = [
                 'page' => $page,
                 'perPage' => $limit,
@@ -136,6 +139,20 @@ class AnimeService
             }
             return $this->fetchPage($variables);
         });
+
+        $result['data'] = $this->filterPlayable($result['data'] ?? []);
+
+        return $result;
+    }
+
+    /**
+     * Drop titles that can never play. Applied AFTER the cache read so a
+     * "no stream" result written by the player takes effect immediately
+     * instead of waiting for the 6h AniList catalogue cache to expire.
+     */
+    protected function filterPlayable(array $cards): array
+    {
+        return array_values(array_filter($cards, fn ($card) => ! $this->isUnplayable($card)));
     }
 
     protected function fetchPage(array $variables): array
@@ -166,6 +183,8 @@ class AnimeService
               seasonYear
               startDate { year }
               genres
+              streamingEpisodes { title site }
+              externalLinks { site type }
             }
           }
         }';
@@ -196,7 +215,7 @@ class AnimeService
             return null;
         }
 
-        return Cache::remember("anime_detail_v2_{$numericId}", 86400, function () use ($numericId) {
+        return Cache::remember("anime_detail_v3_{$numericId}", 86400, function () use ($numericId) {
             $gql = '
             query ($id: Int) {
               Media(id: $id, type: ANIME) {
@@ -221,6 +240,8 @@ class AnimeService
                 genres
                 studios(isMain: true) { nodes { name } }
                 nextAiringEpisode { episode timeUntilAiring }
+                streamingEpisodes { title site }
+                externalLinks { site type }
               }
             }';
 
@@ -246,10 +267,15 @@ class AnimeService
     public function homeSections(): array
     {
         $season = $this->currentSeason();
-        $cacheKey = 'anilist_anime_home_' . $season['season'] . '_' . $season['year'];
+        $cacheKey = 'anilist_anime_home_v2_' . $season['season'] . '_' . $season['year'];
 
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
+            foreach ($cached as $name => $cards) {
+                if (is_array($cards)) {
+                    $cached[$name] = $this->filterPlayable($cards);
+                }
+            }
             return $cached;
         }
 
@@ -270,7 +296,9 @@ class AnimeService
               season
               seasonYear
               startDate { year }
-              genres';
+              genres
+              streamingEpisodes { title site }
+              externalLinks { site type }';
 
         $gql = 'query {
           trending: Page(page: 1, perPage: 10) {
@@ -466,6 +494,85 @@ class AnimeService
             'score' => isset($m['averageScore']) && $m['averageScore'] ? round($m['averageScore'] / 10, 1) : null,
             'genres' => $m['genres'] ?? [],
             'tags' => $m['genres'] ?? [],
+            // Digital-release signals straight from AniList. A title with any
+            // of these is known to exist on a streaming platform, which means
+            // at least one provider can usually serve it. Titles with none of
+            // them are either cinema-only, music videos, or unreleased.
+            'streamingSites' => array_values(array_filter(array_map(
+                fn ($s) => $s['site'] ?? null,
+                $m['streamingEpisodes'] ?? []
+            ))),
+            'streamingLinks' => array_values(array_filter(array_map(
+                fn ($l) => (($l['type'] ?? '') === 'STREAMING') ? ($l['site'] ?? null) : null,
+                $m['externalLinks'] ?? []
+            ))),
         ];
+    }
+
+    /**
+     * Whether a title can never be played by any provider we use.
+     *
+     * AniList lists everything, including cinema-only films that have no
+     * digital release at all (e.g. a 2026 theatrical movie). Providers only
+     * carry titles that were released digitally, so listing such titles leads
+     * to a dead player and a useless "try another server" loop.
+     *
+     * The check is intentionally conservative:
+     *  - an explicit cache flag written after a real playback/success wins;
+     *  - music videos are never carried by anime providers;
+     *  - only *recent* finished movies with zero streaming signals are
+     *    hidden, so older catalogue films are never dropped by mistake.
+     */
+    public function isUnplayable(array $anime): bool
+    {
+        $id = (int) ($anime['anilistId'] ?? 0);
+        if ($id > 0) {
+            if (Cache::get("anime_available_{$id}") === true) {
+                return false;
+            }
+            if (Cache::get("anime_unavailable_{$id}") === true) {
+                return true;
+            }
+        }
+
+        $format = $anime['format'] ?? '';
+        if ($format === 'MUSIC') {
+            return true;
+        }
+
+        $hasStreamingSignal = ! empty($anime['streamingSites']) || ! empty($anime['streamingLinks']);
+        if ($hasStreamingSignal) {
+            return false;
+        }
+
+        $year = (int) ($anime['year'] ?? 0);
+        if ($format === 'MOVIE'
+            && ($anime['statusRaw'] ?? '') === 'FINISHED'
+            && $year > 0
+            && $year >= (int) date('Y') - 1) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /** Remember that a title really did resolve a playable stream. */
+    public function markAvailable(int $anilistId): void
+    {
+        if ($anilistId <= 0) {
+            return;
+        }
+        Cache::put("anime_available_{$anilistId}", true, 604800);
+        Cache::forget("anime_unavailable_{$anilistId}");
+    }
+
+    /** Remember that every provider failed, so listings can hide the title. */
+    public function markUnavailable(int $anilistId): void
+    {
+        if ($anilistId <= 0) {
+            return;
+        }
+        // Short TTL: a provider outage must not hide a good title forever.
+        Cache::put("anime_unavailable_{$anilistId}", true, 21600);
     }
 }

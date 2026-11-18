@@ -40,6 +40,7 @@ class AnimeTest extends TestCase
     public function test_episodes_json_honours_the_dub_audio_track(): void
     {
         $this->mock(\App\Services\Anime\AnimeService::class, function ($mock) {
+            $mock->shouldReceive('isUnplayable')->andReturn(false);
             $mock->shouldReceive('getDetail')->andReturn([
                 'id' => 'al_1',
                 'anilistId' => 1,
