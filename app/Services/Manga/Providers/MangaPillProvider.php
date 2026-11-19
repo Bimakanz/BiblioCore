@@ -59,11 +59,24 @@ class MangaPillProvider
      */
     public function getChapters(string $title, array $altTitles = []): array
     {
-        $cacheKey = 'mangapill_ch_v2_' . md5($title);
+        $cacheKey = 'mangapill_ch_v3_' . md5($title);
 
         $result = Cache::remember($cacheKey, 43200, function () use ($title, $altTitles) {
             $normalize = fn(string $s) => strtolower(trim(preg_replace('/[^a-z0-9]/', '', $s)));
             $targetNorms = array_values(array_filter(array_map($normalize, array_merge([$title], $altTitles))));
+
+            // MangaPill lists web novels as separate entries whose slug ends
+            // with "-novel" (e.g. "solo-leveling-novel"). Those entries carry
+            // NO page images, so matching them turns a manhwa detail page into
+            // a fake "novel only" list. Only accept them when the caller is
+            // explicitly looking for a novel.
+            $wantsNovel = stripos($title, 'novel') !== false;
+            foreach (array_slice($altTitles, 0, 3) as $alt) {
+                if (stripos((string) $alt, 'novel') !== false) {
+                    $wantsNovel = true;
+                    break;
+                }
+            }
 
             $searchQueries = [$title];
             foreach (array_slice($altTitles, 0, 3) as $alt) {
@@ -93,6 +106,13 @@ class MangaPillProvider
                     $mPath = $m[1];
                     $mSlug = $m[2];
                     $mText = trim(strip_tags($m[3]));
+
+                    // Skip web-novel entries for manga/manhwa lookups. The
+                    // slug pattern is specific on purpose so titles such as
+                    // "The Novel's Extra" (slug "the-novels-extra") survive.
+                    if (! $wantsNovel && preg_match('/-novel(?:$|-chapter-\d+)/i', $mSlug)) {
+                        continue;
+                    }
 
                     $bestScore = 0;
                     $slugNorm = $normalize($mSlug);
