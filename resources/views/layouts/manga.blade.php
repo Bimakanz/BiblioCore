@@ -139,7 +139,12 @@
               if (this.isAnimeMode) {
                   return '/anime/' + item.id + '/watch?ep=' + encodeURIComponent(item.episodeId || '') + '&n=' + encodeURIComponent(item.episodeNumber || 1) + '&t=' + Math.max(0, Math.floor((item.positionSec || 0) - 5));
               }
-              return '/manga/' + item.id + '/chapter/' + item.chapterId + '?ch=' + encodeURIComponent(item.chapterNumber || '') + '&source=' + encodeURIComponent(item.source || 'MangaDex');
+              let url = '/manga/' + item.id + '/chapter/' + item.chapterId + '?ch=' + encodeURIComponent(item.chapterNumber || '') + '&source=' + encodeURIComponent(item.source || 'MangaDex');
+              if (item.language) url += '&lang=' + encodeURIComponent(item.language);
+              if (item.readPath) {
+                  try { url += '&p=' + encodeURIComponent(btoa(item.readPath)); } catch (e) {}
+              }
+              return url;
           },
           removeHistoryItem(item) {
               if (this.isAnimeMode) { this.removeAnimeHistory(item.id); } else { this.removeHistory(item.id); }

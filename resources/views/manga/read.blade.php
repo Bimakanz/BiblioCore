@@ -35,6 +35,10 @@
         prevChapter: @js($prevChapter),
         nextChapter: @js($nextChapter),
         chapters: @js($sameLangChapters),
+        chaptersUrl: @js(route('manga.chapters.json', ['id' => $manga['id']]) . '?lang=' . ($currentChapter['language'] ?? 'en')),
+        chaptersLoading: false,
+        chaptersTries: 0,
+        autoContinueWhenLoaded: false,
         latestChapNum: {{ !empty($sameLangChapters[0]['chapter']) ? (int)$sameLangChapters[0]['chapter'] : (count($sameLangChapters) ?: 1) }},
         prefetchedNextChapter: null,
         prefetchedPrevChapter: null,
@@ -52,6 +56,11 @@
         init() {
             this.totalPages = this.pages.length;
             this.fillAdjacentFromList();
+            // Opening straight from history lands on a chapter whose shared
+            // chapter-list cache may have expired. Without a list there is no
+            // next/prev, and the reader wrongly claims "latest chapter".
+            // Hydrate it asynchronously and re-derive the neighbours.
+            this.loadChaptersIfEmpty();
             this.saveHistory();
             this.preloadUpcomingPages();
             // Silently prefetch next chapter in background for 0-delay instant reading
@@ -65,10 +74,71 @@
         // advance to the next chapter.
         fillAdjacentFromList() {
             if (!Array.isArray(this.chapters) || !this.chapters.length) return;
-            const idx = this.chapters.findIndex(c => c.id === this.currentChapter.id);
+            let idx = this.chapters.findIndex(c => c.id === this.currentChapter.id);
+            // A history entry can carry an id that no longer exists (provider
+            // reshuffle), so fall back to the chapter number.
+            if (idx < 0 && this.currentChapter.chapter) {
+                const num = parseFloat(this.currentChapter.chapter);
+                if (!isNaN(num)) {
+                    idx = this.chapters.findIndex(c => parseFloat(c.chapter) === num);
+                    if (idx >= 0) {
+                        const match = this.chapters[idx];
+                        this.currentChapter = Object.assign({}, this.currentChapter, {
+                            id: match.id,
+                            provider: match.provider || this.currentChapter.provider,
+                            chapter: match.chapter || this.currentChapter.chapter,
+                        });
+                    }
+                }
+            }
             if (idx < 0) return;
+            // Descending list: index-1 is the newer chapter.
             if (!this.nextChapter && idx > 0) this.nextChapter = this.chapters[idx - 1];
             if (!this.prevChapter && idx < this.chapters.length - 1) this.prevChapter = this.chapters[idx + 1];
+        },
+
+        // Fetch the chapter list when the server rendered the reader without
+        // one (cold/expired cache, direct link from history). Retries a few
+        // times because the first aggregation may come back partial/empty.
+        async loadChaptersIfEmpty() {
+            if (this.chapters.length || this.chaptersLoading) {
+                if (this.chapters.length) this.autoContinueWhenLoaded = false;
+                return;
+            }
+            this.chaptersLoading = true;
+            try {
+                const res = await fetch(this.chaptersUrl, { headers: { Accept: 'application/json' } });
+                if (res.ok) {
+                    const data = await res.json();
+                    const wanted = this.currentChapter.language || null;
+                    let list = Array.isArray(data.chapters) ? data.chapters : [];
+                    if (wanted) {
+                        const sameLang = list.filter(c => (c.language || 'en') === wanted);
+                        if (sameLang.length) list = sameLang;
+                    }
+                    if (list.length) {
+                        this.chapters = list;
+                        const latest = parseFloat(list[0].chapter);
+                        if (!isNaN(latest)) this.latestChapNum = latest;
+                        this.fillAdjacentFromList();
+                        // The visitor explicitly tried to continue before the
+                        // list was known: follow through now that it is.
+                        if (this.autoContinueWhenLoaded && this.nextChapter) {
+                            this.autoContinueWhenLoaded = false;
+                            this.goToNextChapter();
+                            return;
+                        }
+                        this.autoContinueWhenLoaded = false;
+                        setTimeout(() => this.prefetchAdjacentChapters(), 400);
+                    }
+                }
+            } catch (e) {}
+            this.chaptersLoading = false;
+            // Still nothing? Try again shortly (partial aggregation).
+            if (!this.chapters.length && this.chaptersTries < 4) {
+                this.chaptersTries++;
+                setTimeout(() => this.loadChaptersIfEmpty(), 5000);
+            }
         },
 
         saveHistory() {
@@ -83,6 +153,8 @@
                     chapterNumber: this.currentChapter.chapter,
                     chapterTitle: this.currentChapter.title || '',
                     source: this.currentChapter.provider || 'MangaDex',
+                    language: this.currentChapter.language || 'id',
+                    readPath: this.currentChapter.readPath || null,
                     readAt: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) + ', ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                 });
                 if (hist.length > 50) hist = hist.slice(0, 50);
@@ -149,11 +221,22 @@
             // Arm only after the reader has scrolled a little, then require
             // the bottom to stay visible for a moment so a fast fling does
             // not skip the final panels.
-            if (this.mode !== 'webtoon' || this.autoNextDone || !this.nextChapter) {
+            if (this.mode !== 'webtoon' || this.autoNextDone) {
                 this.bottomSince = 0;
                 return;
             }
             const nearBottom = top + h.clientHeight >= height - 80;
+            if (!this.nextChapter) {
+                // No neighbour known yet (cold chapter-list cache). Keep the
+                // reader from claiming the series ended; load the list and
+                // continue once it is known.
+                this.bottomSince = 0;
+                if (nearBottom && !this.chaptersLoading) {
+                    this.autoContinueWhenLoaded = true;
+                    this.loadChaptersIfEmpty();
+                }
+                return;
+            }
             if (!nearBottom) {
                 this.bottomSince = 0;
                 if (this.progress > 5) this.autoNextArmed = true;
@@ -333,6 +416,11 @@
                 this.preloadUpcomingPages();
             } else if (this.nextChapter) {
                 this.goToNextChapter();
+            } else if (!this.chapters.length) {
+                // Chapter list still unknown (opened from history on a cold
+                // cache). Load it, then continue automatically.
+                this.autoContinueWhenLoaded = true;
+                this.loadChaptersIfEmpty();
             }
         },
 
@@ -601,8 +689,11 @@
                     <span class="text-white/70">Ch. <span x-text="nextChapter ? nextChapter.chapter : ''"></span></span>
                     <span class="material-symbols-rounded text-lg">arrow_forward</span>
                 </button>
-                <p x-show="!nextChapter" class="text-sm font-semibold text-white/50">
+                <p x-show="!nextChapter && chapters.length > 0" class="text-sm font-semibold text-white/50">
                     You have reached the latest chapter.
+                </p>
+                <p x-show="!nextChapter && chapters.length === 0" class="text-sm font-semibold text-white/50">
+                    Memuat daftar chapter…
                 </p>
                 <p x-show="nextChapter" class="mt-2 text-[11px] font-medium text-white/35">
                     Keep scrolling to continue automatically.
@@ -699,8 +790,11 @@
                     <span class="text-white/70">Ch. <span x-text="nextChapter ? nextChapter.chapter : ''"></span></span>
                     <span class="material-symbols-rounded text-lg">arrow_forward</span>
                 </button>
-                <p x-show="!nextChapter" class="rounded-full bg-black/70 px-4 py-2 text-xs font-semibold text-white/70">
+                <p x-show="!nextChapter && chapters.length > 0" class="rounded-full bg-black/70 px-4 py-2 text-xs font-semibold text-white/70">
                     You have reached the latest chapter.
+                </p>
+                <p x-show="!nextChapter && chapters.length === 0" class="rounded-full bg-black/70 px-4 py-2 text-xs font-semibold text-white/70">
+                    Memuat daftar chapter…
                 </p>
             </div>
         </div>
