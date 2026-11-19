@@ -551,6 +551,7 @@
         </div>
     </div>
 
+    @include('partials.animated-favicon')
 </body>
 </html>
 

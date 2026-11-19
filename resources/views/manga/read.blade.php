@@ -815,5 +815,6 @@
         <span class="material-symbols-rounded text-xl">arrow_upward</span>
     </button>
 
+    @include('partials.animated-favicon')
 </body>
 </html>
