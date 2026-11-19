@@ -5,7 +5,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>{{ $title ?? 'BiblioManga — Read Manga Online Without Limits' }}</title>
+    <title>{{ $title ?? 'BiblioManga - Read Manga Online Without Limits' }}</title>
+
+    {{-- Animated site icon. The ICO is the static fallback for Safari. --}}
+    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/gif" href="{{ asset('favicon.gif') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
     <meta name="description" content="Read manga, manhwa, and manhua online for free on BiblioManga. Trending titles, full chapter lists, and fast updates.">
     <meta name="theme-color" content="#0f766e">
     <meta name="color-scheme" content="light">
