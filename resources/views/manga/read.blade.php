@@ -58,7 +58,7 @@
             this.fillAdjacentFromList();
             // Opening straight from history lands on a chapter whose shared
             // chapter-list cache may have expired. Without a list there is no
-            // next/prev, and the reader wrongly claims "latest chapter".
+            // next/prev, and the reader wrongly claims the series ended.
             // Hydrate it asynchronously and re-derive the neighbours.
             this.loadChaptersIfEmpty();
             this.saveHistory();
