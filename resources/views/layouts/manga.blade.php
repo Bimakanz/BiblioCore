@@ -22,7 +22,8 @@
         <link rel="preconnect" href="https://i.ytimg.com" crossorigin>
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     @endif
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Material+Symbols+Rounded:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:wght@300;400;500;600&display=swap" rel="stylesheet">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -103,7 +104,7 @@
     </style>
 </head>
 <body class="relative min-h-screen bg-[#f6f1e8] text-[#24323f] antialiased selection:bg-[#0f766e] selection:text-white"
-      style="font-family: 'Inter', sans-serif;"
+      style="font-family: 'Plus Jakarta Sans', system-ui, sans-serif;"
       x-data="{ 
           favorites: JSON.parse(localStorage.getItem('bibliomanga_favs') || '[]'),
           favModalOpen: false,
@@ -111,6 +112,23 @@
           animeHistory: JSON.parse(localStorage.getItem('biblioanime_history') || '[]'),
           isAnimeMode: {{ request()->is('anime') || request()->is('anime/*') ? 'true' : 'false' }},
           historyModalOpen: false,
+          railCollapsed: JSON.parse(localStorage.getItem('biblio_rail_collapsed') || 'false'),
+          toggleRail() {
+              this.railCollapsed = !this.railCollapsed;
+              localStorage.setItem('biblio_rail_collapsed', JSON.stringify(this.railCollapsed));
+          },
+          continueHref(item) {
+              if (!item) return '/';
+              if (item.episodeId !== undefined || item.episodeNumber !== undefined) {
+                  return '/anime/' + item.id + '/watch?ep=' + encodeURIComponent(item.episodeId || '') + '&n=' + encodeURIComponent(item.episodeNumber || 1) + '&t=' + Math.max(0, Math.floor((item.positionSec || 0) - 5));
+              }
+              let url = '/manga/' + item.id + '/chapter/' + item.chapterId + '?ch=' + encodeURIComponent(item.chapterNumber || '') + '&source=' + encodeURIComponent(item.source || 'MangaDex');
+              if (item.language) url += '&lang=' + encodeURIComponent(item.language);
+              if (item.readPath) {
+                  try { url += '&p=' + encodeURIComponent(btoa(item.readPath)); } catch (e) {}
+              }
+              return url;
+          },
           loadHistory() {
               this.readingHistory = JSON.parse(localStorage.getItem('bibliomanga_history') || '[]');
           },
@@ -201,223 +219,140 @@
         $searchPlaceholder = $isAnimeMode ? 'Search anime titles...' : 'Search manga, manhwa, manhua titles...';
     @endphp
 
-    <!-- Header Navigation -->
-    <header class="sticky top-0 z-40 border-b border-[#e0d9c8] bg-white/85 backdrop-blur-md transition-all">
-        <div class="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-            
-            <!-- Logo Brand -->
-            <a href="{{ $homeRoute }}" class="group">
-                <div class="flex items-center gap-2">
-                    <span class="text-xl sm:text-2xl font-bold tracking-tight text-[#172a37] transition-colors group-hover:text-[#0f766e]" style="font-family: 'Space Grotesk', sans-serif;">
-                        {{ $isAnimeMode ? 'BiblioAnime' : 'BiblioManga' }}
-                    </span>
-                </div>
+    <!-- App shell -->
+    <a href="#siteView"
+       class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[90] focus:rounded-full focus:bg-[#0f766e] focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-white">
+        Skip to content
+    </a>
+
+    <div class="relative flex min-h-screen">
+        <!-- Desktop rail -->
+        <aside id="siteRail"
+               class="biblio-rail sticky top-0 hidden h-screen w-[232px] flex-shrink-0 flex-col border-r border-[#e0d9c8]/80 bg-[#f6f1e8]/95 px-3 py-4 backdrop-blur lg:flex"
+               :class="railCollapsed ? 'is-collapsed' : ''"
+               aria-label="Main navigation">
+            <a href="{{ $homeRoute }}" class="rail-brand flex items-center gap-2.5 rounded-xl px-2 py-2 transition hover:bg-white/70" title="BiblioCore">
+                <span class="grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl bg-[#0f766e] text-sm font-extrabold text-white shadow-sm" style="font-family: 'Plus Jakarta Sans', sans-serif;">B</span>
+                <span class="rail-brand-text min-w-0">
+                    <span class="block truncate text-base font-bold tracking-tight text-[#172a37]">BiblioCore</span>
+                    <span class="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[#84948a]">Manga &amp; Anime</span>
+                </span>
             </a>
 
-            <!-- Search Bar Inline (Desktop Debounced Live Search) -->
-            <div class="hidden md:block flex-1 max-w-md mx-4 relative"
-                 x-data="{
-                    query: '{{ request('q', '') }}',
-                    results: [],
-                    loading: false,
-                    open: false,
-                    async search() {
-                        const q = this.query.trim();
-                        if (q.length < 2) {
-                            this.results = [];
-                            this.open = false;
-                            return;
-                        }
-                        this.loading = true;
-                        try {
-                            const res = await fetch('{{ $liveSearchEndpoint }}?q=' + encodeURIComponent(q));
-                            const data = await res.json();
-                            this.results = data.data || [];
-                            this.open = this.results.length > 0;
-                        } catch(e) {
-                            this.results = [];
-                        } finally {
-                            this.loading = false;
-                        }
-                    }
-                 }"
-                 @click.away="open = false">
-                <form action="{{ $homeRoute }}" method="GET" class="w-full">
-                    @if(request('category'))
-                        <input type="hidden" name="category" value="{{ request('category') }}">
-                    @endif
-                    <div class="relative w-full">
-                        <span class="material-symbols-rounded absolute left-3.5 top-1/2 -translate-y-1/2 text-lg text-[#84948a]">search</span>
-                        <input type="text" name="q" x-model="query"
-                               @input.debounce.300ms="search()"
-                               @focus="if(results.length > 0) open = true"
-                               @keydown.escape="open = false"
-                               placeholder="{{ $searchPlaceholder }}"
-                               autocomplete="off"
-                               class="w-full rounded-full border border-[#dcd2bd] bg-[#fbf9f4] py-2 pl-10 pr-9 text-xs sm:text-sm text-[#172a37] placeholder:text-[#9aa29a] focus:border-[#0f766e] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0f766e]/20 transition" />
-                        
-                        <div x-show="loading" x-cloak class="absolute right-3.5 top-1/2 -translate-y-1/2">
-                            <div class="h-4 w-4 animate-spin rounded-full border-2 border-[#0f766e] border-t-transparent"></div>
-                        </div>
-                    </div>
-                </form>
-
-                <!-- Floating Live Search Results Panel -->
-                <div x-show="open && results.length > 0"
-                     x-cloak
-                     x-transition:enter="transition ease-out duration-150"
-                     x-transition:enter-start="opacity-0 translate-y-2 scale-95"
-                     x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                     x-transition:leave="transition ease-in duration-100"
-                     x-transition:leave-start="opacity-100"
-                     x-transition:leave-end="opacity-0"
-                     class="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl border border-[#dcd2bd] bg-white/95 backdrop-blur-xl p-2 shadow-2xl space-y-1 max-h-[400px] overflow-y-auto custom-scroll">
-                    
-                    <template x-for="item in results" :key="item.id">
-                        <a :href="'{{ $detailBase }}' + item.id"
-                           class="flex items-center gap-3 p-2 rounded-xl transition hover:bg-[#f6ecda]/60 group">
-                            <img :src="item.coverUrl || 'https://via.placeholder.com/60x80?text=No+Cover'"
-                                 class="w-10 h-14 object-cover rounded-lg shadow-sm flex-shrink-0" />
-                            <div class="min-w-0 flex-1">
-                                <h4 class="text-xs sm:text-sm font-bold text-[#172a37] truncate group-hover:text-[#0f766e] transition-colors" x-text="item.title"></h4>
-                                <div class="flex items-center gap-1.5 mt-1">
-                                    <span class="rounded bg-[#0f766e]/10 px-1.5 py-0.5 text-[9px] font-bold text-[#0f766e] uppercase" x-text="item.status || 'Ongoing'"></span>
-                                    <span x-show="item.format && item.format.toLowerCase() === 'novel'"
-                                          class="rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 uppercase">Novel</span>
-                                    <span x-show="item.year" class="text-[10px] text-[#84948a]" x-text="item.year"></span>
-                                </div>
-                            </div>
-                            <span class="material-symbols-rounded text-base text-[#84948a] group-hover:text-[#0f766e] transition">chevron_right</span>
-                        </a>
-                    </template>
-
-                    <a :href="'{{ $searchAllBase }}' + encodeURIComponent(query)"
-                       class="block w-full text-center py-2 text-xs font-bold text-[#0f766e] hover:bg-[#0f766e]/10 rounded-xl transition border-t border-[#e0d9c8] mt-1">
-                        View all search results &rarr;
-                    </a>
-                </div>
-            </div>
-
-            <!-- Quick Navigation & Favorites -->
-            <div class="flex items-center gap-2 sm:gap-3">
-                <!-- History Button -->
-                <button type="button" @click="openHistory()"
-                        class="inline-flex items-center gap-1.5 rounded-full border border-[#0f766e]/30 bg-[#0f766e]/10 px-3.5 py-2.5 sm:py-1.5 text-xs font-semibold text-[#0f766e] transition hover:bg-[#0f766e]/20">
-                    <span class="material-symbols-rounded text-base">history</span>
-                    <span class="hidden sm:inline">History</span>
-                    <span class="rounded-full bg-[#0f766e] text-white text-[10px] px-1.5 py-0.2" x-text="visibleHistory.length" x-show="visibleHistory.length > 0"></span>
-                </button>
-
-                <!-- Favorites Button: manga mode only (favorites are manga-only) -->
-                @if(!$isAnimeMode)
-                <button type="button" @click="favModalOpen = true"
-                        class="inline-flex items-center gap-1 rounded-full border border-[#f97316]/30 bg-[#f97316]/10 px-3.5 py-2.5 sm:py-1.5 text-xs font-semibold text-[#ea580c] transition hover:bg-[#f97316]/20">
-                    <span class="material-symbols-rounded text-base">bookmark</span>
-                    <span class="hidden sm:inline">Favorites</span>
-                    <span class="rounded-full bg-[#ea580c] text-white text-[10px] px-1.5 py-0.2" x-text="favorites.length"></span>
-                </button>
-                @endif
-
-                <!-- Mode Switch: two explicit buttons (Manga / Anime) -->
-                <div class="flex flex-shrink-0 items-center rounded-full border border-[#dcd2bd] bg-[#fbf9f4] p-1" role="group" aria-label="Select mode">
-                    <a href="{{ route('manga.index') }}"
-                       @if(!$isAnimeMode) aria-current="page" @endif
-                       class="whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold leading-none transition sm:px-3 sm:py-1.5 sm:text-xs {{ $isAnimeMode ? 'text-[#6f7e75] hover:text-[#172a37]' : 'bg-[#0f766e] text-white shadow-sm' }}">
-                        Manga
-                    </a>
-                    <a href="{{ route('anime.index') }}"
-                       @if($isAnimeMode) aria-current="page" @endif
-                       class="whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold leading-none transition sm:px-3 sm:py-1.5 sm:text-xs {{ $isAnimeMode ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#6f7e75] hover:text-[#172a37]' }}">
-                        Anime
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <!-- Mobile search row (Debounced Live Search) -->
-        <div class="px-4 pb-3 md:hidden relative"
-             x-data="{
-                query: '{{ request('q', '') }}',
-                results: [],
-                loading: false,
-                open: false,
-                async search() {
-                    const q = this.query.trim();
-                    if (q.length < 2) {
-                        this.results = [];
-                        this.open = false;
-                        return;
-                    }
-                    this.loading = true;
-                    try {
-                        const res = await fetch('{{ $liveSearchEndpoint }}?q=' + encodeURIComponent(q));
-                        const data = await res.json();
-                        this.results = data.data || [];
-                        this.open = this.results.length > 0;
-                    } catch(e) {
-                        this.results = [];
-                    } finally {
-                        this.loading = false;
-                    }
-                }
-             }"
-             @click.away="open = false">
-            <form action="{{ $homeRoute }}" method="GET" class="w-full">
-                @if(request('category'))
-                    <input type="hidden" name="category" value="{{ request('category') }}">
-                @endif
-                <div class="relative w-full">
-                    <span class="material-symbols-rounded absolute left-3 top-1/2 -translate-y-1/2 text-lg text-[#84948a]">search</span>
-                    <input type="text" name="q" x-model="query"
-                           @input.debounce.300ms="search()"
-                           @focus="if(results.length > 0) open = true"
-                           placeholder="{{ $searchPlaceholder }}"
-                           autocomplete="off"
-                           class="w-full rounded-full border border-[#dcd2bd] bg-[#fbf9f4] py-1.5 pl-9 pr-8 text-xs text-[#172a37] placeholder:text-[#9aa29a] focus:border-[#0f766e] focus:bg-white focus:outline-none" />
-                    
-                    <div x-show="loading" x-cloak class="absolute right-3 top-1/2 -translate-y-1/2">
-                        <div class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#0f766e] border-t-transparent"></div>
-                    </div>
-                </div>
-            </form>
-
-            <!-- Floating Mobile Live Search Panel -->
-            <div x-show="open && results.length > 0"
-                 x-cloak
-                 x-transition:enter="transition ease-out duration-150"
-                 x-transition:enter-start="opacity-0 translate-y-2 scale-95"
-                 x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                 x-transition:leave="transition ease-in duration-100"
-                 x-transition:leave-start="opacity-100"
-                 x-transition:leave-end="opacity-0"
-                 class="absolute left-4 right-4 top-full mt-1 z-50 rounded-2xl border border-[#dcd2bd] bg-white/95 backdrop-blur-xl p-2 shadow-2xl space-y-1 max-h-[350px] overflow-y-auto custom-scroll">
-                <template x-for="item in results" :key="item.id">
-                    <a :href="'{{ $detailBase }}' + item.id"
-                       class="flex items-center gap-2.5 p-1.5 rounded-xl transition hover:bg-[#f6ecda]/60">
-                        <img :src="item.coverUrl || 'https://via.placeholder.com/60x80?text=No+Cover'"
-                             class="w-8 h-12 object-cover rounded-md shadow-sm flex-shrink-0" />
-                        <div class="min-w-0 flex-1">
-                            <h4 class="text-xs font-bold text-[#172a37] truncate" x-text="item.title"></h4>
-                            <div class="flex items-center gap-1.5 mt-0.5">
-                                <span class="rounded bg-[#0f766e]/10 px-1 py-0.2 text-[8px] font-bold text-[#0f766e] uppercase" x-text="item.status || 'Ongoing'"></span>
-                                <span x-show="item.format && item.format.toLowerCase() === 'novel'"
-                                      class="rounded bg-amber-500/10 px-1 py-0.2 text-[8px] font-bold text-amber-700 uppercase">Novel</span>
-                            </div>
-                        </div>
-                    </a>
-                </template>
-                <a :href="'{{ $searchAllBase }}' + encodeURIComponent(query)"
-                   class="block w-full text-center py-1.5 text-xs font-bold text-[#0f766e] hover:bg-[#0f766e]/10 rounded-xl transition border-t border-[#e0d9c8] mt-1">
-                    View all results &rarr;
+            <nav class="mt-4 flex flex-col gap-1">
+                <a href="{{ route('manga.index') }}"
+                   class="rail-link relative flex h-10 items-center gap-3 rounded-xl pl-4 pr-3 text-sm font-semibold transition {{ !$isAnimeMode ? 'rail-link-active' : 'text-[#5f6b63] hover:bg-white/70 hover:text-[#172a37]' }}"
+                   @if(!$isAnimeMode) aria-current="page" @endif>
+                    <span class="material-symbols-rounded text-[20px]">menu_book</span>
+                    <span class="rail-label">Manga</span>
                 </a>
-            </div>
-        </div>
-    </header>
+                <a href="{{ route('anime.index') }}"
+                   class="rail-link relative flex h-10 items-center gap-3 rounded-xl pl-4 pr-3 text-sm font-semibold transition {{ $isAnimeMode ? 'rail-link-active' : 'text-[#5f6b63] hover:bg-white/70 hover:text-[#172a37]' }}"
+                   @if($isAnimeMode) aria-current="page" @endif>
+                    <span class="material-symbols-rounded text-[20px]">smart_display</span>
+                    <span class="rail-label">Anime</span>
+                </a>
 
-    <!-- Main Content -->
-    <main class="min-h-[80vh]">
+                <div class="my-2 h-px bg-[#e0d9c8]"></div>
+
+                <button type="button" @click="openHistory()"
+                        class="rail-link relative flex h-10 items-center gap-3 rounded-xl pl-4 pr-3 text-sm font-semibold text-[#5f6b63] transition hover:bg-white/70 hover:text-[#172a37]"
+                        :class="historyModalOpen ? 'rail-link-active' : ''">
+                    <span class="material-symbols-rounded text-[20px]">history</span>
+                    <span class="rail-label flex-1 text-left">History</span>
+                    <span class="rail-label grid h-4 w-4 flex-shrink-0 place-items-center rounded-full bg-[#0f766e] text-[9px] font-bold leading-none text-white"
+                          x-show="visibleHistory.length > 0" x-text="visibleHistory.length"></span>
+                </button>
+                <button type="button" @click="favModalOpen = true"
+                        class="rail-link relative flex h-10 items-center gap-3 rounded-xl pl-4 pr-3 text-sm font-semibold text-[#5f6b63] transition hover:bg-white/70 hover:text-[#172a37]"
+                        :class="favModalOpen ? 'rail-link-active' : ''">
+                    <span class="material-symbols-rounded text-[20px]">bookmark</span>
+                    <span class="rail-label flex-1 text-left">Favorites</span>
+                    <span class="rail-label grid h-4 w-4 flex-shrink-0 place-items-center rounded-full bg-[#ea580c] text-[9px] font-bold leading-none text-white"
+                          x-show="favorites.length > 0" x-text="favorites.length"></span>
+                </button>
+            </nav>
+
+            <button type="button" @click="toggleRail()"
+                    class="rail-collapse mt-auto flex h-9 items-center justify-center gap-2 rounded-xl border border-[#e0d9c8] bg-white/60 text-xs font-bold text-[#5f6b63] transition hover:border-[#0f766e]/40 hover:text-[#0f766e]"
+                    :aria-label="railCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+                    :title="railCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
+                <span class="material-symbols-rounded text-[18px]" x-text="railCollapsed ? 'chevron_right' : 'chevron_left'"></span>
+                <span class="rail-label">Collapse</span>
+            </button>
+        </aside>
+
+        <div class="flex min-w-0 flex-1 flex-col">
+            <!-- Topbar -->
+            <header class="sticky top-0 z-40 border-b border-[#e0d9c8]/80 bg-[#f6f1e8]/90 backdrop-blur-md">
+                <div class="mx-auto flex h-[60px] w-full max-w-[1440px] items-center gap-3 px-4 sm:px-6 lg:px-7">
+                    <a href="{{ $homeRoute }}" class="flex items-center gap-2 lg:hidden">
+                        <span class="grid h-8 w-8 place-items-center rounded-lg bg-[#0f766e] text-xs font-extrabold text-white">B</span>
+                        <span class="text-sm font-bold tracking-tight text-[#172a37]">{{ $isAnimeMode ? 'BiblioAnime' : 'BiblioCore' }}</span>
+                    </a>
+
+                    <div class="hidden min-w-0 flex-1 justify-center md:flex">
+                        @include('partials.live-search', ['variant' => 'topbar'])
+                    </div>
+
+                    <div class="ml-auto flex items-center gap-1.5 sm:gap-2"></div>
+                </div>
+
+                <!-- Mobile search row: always visible -->
+                <div class="px-4 pb-3 sm:px-6 md:hidden">
+                    @include('partials.live-search', ['variant' => 'mobile'])
+                </div>
+            </header>
+
+            <main id="siteView" class="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 pb-28 sm:px-6 lg:px-7 lg:py-8 lg:pb-14">
+
         {{ $slot }}
-    </main>
+            </main>
+        </div>
+    </div>
+
+    <!-- Mobile bottom navigation -->
+    <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-[#e0d9c8] bg-[#f6f1e8]/95 px-2 pt-1.5 pb-safe backdrop-blur-md lg:hidden"
+         aria-label="Navigasi utama">
+        <div class="mx-auto grid max-w-md grid-cols-4 gap-1">
+            <a href="{{ route('manga.index') }}"
+               class="flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition {{ !$isAnimeMode ? 'text-[#0f766e]' : 'text-[#84948a]' }}"
+               @if(!$isAnimeMode) aria-current="page" @endif>
+                <span class="grid h-7 w-12 place-items-center rounded-full {{ !$isAnimeMode ? 'bg-[#0f766e]/10' : '' }}">
+                    <span class="material-symbols-rounded text-[20px]">menu_book</span>
+                </span>
+                Manga
+            </a>
+            <a href="{{ route('anime.index') }}"
+               class="flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition {{ $isAnimeMode ? 'text-[#0f766e]' : 'text-[#84948a]' }}"
+               @if($isAnimeMode) aria-current="page" @endif>
+                <span class="grid h-7 w-12 place-items-center rounded-full {{ $isAnimeMode ? 'bg-[#0f766e]/10' : '' }}">
+                    <span class="material-symbols-rounded text-[20px]">smart_display</span>
+                </span>
+                Anime
+            </a>
+            <button type="button" @click="openHistory()"
+                    class="relative flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition"
+                    :class="historyModalOpen ? 'text-[#0f766e]' : 'text-[#84948a]'">
+                <span class="grid h-7 w-12 place-items-center rounded-full" :class="historyModalOpen ? 'bg-[#0f766e]/10' : ''">
+                    <span class="material-symbols-rounded text-[20px]">history</span>
+                </span>
+                History
+                <span class="absolute right-2 top-0 grid h-4 w-4 place-items-center rounded-full bg-[#0f766e] text-[9px] font-bold leading-none text-white"
+                      x-show="visibleHistory.length > 0" x-text="visibleHistory.length"></span>
+            </button>
+            <button type="button" @click="favModalOpen = true"
+                    class="relative flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition"
+                    :class="favModalOpen ? 'text-[#ea580c]' : 'text-[#84948a]'">
+                <span class="grid h-7 w-12 place-items-center rounded-full" :class="favModalOpen ? 'bg-[#f97316]/10' : ''">
+                    <span class="material-symbols-rounded text-[20px]">bookmark</span>
+                </span>
+                Favorites
+                <span class="absolute right-2 top-0 grid h-4 w-4 place-items-center rounded-full bg-[#ea580c] text-[9px] font-bold leading-none text-white"
+                      x-show="favorites.length > 0" x-text="favorites.length"></span>
+            </button>
+        </div>
+    </nav>
 
     <!-- Favorites Modal (localStorage) -->
     <div x-cloak x-show="favModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
@@ -432,7 +367,7 @@
             <div class="flex items-center justify-between border-b border-[#e0d9c8] pb-3">
                 <div class="flex items-center gap-2">
                     <span class="material-symbols-rounded text-[#f97316]">bookmarks</span>
-                    <h3 class="text-lg font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Your Favorite Manga</h3>
+                    <h3 class="text-lg font-bold text-[#172a37]" style="font-family: 'Plus Jakarta Sans', sans-serif;">Your Favorite Manga</h3>
                 </div>
                 <button type="button" @click="favModalOpen = false" class="text-gray-400 hover:text-gray-600">
                     <span class="material-symbols-rounded">close</span>
@@ -482,7 +417,7 @@
             <div class="flex items-center justify-between border-b border-[#e0d9c8] pb-3">
                 <div class="flex items-center gap-2">
                     <span class="material-symbols-rounded text-[#0f766e]">history</span>
-                    <h3 class="text-lg font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;" x-text="isAnimeMode ? 'Watch History' : 'Reading History'">Reading History</h3>
+                    <h3 class="text-lg font-bold text-[#172a37]" style="font-family: 'Plus Jakarta Sans', sans-serif;" x-text="isAnimeMode ? 'Watch History' : 'Reading History'">Reading History</h3>
                 </div>
                 <button type="button" @click="historyModalOpen = false" class="text-gray-400 hover:text-gray-600 transition">
                     <span class="material-symbols-rounded">close</span>

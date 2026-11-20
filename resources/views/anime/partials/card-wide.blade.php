@@ -16,7 +16,7 @@
         <span class="absolute bottom-3 left-3 rounded-full bg-[#0f766e] px-2.5 py-0.5 text-[10px] font-bold text-white">{{ $anime['status'] }}</span>
     </div>
     <div class="space-y-1.5 p-4">
-        <h3 class="truncate text-sm font-bold text-[#172a37] transition-colors group-hover:text-[#0f766e]" style="font-family: 'Space Grotesk', sans-serif;">{{ $anime['title'] }}</h3>
+        <h3 class="truncate text-sm font-bold text-[#172a37] transition-colors group-hover:text-[#0f766e]" style="font-family: 'Plus Jakarta Sans', sans-serif;">{{ $anime['title'] }}</h3>
         <div class="flex items-center gap-2 text-[11px] font-semibold text-[#84948a]">
             @if($anime['year'])<span>{{ $anime['year'] }}</span><span>&middot;</span>@endif
             @if($anime['episodes'])<span>{{ $anime['episodes'] }} Episodes</span><span>&middot;</span>@endif

@@ -1,6 +1,6 @@
 <section class="space-y-6">
     <header>
-        <h2 class="text-lg font-semibold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
+        <h2 class="text-lg font-semibold text-[#172a37]" style="font-family: 'Plus Jakarta Sans', sans-serif;">
             {{ __('Delete Account') }}
         </h2>
 
@@ -19,7 +19,7 @@
             @csrf
             @method('delete')
 
-            <h2 class="text-lg font-semibold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
+            <h2 class="text-lg font-semibold text-[#172a37]" style="font-family: 'Plus Jakarta Sans', sans-serif;">
                 {{ __('Are you sure you want to delete your account?') }}
             </h2>
 

@@ -6,22 +6,20 @@ use Tests\TestCase;
 
 class AnimeTest extends TestCase
 {
-    public function test_manga_home_shows_switch_to_anime_mode(): void
+    public function test_manga_home_shows_link_to_anime_mode(): void
     {
         $response = $this->get('/');
         $response->assertOk();
-        $response->assertSee('aria-label="Select mode"', false);
         $response->assertSee('href="' . route('anime.index') . '"', false);
         $response->assertSee('Manga', false);
     }
 
-    public function test_anime_home_loads_and_shows_switch_to_manga_mode(): void
+    public function test_anime_home_loads_and_shows_link_to_manga_mode(): void
     {
         $response = $this->get('/anime');
         $response->assertOk();
-        $response->assertSee('aria-label="Select mode"', false);
         $response->assertSee('href="' . route('manga.index') . '"', false);
-        $response->assertSee('BiblioAnime', false);
+        $response->assertSee('Anime', false);
     }
 
     public function test_anime_live_search_short_query_returns_empty(): void

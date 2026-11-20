@@ -12,7 +12,9 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+                sans: ['Plus Jakarta Sans', ...defaultTheme.fontFamily.sans],
+                display: ['Plus Jakarta Sans', ...defaultTheme.fontFamily.sans],
+                mono: ['JetBrains Mono', ...defaultTheme.fontFamily.mono],
             },
             keyframes: {
                 fadeIn: {

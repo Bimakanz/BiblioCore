@@ -1,6 +1,6 @@
 <section>
     <header>
-        <h2 class="text-lg font-semibold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
+        <h2 class="text-lg font-semibold text-[#172a37]" style="font-family: 'Plus Jakarta Sans', sans-serif;">
             {{ __('Profile Information') }}
         </h2>
 

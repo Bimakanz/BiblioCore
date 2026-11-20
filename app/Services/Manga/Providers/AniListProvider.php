@@ -52,7 +52,8 @@ class AniListProvider
      */
     public function getPopular(int $page = 1, int $limit = 24, ?string $category = 'popular', ?string $genre = null): array
     {
-        $cacheKey = "anilist_catalog_{$category}_{$page}_{$limit}_" . md5((string)$genre);
+        // v2: cards now carry bannerUrl, so old catalog entries must not be reused.
+        $cacheKey = "anilist_v2_catalog_{$category}_{$page}_{$limit}_" . md5((string)$genre);
 
         return Cache::remember($cacheKey, 21600, function () use ($page, $limit, $category, $genre) {
             $variables = [
@@ -170,7 +171,7 @@ class AniListProvider
      */
     public function search(string $query, int $page = 1, int $limit = 24, ?string $category = null, ?string $genre = null): array
     {
-        $cacheKey = "anilist_search_" . md5("{$query}_{$page}_{$limit}_{$category}_{$genre}");
+        $cacheKey = "anilist_v2_search_" . md5("{$query}_{$page}_{$limit}_{$category}_{$genre}");
 
         return Cache::remember($cacheKey, 3600, function () use ($query, $page, $limit, $genre) {
             $variables = [
@@ -384,6 +385,7 @@ class AniListProvider
             'altTitles' => $altTitles,
             'description' => $cleanDesc,
             'coverUrl' => $cover,
+            'bannerUrl' => $m['bannerImage'] ?? null,
             'status' => $status,
             'year' => $m['startDate']['year'] ?? null,
             'contentRating' => 'Safe',

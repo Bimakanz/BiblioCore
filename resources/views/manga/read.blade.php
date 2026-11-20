@@ -12,7 +12,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:wght@300;400;500;600&display=swap" rel="stylesheet">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -478,7 +478,7 @@
 
         <!-- Chapter Display -->
         <div class="px-2 select-none text-center">
-            <span class="text-xs sm:text-sm font-bold text-white tracking-wide" style="font-family: 'Space Grotesk', sans-serif;">
+            <span class="font-mono text-xs sm:text-sm font-bold text-white tracking-wide" style="font-family: 'Plus Jakarta Sans', sans-serif;">
                 Ch. <span x-text="currentChapter.chapter"></span>
             </span>
             <span class="text-xs sm:text-sm text-white/40 font-medium">
@@ -580,7 +580,7 @@
                x-transition:leave-end="translate-x-full">
             <div class="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
                 <div class="min-w-0">
-                    <h2 class="text-sm font-bold text-white" style="font-family: 'Space Grotesk', sans-serif;">Chapter List</h2>
+                    <h2 class="text-sm font-bold text-white" style="font-family: 'Plus Jakarta Sans', sans-serif;">Chapter List</h2>
                     <p class="mt-0.5 text-[11px] font-medium text-white/50">
                         Now reading Ch. <span x-text="currentChapter.chapter"></span>
                         &middot; <span x-text="chapters.length"></span> chapters
@@ -599,7 +599,7 @@
                             class="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition"
                             :class="chap.id === currentChapter.id ? 'bg-[#0f766e] text-white' : 'bg-white/5 text-white/80 hover:bg-white/10 hover:text-white'">
                         <span class="min-w-0">
-                            <span class="block text-sm font-bold">Chapter <span x-text="chap.chapter"></span></span>
+                            <span class="block font-mono text-sm font-bold">Chapter <span x-text="chap.chapter"></span></span>
                             <span x-show="chap.title" class="block truncate text-[11px] font-medium opacity-60" x-text="chap.title"></span>
                         </span>
                         <span class="flex-shrink-0 text-[10px] font-bold uppercase tracking-wider opacity-60"
@@ -658,7 +658,7 @@
                         <div x-show="!loaded"
                              class="absolute inset-0 flex flex-col items-center justify-center bg-[#171a1e] text-[#6b766f] space-y-2">
                             <div class="h-8 w-8 animate-spin rounded-full border-2 border-[#0f766e] border-t-transparent"></div>
-                            <span class="text-[11px] font-semibold text-white/40 tracking-wider">Page <span x-text="p.page"></span></span>
+                            <span class="font-mono text-[11px] font-semibold text-white/40 tracking-wider">Page <span x-text="p.page"></span></span>
                         </div>
 
                         <!-- Panel Image -->
@@ -698,7 +698,7 @@
                     You have reached the latest chapter.
                 </p>
                 <p x-show="!nextChapter && chapters.length === 0" class="text-sm font-semibold text-white/50">
-                    Memuat daftar chapter…
+                    Loading chapter list…
                 </p>
                 <p x-show="nextChapter" class="mt-2 text-[11px] font-medium text-white/35">
                     Keep scrolling to continue automatically.
@@ -761,7 +761,7 @@
                         <!-- Skeleton loading -->
                         <div x-show="!pLoaded" class="min-h-[70vh] flex flex-col items-center justify-center text-white/40 space-y-3">
                             <div class="h-8 w-8 animate-spin rounded-full border-2 border-[#0f766e] border-t-transparent"></div>
-                            <span class="text-xs font-semibold text-white/50 tracking-wider">Page <span x-text="p.page"></span></span>
+                            <span class="font-mono text-xs font-semibold text-white/50 tracking-wider">Page <span x-text="p.page"></span></span>
                         </div>
 
                         <!-- Pure Image -->
@@ -799,7 +799,7 @@
                     You have reached the latest chapter.
                 </p>
                 <p x-show="!nextChapter && chapters.length === 0" class="rounded-full bg-black/70 px-4 py-2 text-xs font-semibold text-white/70">
-                    Memuat daftar chapter…
+                    Loading chapter list…
                 </p>
             </div>
         </div>

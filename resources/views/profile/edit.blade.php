@@ -1,7 +1,7 @@
 <x-manga-layout title="Profile Settings — BiblioManga">
     <div class="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 space-y-6">
         <div>
-            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
+            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#172a37]" style="font-family: 'Plus Jakarta Sans', sans-serif;">
                 Profile Settings
             </h1>
             <p class="mt-1 text-sm text-[#4c5b54]">

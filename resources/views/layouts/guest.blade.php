@@ -15,13 +15,13 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:wght@300;400;600&display=swap" rel="stylesheet">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body class="relative min-h-screen overflow-auto bg-[#f6f1e8] text-[#24323f] antialiased" style="font-family: 'Inter', sans-serif;">
+<body class="relative min-h-screen overflow-auto bg-[#f6f1e8] text-[#24323f] antialiased" style="font-family: 'Plus Jakarta Sans', system-ui, sans-serif;">
     <div class="pointer-events-none fixed inset-0 overflow-hidden">
         <div class="absolute -top-40 left-0 h-96 w-96 -translate-x-1/3 rounded-full bg-[#0f766e]/20 blur-3xl"></div>
         <div class="absolute top-32 right-0 h-[30rem] w-[30rem] translate-x-1/4 rounded-full bg-[#f4bb7a]/35 blur-3xl"></div>
@@ -36,7 +36,7 @@
                         <span class="material-symbols-rounded text-sm">auto_stories</span>
                         BiblioManga
                     </span>
-                    <h1 class="text-4xl font-semibold leading-tight text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
+                    <h1 class="text-4xl font-semibold leading-tight text-[#172a37]" style="font-family: 'Plus Jakarta Sans', sans-serif;">
                         Read your favorite manga, manhwa, and manhua without limits.
                     </h1>
                     <p class="text-sm leading-relaxed text-[#4c5b54]">
@@ -69,7 +69,7 @@
                     </span>
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#6b766f]">Account Portal</p>
-                        <h2 class="text-xl font-semibold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">
+                        <h2 class="text-xl font-semibold text-[#172a37]" style="font-family: 'Plus Jakarta Sans', sans-serif;">
                             Sign In to BiblioManga
                         </h2>
                     </div>

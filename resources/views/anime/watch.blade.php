@@ -1,5 +1,5 @@
 <x-manga-layout title="{{ $anime['title'] }} Episode {{ $episodeNumber }} — BiblioAnime">
-    <div class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 space-y-5">
+    <div class="space-y-4">
 
         {{-- Breadcrumb --}}
         <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-[#84948a]">
@@ -10,9 +10,9 @@
             <span class="text-[#172a37]">Episode {{ $episodeNumber }}</span>
         </div>
 
-        <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
             {{-- ===== PLAYER COLUMN ===== --}}
-            <div class="space-y-4 lg:col-span-2">
+            <div class="min-w-0 space-y-4">
                 <div id="playerWrap" class="relative overflow-hidden rounded-[1.75rem] bg-black shadow-[0_25px_60px_-25px_rgba(0,0,0,0.7)] group">
                     <video id="player" class="aspect-video w-full bg-black" crossorigin="anonymous" playsinline controls
                            poster="{{ $anime['bannerUrl'] ?: $anime['coverUrl'] }}"></video>
@@ -23,17 +23,17 @@
                             <img src="{{ asset('images/loading/loading-2.webp') }}" alt="" fetchpriority="high" class="loader-img loader-img-2">
                         </div>
                         <p class="text-sm font-semibold">Loading wait a damn minute wontcha?</p>
-                        <p class="text-xs text-white/60">Sumber langsung tanpa iklan</p>
+                        <p class="text-xs text-white/60">Direct source, no ads</p>
                     </div>
 
                     <div id="playerError" class="absolute inset-0 hidden flex-col items-center justify-center gap-3 bg-black/85 p-6 text-center text-white z-40">
                         <span class="material-symbols-rounded text-4xl text-[#f97316]">error</span>
                         <p id="playerErrorText" class="max-w-md text-sm font-medium">Stream is not available for this episode.</p>
                         <button type="button" id="retryBtn" class="rounded-full bg-[#f97316] px-5 py-2 text-xs font-bold text-white transition hover:bg-[#ea580c]">Try Again</button>
-                        <button type="button" id="embedBtn" class="rounded-full border border-white/25 bg-white/10 px-5 py-2 text-xs font-bold text-white transition hover:bg-white/20">Coba Server Cadangan</button>
+                        <button type="button" id="embedBtn" class="rounded-full border border-white/25 bg-white/10 px-5 py-2 text-xs font-bold text-white transition hover:bg-white/20">Try Backup Server</button>
                         <a id="backToAnimeBtn" href="{{ route('anime.show', ['id' => $anime['id']]) }}"
                            class="hidden rounded-full bg-[#0f766e] px-5 py-2 text-xs font-bold text-white transition hover:bg-[#115e59]">
-                            Kembali ke detail anime
+                            Back to anime details
                         </a>
                     </div>
 
@@ -63,7 +63,7 @@
                 </div>
 
                 <p id="audioNotice" class="hidden rounded-2xl border border-[#f5c99b] bg-[#fff7ed] px-4 py-2 text-xs font-semibold text-[#9a3412]">
-                    Versi Dub untuk episode ini belum tersedia — memutar versi Sub.
+                    The dub for this episode is not available yet — playing the sub version.
                 </p>
 
                 {{-- Control bar --}}
@@ -104,28 +104,36 @@
                 </div>
 
                 <div class="rounded-3xl border border-[#e0d9c8] bg-white p-5 shadow-sm">
-                    <h1 class="text-lg sm:text-xl font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">{{ $anime['title'] }} — Episode {{ $episodeNumber }}</h1>
+                    <h1 class="text-lg sm:text-xl font-bold text-[#172a37]" style="font-family: 'Plus Jakarta Sans', sans-serif;">{{ $anime['title'] }} — Episode {{ $episodeNumber }}</h1>
                     <p class="mt-1 text-xs font-semibold text-[#84948a]">{{ $anime['format'] }} &middot; {{ $anime['status'] }} @if($anime['year']) &middot; {{ $anime['year'] }} @endif @if($anime['score']) &middot; Score {{ $anime['score'] }}/10 @endif</p>
                     <p class="mt-3 text-sm leading-relaxed text-[#4c5b54] line-clamp-3">{{ $anime['description'] }}</p>
                 </div>
             </div>
 
             {{-- ===== RIGHT COLUMN: episodes + recommendations ===== --}}
-            <div class="space-y-5">
-            <aside class="rounded-3xl border border-[#e0d9c8] bg-white p-5 shadow-sm h-fit">
-                <h2 class="mb-3 text-sm font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">Episode List</h2>
-                <div id="epList" class="custom-scroll max-h-[560px] space-y-1.5 overflow-y-auto pr-1">
-                    <div class="space-y-1.5">
-                        @for($i = 0; $i < 8; $i++)
-                            <div class="h-10 animate-pulse rounded-xl bg-[#f1ebd8]"></div>
-                        @endfor
+            <div class="space-y-5 lg:sticky lg:top-[76px] lg:max-h-[calc(100dvh-5.75rem)] lg:overflow-y-auto lg:pr-1 lg:no-scrollbar">
+            <aside class="h-fit overflow-hidden rounded-2xl border border-[#e0d9c8] bg-white shadow-sm"
+                   x-data="{ epOpen: false }">
+                <button type="button" @click="epOpen = !epOpen"
+                        class="flex w-full items-center justify-between gap-2 border-b border-[#e0d9c8] px-4 py-3 text-left lg:cursor-default">
+                    <span class="font-display text-sm font-bold text-[#172a37]">Episode List</span>
+                    <span class="material-symbols-rounded text-base text-[#84948a] transition-transform lg:hidden"
+                          :class="epOpen ? 'rotate-180' : ''">expand_more</span>
+                </button>
+                <div class="p-3" :class="epOpen ? 'block' : 'hidden lg:block'">
+                    <div id="epList" class="custom-scroll max-h-[560px] space-y-1.5 overflow-y-auto pr-1">
+                        <div class="space-y-1.5">
+                            @for($i = 0; $i < 8; $i++)
+                                <div class="h-10 animate-pulse rounded-xl bg-[#f1ebd8]"></div>
+                            @endfor
+                        </div>
                     </div>
                 </div>
             </aside>
 
-            <aside class="rounded-3xl border border-[#e0d9c8] bg-white p-5 shadow-sm h-fit">
-                <h2 class="mb-3 text-sm font-bold text-[#172a37]" style="font-family: 'Space Grotesk', sans-serif;">You Might Like</h2>
-                <p class="mb-3 text-[11px] font-medium text-[#84948a]">Based on genres similar to what you watch</p>
+            <aside class="rounded-2xl border border-[#e0d9c8] bg-white p-4 shadow-sm h-fit">
+                <h2 class="mb-1 font-display text-sm font-bold text-[#172a37]">You Might Like</h2>
+                <p class="mb-3 text-[11px] font-medium text-[#84948a]">Based on genres similar to what you are watching</p>
                 <div id="recoList" class="space-y-2.5">
                     @for($i = 0; $i < 4; $i++)
                         <div class="flex gap-3">
@@ -255,7 +263,7 @@
             idle.classList.remove.apply(idle.classList, AUDIO_ON);
             idle.classList.add.apply(idle.classList, AUDIO_OFF);
             dubBtn.disabled = !dubAvailable && audioValue !== 'dub';
-            dubBtn.title = dubBtn.disabled ? 'Dub belum tersedia untuk judul ini' : '';
+            dubBtn.title = dubBtn.disabled ? 'Dub is not available for this title' : '';
         }
 
         function pickAudio(next) {
@@ -277,14 +285,14 @@
                 const eps = data.episodes || [];
                 const match = eps.find(function (ep) { return Number(ep.number) === Number(EPISODE_NUMBER); });
                 if (!match) {
-                    showError('Versi ' + (audioValue === 'dub' ? 'Dub' : 'Sub') + ' untuk episode ini belum tersedia.');
+                    showError('Versi ' + (audioValue === 'dub' ? 'Dub' : 'Sub') + ' is not available for this episode.');
                     audioValue = audioValue === 'dub' ? 'sub' : 'dub';
                     paintAudioButtons();
                     return;
                 }
                 location.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(match.id) + '&n=' + match.number + '&audio=' + audioValue;
             } catch (e) {
-                showError('Gagal memuat versi ' + (audioValue === 'dub' ? 'Dub' : 'Sub') + '.'); 
+                showError('Failed to load the ' + (audioValue === 'dub' ? 'Dub' : 'Sub') + '.'); 
             }
         }
 
@@ -424,7 +432,7 @@
         // so send the visitor back to the detail page instead.
         function showUnavailable(msg) {
             loadingEl.style.display = 'none';
-            errorText.textContent = msg || 'Judul ini belum punya sumber video di penyedia mana pun.';
+            errorText.textContent = msg || 'This title has no video source on any provider.';
             errorEl.style.display = 'flex';
             const retry = document.getElementById('retryBtn');
             const backup = document.getElementById('embedBtn');
@@ -653,12 +661,12 @@
                 const res = await fetch(STREAM_URL);
                 data = await res.json();
             } catch (e) {
-                showError('Tidak bisa menghubungi layanan streaming. Periksa koneksi lalu coba lagi.');
+                showError('Could not reach the streaming service. Check your connection and try again.');
                 return;
             }
             if (!data || !data.source) {
                 if (data && data.unavailable) {
-                    showUnavailable(data.error || 'Judul ini belum punya sumber video di penyedia mana pun.');
+                    showUnavailable(data.error || 'This title has no video source on any provider.');
                 } else {
                     showError((data && data.error) || 'All servers were tried automatically, but none could play this episode. Please try again later.');
                 }
