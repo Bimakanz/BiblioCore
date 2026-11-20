@@ -267,7 +267,7 @@ class AnimeService
     public function homeSections(): array
     {
         $season = $this->currentSeason();
-        $cacheKey = 'anilist_anime_home_v2_' . $season['season'] . '_' . $season['year'];
+        $cacheKey = 'anilist_anime_home_v3_' . $season['season'] . '_' . $season['year'];
 
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
@@ -301,7 +301,7 @@ class AnimeService
               externalLinks { site type }';
 
         $gql = 'query {
-          trending: Page(page: 1, perPage: 10) {
+          trending: Page(page: 1, perPage: 12) {
             media(type: ANIME, sort: TRENDING_DESC, isAdult: false) {' . $fields . '}
           }
           season: Page(page: 1, perPage: 12) {

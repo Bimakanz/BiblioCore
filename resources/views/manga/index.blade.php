@@ -25,7 +25,7 @@
                     <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[#84948a]">Pick up where you left off</p>
                     <h2 class="font-display text-xl font-bold text-[#172a37] sm:text-2xl">Continue Reading</h2>
                 </div>
-                <button type="button" @click="openHistory()" class="text-xs font-bold text-[#0f766e] hover:underline">View all history &rarr;</button>
+                <x-section-link @click="openHistory()">View all history</x-section-link>
             </div>
 
             <div class="rail-x no-scrollbar">
