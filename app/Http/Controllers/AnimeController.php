@@ -82,7 +82,7 @@ class AnimeController extends Controller
             'mode' => 'home',
             'hero' => $hero,
             'trending' => $sections['trending'] ?? [],
-            'seasonPopular' => $sections['season'] ?? [],
+            'seasonPopular' => array_slice($sections['season'] ?? [], 0, 12),
             'topRated' => $sections['top'] ?? [],
             'upcoming' => $sections['upcoming'] ?? [],
             'genres' => $this->animeService->getGenres(),

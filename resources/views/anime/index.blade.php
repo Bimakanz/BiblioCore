@@ -174,7 +174,7 @@
                         </div>
                         <x-section-link :href="route('anime.index', ['category' => 'season'])">View all</x-section-link>
                     </div>
-                    <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                    <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                         @foreach($seasonPopular as $anime)
                             @include('anime.partials.card-poster', ['anime' => $anime])
                         @endforeach
