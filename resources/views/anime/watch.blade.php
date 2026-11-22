@@ -97,10 +97,19 @@
                     </div>
                     <div class="flex items-center gap-1.5">
                         <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Subtitle Offset</span>
-                        <button type="button" id="subMinus" class="rounded-full border border-[#dcd2bd] bg-white px-2.5 py-1 text-xs font-bold text-[#172a37] transition hover:border-[#0f766e]/50">-0,5s</button>
-                        <span id="subOffsetLabel" class="min-w-[38px] text-center text-xs font-bold text-[#0f766e]">0s</span>
-                        <button type="button" id="subPlus" class="rounded-full border border-[#dcd2bd] bg-white px-2.5 py-1 text-xs font-bold text-[#172a37] transition hover:border-[#0f766e]/50">+0,5s</button>
+                        <button type="button" id="subMinus"
+                                class="rounded-full border border-[#dcd2bd] bg-white px-2.5 py-1 font-mono text-xs font-bold text-[#172a37] transition hover:border-[#0f766e]/50 hover:text-[#0f766e]"
+                                title="Show subtitles 0.5s earlier — hold Shift for 0.1s">&minus;0.5s</button>
+                        <button type="button" id="subOffsetLabel"
+                                class="min-w-[46px] rounded-full px-2 py-1 text-center font-mono text-xs font-bold text-[#0f766e] transition hover:bg-[#0f766e]/10"
+                                title="Subtitle offset — tap to reset to 0s">0s</button>
+                        <button type="button" id="subPlus"
+                                class="rounded-full border border-[#dcd2bd] bg-white px-2.5 py-1 font-mono text-xs font-bold text-[#172a37] transition hover:border-[#0f766e]/50 hover:text-[#0f766e]"
+                                title="Show subtitles 0.5s later — hold Shift for 0.1s">+0.5s</button>
                     </div>
+                    <p class="w-full text-[10px] font-medium text-[#84948a]">
+                        Out of sync? <span class="font-bold text-[#172a37]">&minus;</span> shows the subtitles earlier, <span class="font-bold text-[#172a37]">+</span> shows them later. Tap the value to reset.
+                    </p>
                 </div>
 
                 <div class="rounded-3xl border border-[#e0d9c8] bg-white p-5 shadow-sm">
@@ -201,6 +210,10 @@
         const SKIP_TIMES_URL = @json(route('anime.skip-times.json', ['id' => $anime['id']]));
         const URL_T = {{ (int) request()->query('t', 0) }};
         const HISTORY_KEY = 'biblioanime_history';
+        // Subtitle sync is remembered per anime: every episode of a series
+        // usually comes from the same release, so it carries the same
+        // constant delay.
+        const SUB_OFFSET_PREFIX = 'biblioanime_sub_offset_';
 
         const video = document.getElementById('player');
         const loadingEl = document.getElementById('playerLoading');
@@ -317,7 +330,7 @@
         let skipTimesLoaded = false;
         let nextEpisodeUrl = null;
         let autoNextDone = false;
-        let subOffset = 0;
+        let subOffset = readSubOffset();
         let lastSavedAt = 0;
         let resumeApplied = false;
         let resumeOverride = 0;
@@ -558,7 +571,12 @@
                         } catch (e) {}
                     }
                 };
-                track.addEventListener('load', liftCues);
+                track.addEventListener('load', function () {
+                    liftCues();
+                    // Cues may finish parsing long after the offset was set:
+                    // re-apply it to every track as soon as this one loads.
+                    applySubOffset();
+                });
                 track.addEventListener('cuechange', liftCues);
                 video.appendChild(track);
                 const opt = document.createElement('button');
@@ -592,6 +610,9 @@
             video.querySelectorAll('track').forEach((el, i) => {
                 el.track.mode = (i === idx) ? 'showing' : 'disabled';
             });
+            // Browsers reset cue timings when a track is re-shown; re-apply
+            // the viewer's offset so sync survives channel switching.
+            applySubOffset();
             if (!persist) return;
             if (idx >= 0 && currentSubtitles[idx]) {
                 localStorage.setItem('biblioanime_sub_lang', subtitleLanguage(currentSubtitles[idx], idx));
@@ -626,23 +647,86 @@
             applySubtitle(target);
         }
 
-        function shiftSubtitles(delta) {
-            subOffset = Math.round((subOffset + delta) * 10) / 10;
-            document.getElementById('subOffsetLabel').textContent = (subOffset > 0 ? '+' : '') + String(subOffset).replace('.', ',') + 's';
+        // ===== Subtitle sync =====
+        // Cue timestamps are shifted from a cached base (never from the
+        // already-shifted value), so repeated taps cannot drift and the
+        // result stays precise. Every track is shifted, not just the visible
+        // one, and the choice is remembered per anime so the next episode of
+        // the same release starts in sync too.
+        function readSubOffset() {
+            try {
+                const raw = parseFloat(localStorage.getItem(SUB_OFFSET_PREFIX + ANIME.id) || '0');
+                return isFinite(raw) ? Math.round(raw * 10) / 10 : 0;
+            } catch (e) {
+                return 0;
+            }
+        }
+
+        function paintSubOffset() {
+            const label = document.getElementById('subOffsetLabel');
+            if (!label) return;
+            const magnitude = Math.abs(subOffset).toFixed(1).replace(/\.0$/, '');
+            label.textContent = (subOffset > 0 ? '+' : subOffset < 0 ? '\u2212' : '') + magnitude + 's';
+            label.classList.toggle('text-[#f97316]', subOffset !== 0);
+            label.classList.toggle('text-[#0f766e]', subOffset === 0);
+            label.classList.toggle('bg-[#f97316]/10', subOffset !== 0);
+            label.title = subOffset === 0
+                ? 'Subtitles are on their original timing. Tap to reset.'
+                : 'Offset ' + label.textContent + '. Tap to reset to 0s.';
+        }
+
+        function cueBase(cue) {
+            if (cue.__bibStart === undefined) {
+                cue.__bibStart = cue.startTime;
+                cue.__bibEnd = cue.endTime;
+            }
+            return [cue.__bibStart, cue.__bibEnd];
+        }
+
+        function applySubOffset() {
             const tracks = video.textTracks;
+            if (!tracks) return;
             for (let i = 0; i < tracks.length; i++) {
-                if (tracks[i].mode === 'showing' && tracks[i].cues) {
-                    for (let j = 0; j < tracks[i].cues.length; j++) {
-                        try {
-                            tracks[i].cues[j].startTime = Math.max(0, tracks[i].cues[j].startTime + delta);
-                            tracks[i].cues[j].endTime = Math.max(0, tracks[i].cues[j].endTime + delta);
-                        } catch (e) {}
-                    }
+                const cues = tracks[i].cues;
+                if (!cues) continue;
+                for (let j = 0; j < cues.length; j++) {
+                    const base = cueBase(cues[j]);
+                    const start = Math.max(0, base[0] + subOffset);
+                    const end = Math.max(start + 0.02, base[1] + subOffset);
+                    try {
+                        // Grow the end first when shifting later, the start
+                        // first when shifting earlier: the cue never becomes
+                        // invalid (end < start) mid-update.
+                        if (subOffset >= 0) {
+                            cues[j].endTime = end;
+                            cues[j].startTime = start;
+                        } else {
+                            cues[j].startTime = start;
+                            cues[j].endTime = end;
+                        }
+                    } catch (e) {}
                 }
             }
         }
-        document.getElementById('subMinus').addEventListener('click', () => shiftSubtitles(-0.5));
-        document.getElementById('subPlus').addEventListener('click', () => shiftSubtitles(0.5));
+
+        function setSubOffset(value) {
+            subOffset = Math.round(Math.max(-30, Math.min(30, value)) * 10) / 10;
+            try {
+                if (subOffset === 0) localStorage.removeItem(SUB_OFFSET_PREFIX + ANIME.id);
+                else localStorage.setItem(SUB_OFFSET_PREFIX + ANIME.id, String(subOffset));
+            } catch (e) {}
+            paintSubOffset();
+            applySubOffset();
+        }
+
+        function nudgeSubtitles(delta) {
+            setSubOffset(subOffset + delta);
+        }
+
+        paintSubOffset();
+        document.getElementById('subMinus').addEventListener('click', function (e) { nudgeSubtitles(e.shiftKey ? -0.1 : -0.5); });
+        document.getElementById('subPlus').addEventListener('click', function (e) { nudgeSubtitles(e.shiftKey ? 0.1 : 0.5); });
+        document.getElementById('subOffsetLabel').addEventListener('click', function () { setSubOffset(0); });
 
         // Automatic source failover: the backend walks every provider for us
         // (and the same episode in the chosen audio), so the player no longer
