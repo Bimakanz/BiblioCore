@@ -261,20 +261,37 @@ $headers = ['Accept: application/json'];
             $this->extra->rememberTitles($anilistId, $anime);
         }
 
-        $cacheKey = "anivexa_episodes_v3_{$anilistId}_{$audio}";
+        $cacheKey = "anivexa_episodes_v4_{$anilistId}_{$audio}";
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && !empty($cached['episodes'])
             && ($expected === null || $expected <= 0 || count($cached['episodes']) >= $expected)) {
             return $cached;
         }
 
-        // AniList already tells us how many episodes aired. The resolver's
-        // aggregate endpoint needs ~30 s for that same information (and even
-        // longer for long-running titles), so the numbered list is built
-        // locally and playback resolves each episode on demand through the
-        // deterministic watch path. Only titles with an unknown count ask
-        // the resolver for its aggregate.
-        $responses = $expected === null ? $this->fetchProviderEpisodes($anilistId) : [];
+        // AniList already tells us how many episodes aired. Build the
+        // deterministic Anivexa watch paths immediately so playback hits our
+        // self-hosted api-eps-nine.vercel.app (direct HLS) instead of getting
+        // hijacked by AnimeHeaven/Samehadaku scrapers.
+        if ($expected !== null && $expected > 0) {
+            $audioAvailable = $this->audioAvailability($anilistId);
+            $audioAvailable[$audio] = true;
+            $synthetic = $this->syntheticEpisodes($anilistId, $expected, $audio);
+            if (!empty($synthetic)) {
+                $result = [
+                    'provider' => $this->priority[0] ?? 'anikoto',
+                    'providers' => $this->priority,
+                    'episodes' => $synthetic,
+                    'audio' => $audio,
+                    'audioAvailable' => array_merge($audioAvailable, [$audio => true]),
+                    'synthetic' => true,
+                ];
+                Cache::put($cacheKey, $result, 3600);
+
+                return $result;
+            }
+        }
+
+        $responses = $this->fetchProviderEpisodes($anilistId);
 
         // Audio availability comes from the same response: providers expose
         // separate `episodes.sub` / `episodes.dub` arrays, so a title can
