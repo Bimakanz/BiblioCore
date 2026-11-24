@@ -177,6 +177,7 @@ class AnimeService
               trailer { id site thumbnail }
               status
               episodes
+              nextAiringEpisode { episode }
               duration
               averageScore
               season
@@ -291,6 +292,7 @@ class AnimeService
               trailer { id site thumbnail }
               status
               episodes
+              nextAiringEpisode { episode }
               duration
               averageScore
               season
@@ -490,6 +492,9 @@ class AnimeService
             'year' => $m['startDate']['year'] ?? $m['seasonYear'] ?? null,
             'season' => isset($m['season']) ? ucfirst(strtolower($m['season'])) . ' ' . ($m['seasonYear'] ?? '') : null,
             'episodes' => $m['episodes'] ?? null,
+            'airedEpisodes' => isset($m['nextAiringEpisode']['episode'])
+                ? max(0, (int) $m['nextAiringEpisode']['episode'] - 1)
+                : null,
             'duration' => $m['duration'] ?? null,
             'score' => isset($m['averageScore']) && $m['averageScore'] ? round($m['averageScore'] / 10, 1) : null,
             'genres' => $m['genres'] ?? [],

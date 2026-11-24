@@ -22,8 +22,8 @@
         <link rel="preconnect" href="https://i.ytimg.com" crossorigin>
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     @endif
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:wght@400&display=swap" rel="stylesheet">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -112,11 +112,6 @@
           animeHistory: JSON.parse(localStorage.getItem('biblioanime_history') || '[]'),
           isAnimeMode: {{ request()->is('anime') || request()->is('anime/*') ? 'true' : 'false' }},
           historyModalOpen: false,
-          railCollapsed: JSON.parse(localStorage.getItem('biblio_rail_collapsed') || 'false'),
-          toggleRail() {
-              this.railCollapsed = !this.railCollapsed;
-              localStorage.setItem('biblio_rail_collapsed', JSON.stringify(this.railCollapsed));
-          },
           continueHref(item) {
               if (!item) return '/';
               if (item.episodeId !== undefined || item.episodeNumber !== undefined) {
@@ -203,11 +198,12 @@
           }
       }">
 
-    <!-- Ambient background glows -->
-    <div class="pointer-events-none fixed inset-0 overflow-hidden -z-10">
-        <div class="absolute -top-40 -left-24 h-96 w-96 rounded-full bg-[#f1bc7a]/30 blur-3xl"></div>
-        <div class="absolute top-24 right-0 h-[28rem] w-[28rem] translate-x-1/4 rounded-full bg-[#0f766e]/20 blur-3xl"></div>
-        <div class="absolute bottom-10 left-1/2 h-[22rem] w-[22rem] -translate-x-1/2 rounded-full bg-[#fde68a]/30 blur-3xl"></div>
+    <!-- Ambient background glows (pure radial gradients: same look, zero blur-3xl GPU cost) -->
+    <div class="pointer-events-none fixed inset-0 -z-10"
+         style="background:
+             radial-gradient(36rem circle at 4% -6%, rgba(241, 188, 122, 0.28), transparent 65%),
+             radial-gradient(40rem circle at 98% 22%, rgba(15, 118, 110, 0.16), transparent 65%),
+             radial-gradient(30rem circle at 50% 94%, rgba(253, 230, 138, 0.28), transparent 65%);">
     </div>
 
     @php
@@ -225,130 +221,113 @@
         Skip to content
     </a>
 
-    <div class="relative flex min-h-screen">
-        <!-- Desktop rail -->
-        <aside id="siteRail"
-               class="biblio-rail sticky top-0 hidden h-screen w-[232px] flex-shrink-0 flex-col border-r border-[#e0d9c8]/80 bg-[#f6f1e8]/95 px-3 py-4 backdrop-blur lg:flex"
-               :class="railCollapsed ? 'is-collapsed' : ''"
-               aria-label="Main navigation">
-            <a href="{{ $homeRoute }}" class="rail-brand flex items-center gap-2.5 rounded-xl px-2 py-2 transition hover:bg-white/70" title="BiblioCore">
-                <span class="grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl bg-[#0f766e] text-sm font-extrabold text-white shadow-sm" style="font-family: 'Plus Jakarta Sans', sans-serif;">B</span>
-                <span class="rail-brand-text min-w-0">
-                    <span class="block truncate text-base font-bold tracking-tight text-[#172a37]">BiblioCore</span>
-                    <span class="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[#84948a]">Manga &amp; Anime</span>
-                </span>
-            </a>
-
-            <nav class="mt-4 flex flex-col gap-1">
-                <a href="{{ route('manga.index') }}"
-                   class="rail-link relative flex h-10 items-center gap-3 rounded-xl pl-4 pr-3 text-sm font-semibold transition {{ !$isAnimeMode ? 'rail-link-active' : 'text-[#5f6b63] hover:bg-white/70 hover:text-[#172a37]' }}"
-                   @if(!$isAnimeMode) aria-current="page" @endif>
-                    <span class="material-symbols-rounded text-[20px]">menu_book</span>
-                    <span class="rail-label">Manga</span>
-                </a>
-                <a href="{{ route('anime.index') }}"
-                   class="rail-link relative flex h-10 items-center gap-3 rounded-xl pl-4 pr-3 text-sm font-semibold transition {{ $isAnimeMode ? 'rail-link-active' : 'text-[#5f6b63] hover:bg-white/70 hover:text-[#172a37]' }}"
-                   @if($isAnimeMode) aria-current="page" @endif>
-                    <span class="material-symbols-rounded text-[20px]">smart_display</span>
-                    <span class="rail-label">Anime</span>
+    <div class="relative flex min-h-screen flex-col">
+        <!-- Standard top navbar -->
+        <header class="sticky top-0 z-40 border-b border-[#e0d9c8]/80 bg-[#f6f1e8]/95 backdrop-blur-sm">
+            <div class="mx-auto flex h-14 w-full max-w-[1440px] items-center gap-3 px-4 sm:px-6 lg:h-16 lg:gap-5 lg:px-7">
+                <!-- Brand -->
+                <a href="{{ $homeRoute }}" class="flex flex-shrink-0 items-center gap-2.5" title="BiblioCore">
+                    <span class="grid h-8 w-8 place-items-center rounded-xl bg-[#0f766e] text-xs font-extrabold text-white shadow-sm lg:h-9 lg:w-9 lg:text-sm" style="font-family: 'Plus Jakarta Sans', sans-serif;">B</span>
+                    <span class="min-w-0">
+                        <span class="block text-sm font-bold tracking-tight text-[#172a37] lg:text-base">{{ $isAnimeMode ? 'BiblioAnime' : 'BiblioCore' }}</span>
+                        <span class="hidden text-[10px] font-semibold uppercase tracking-[0.16em] text-[#84948a] lg:block">Manga &amp; Anime</span>
+                    </span>
                 </a>
 
-                <div class="my-2 h-px bg-[#e0d9c8]"></div>
-
-                <button type="button" @click="openHistory()"
-                        class="rail-link relative flex h-10 items-center gap-3 rounded-xl pl-4 pr-3 text-sm font-semibold text-[#5f6b63] transition hover:bg-white/70 hover:text-[#172a37]"
-                        :class="historyModalOpen ? 'rail-link-active' : ''">
-                    <span class="material-symbols-rounded text-[20px]">history</span>
-                    <span class="rail-label flex-1 text-left">History</span>
-                    <span class="rail-label grid h-4 w-4 flex-shrink-0 place-items-center rounded-full bg-[#0f766e] text-[9px] font-bold leading-none text-white"
-                          x-show="visibleHistory.length > 0" x-text="visibleHistory.length"></span>
-                </button>
-                <button type="button" @click="favModalOpen = true"
-                        class="rail-link relative flex h-10 items-center gap-3 rounded-xl pl-4 pr-3 text-sm font-semibold text-[#5f6b63] transition hover:bg-white/70 hover:text-[#172a37]"
-                        :class="favModalOpen ? 'rail-link-active' : ''">
-                    <span class="material-symbols-rounded text-[20px]">bookmark</span>
-                    <span class="rail-label flex-1 text-left">Favorites</span>
-                    <span class="rail-label grid h-4 w-4 flex-shrink-0 place-items-center rounded-full bg-[#ea580c] text-[9px] font-bold leading-none text-white"
-                          x-show="favorites.length > 0" x-text="favorites.length"></span>
-                </button>
-            </nav>
-
-            <button type="button" @click="toggleRail()"
-                    class="rail-collapse mt-auto flex h-9 items-center justify-center gap-2 rounded-xl border border-[#e0d9c8] bg-white/60 text-xs font-bold text-[#5f6b63] transition hover:border-[#0f766e]/40 hover:text-[#0f766e]"
-                    :aria-label="railCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-                    :title="railCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
-                <span class="material-symbols-rounded text-[18px]" x-text="railCollapsed ? 'chevron_right' : 'chevron_left'"></span>
-                <span class="rail-label">Collapse</span>
-            </button>
-        </aside>
-
-        <div class="flex min-w-0 flex-1 flex-col">
-            <!-- Topbar -->
-            <header class="sticky top-0 z-40 border-b border-[#e0d9c8]/80 bg-[#f6f1e8]/90 backdrop-blur-md">
-                <div class="mx-auto flex h-[60px] w-full max-w-[1440px] items-center gap-3 px-4 sm:px-6 lg:px-7">
-                    <a href="{{ $homeRoute }}" class="flex items-center gap-2 lg:hidden">
-                        <span class="grid h-8 w-8 place-items-center rounded-lg bg-[#0f766e] text-xs font-extrabold text-white">B</span>
-                        <span class="text-sm font-bold tracking-tight text-[#172a37]">{{ $isAnimeMode ? 'BiblioAnime' : 'BiblioCore' }}</span>
+                <!-- Desktop nav links -->
+                <nav class="hidden items-center gap-1 rounded-full border border-[#dcd2bd] bg-white/75 p-1 lg:flex" aria-label="Main navigation">
+                    <a href="{{ route('manga.index') }}"
+                       class="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition {{ !$isAnimeMode ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] hover:text-[#172a37]' }}"
+                       @if(!$isAnimeMode) aria-current="page" @endif>
+                        <span class="material-symbols-rounded text-[17px]">menu_book</span>
+                        Manga
                     </a>
+                    <a href="{{ route('anime.index') }}"
+                       class="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition {{ $isAnimeMode ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] hover:text-[#172a37]' }}"
+                       @if($isAnimeMode) aria-current="page" @endif>
+                        <span class="material-symbols-rounded text-[17px]">smart_display</span>
+                        Anime
+                    </a>
+                </nav>
 
-                    <div class="hidden min-w-0 flex-1 justify-center md:flex">
-                        @include('partials.live-search', ['variant' => 'topbar'])
+                <!-- Search (tablet/desktop) -->
+                <div class="hidden min-w-0 flex-1 justify-center md:flex">
+                    @include('partials.live-search', ['variant' => 'topbar'])
+                </div>
+
+                <!-- Right actions -->
+                <div class="ml-auto flex flex-shrink-0 items-center gap-2">
+                    <span class="inline-flex items-center rounded-full border border-[#dcd2bd] bg-white/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#0f766e] md:hidden">
+                        {{ $isAnimeMode ? 'Anime' : 'Manga' }}
+                    </span>
+
+                    <div class="hidden items-center gap-2 lg:flex">
+                        <button type="button" @click="openHistory()"
+                                class="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-bold transition"
+                                :class="historyModalOpen ? 'border-[#0f766e] bg-[#0f766e] text-white shadow-sm' : 'border-[#dcd2bd] bg-white/80 text-[#4c5b54] hover:border-[#0f766e]/50 hover:text-[#0f766e]'">
+                            <span class="material-symbols-rounded text-[17px]">history</span>
+                            <span>History</span>
+                            <span class="grid h-4 min-w-[16px] place-items-center rounded-full px-1 text-[9px] font-bold leading-none"
+                                  :class="historyModalOpen ? 'bg-white text-[#0f766e]' : 'bg-[#0f766e] text-white'"
+                                  x-show="visibleHistory.length > 0" x-text="visibleHistory.length"></span>
+                        </button>
+                        <button type="button" @click="favModalOpen = true"
+                                class="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-bold transition"
+                                :class="favModalOpen ? 'border-[#ea580c] bg-[#ea580c] text-white shadow-sm' : 'border-[#dcd2bd] bg-white/80 text-[#4c5b54] hover:border-[#ea580c]/50 hover:text-[#ea580c]'">
+                            <span class="material-symbols-rounded text-[17px]">bookmark</span>
+                            <span>Favorites</span>
+                            <span class="grid h-4 min-w-[16px] place-items-center rounded-full px-1 text-[9px] font-bold leading-none"
+                                  :class="favModalOpen ? 'bg-white text-[#ea580c]' : 'bg-[#ea580c] text-white'"
+                                  x-show="favorites.length > 0" x-text="favorites.length"></span>
+                        </button>
                     </div>
-
-                    <div class="ml-auto flex items-center gap-1.5 sm:gap-2"></div>
                 </div>
+            </div>
 
-                <!-- Mobile search row: always visible -->
-                <div class="px-4 pb-3 sm:px-6 md:hidden">
-                    @include('partials.live-search', ['variant' => 'mobile'])
-                </div>
-            </header>
+            <!-- Mobile search row: always visible -->
+            <div class="px-4 pb-2.5 sm:px-6 md:hidden">
+                @include('partials.live-search', ['variant' => 'mobile'])
+            </div>
+        </header>
 
-            <main id="siteView" class="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 pb-28 sm:px-6 lg:px-7 lg:py-8 lg:pb-14">
+        <main id="siteView" class="mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 pb-28 sm:px-6 lg:px-7 lg:py-8 lg:pb-14">
 
         {{ $slot }}
-            </main>
-        </div>
+        </main>
     </div>
 
-    <!-- Mobile bottom navigation -->
-    <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-[#e0d9c8] bg-[#f6f1e8]/95 px-2 pt-1.5 pb-safe backdrop-blur-md lg:hidden"
+    <!-- Mobile bottom navigation (floating dock) -->
+    <nav class="fixed inset-x-3 bottom-safe z-40 mx-auto max-w-md rounded-2xl border border-[#dcd2bd] bg-[#fbf9f4]/95 px-2 py-1.5 shadow-[0_14px_34px_-12px_rgba(23,42,55,0.32)] backdrop-blur-md lg:hidden"
          aria-label="Navigasi utama">
-        <div class="mx-auto grid max-w-md grid-cols-4 gap-1">
+        <div class="grid grid-cols-4 gap-1">
             <a href="{{ route('manga.index') }}"
-               class="flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition {{ !$isAnimeMode ? 'text-[#0f766e]' : 'text-[#84948a]' }}"
+               class="flex flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition {{ !$isAnimeMode ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] active:bg-[#eaddc2]/60' }}"
                @if(!$isAnimeMode) aria-current="page" @endif>
-                <span class="grid h-7 w-12 place-items-center rounded-full {{ !$isAnimeMode ? 'bg-[#0f766e]/10' : '' }}">
-                    <span class="material-symbols-rounded text-[20px]">menu_book</span>
-                </span>
-                Manga
+                <span class="material-symbols-rounded text-[20px] leading-none">menu_book</span>
+                <span>Manga</span>
             </a>
             <a href="{{ route('anime.index') }}"
-               class="flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition {{ $isAnimeMode ? 'text-[#0f766e]' : 'text-[#84948a]' }}"
+               class="flex flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition {{ $isAnimeMode ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] active:bg-[#eaddc2]/60' }}"
                @if($isAnimeMode) aria-current="page" @endif>
-                <span class="grid h-7 w-12 place-items-center rounded-full {{ $isAnimeMode ? 'bg-[#0f766e]/10' : '' }}">
-                    <span class="material-symbols-rounded text-[20px]">smart_display</span>
-                </span>
-                Anime
+                <span class="material-symbols-rounded text-[20px] leading-none">smart_display</span>
+                <span>Anime</span>
             </a>
             <button type="button" @click="openHistory()"
-                    class="relative flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition"
-                    :class="historyModalOpen ? 'text-[#0f766e]' : 'text-[#84948a]'">
-                <span class="grid h-7 w-12 place-items-center rounded-full" :class="historyModalOpen ? 'bg-[#0f766e]/10' : ''">
-                    <span class="material-symbols-rounded text-[20px]">history</span>
-                </span>
-                History
-                <span class="absolute right-2 top-0 grid h-4 w-4 place-items-center rounded-full bg-[#0f766e] text-[9px] font-bold leading-none text-white"
+                    class="relative flex flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition"
+                    :class="historyModalOpen ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] active:bg-[#eaddc2]/60'">
+                <span class="material-symbols-rounded text-[20px] leading-none">history</span>
+                <span>History</span>
+                <span class="absolute right-2.5 top-1 grid min-w-[16px] h-4 px-1 place-items-center rounded-full text-[9px] font-bold leading-none"
+                      :class="historyModalOpen ? 'bg-white text-[#0f766e]' : 'bg-[#0f766e] text-white'"
                       x-show="visibleHistory.length > 0" x-text="visibleHistory.length"></span>
             </button>
             <button type="button" @click="favModalOpen = true"
-                    class="relative flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition"
-                    :class="favModalOpen ? 'text-[#ea580c]' : 'text-[#84948a]'">
-                <span class="grid h-7 w-12 place-items-center rounded-full" :class="favModalOpen ? 'bg-[#f97316]/10' : ''">
-                    <span class="material-symbols-rounded text-[20px]">bookmark</span>
-                </span>
-                Favorites
-                <span class="absolute right-2 top-0 grid h-4 w-4 place-items-center rounded-full bg-[#ea580c] text-[9px] font-bold leading-none text-white"
+                    class="relative flex flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition"
+                    :class="favModalOpen ? 'bg-[#ea580c] text-white shadow-sm' : 'text-[#5f6b63] active:bg-[#eaddc2]/60'">
+                <span class="material-symbols-rounded text-[20px] leading-none">bookmark</span>
+                <span>Favorites</span>
+                <span class="absolute right-2.5 top-1 grid min-w-[16px] h-4 px-1 place-items-center rounded-full text-[9px] font-bold leading-none"
+                      :class="favModalOpen ? 'bg-white text-[#ea580c]' : 'bg-[#ea580c] text-white'"
                       x-show="favorites.length > 0" x-text="favorites.length"></span>
             </button>
         </div>
@@ -387,7 +366,7 @@
                 <template x-for="item in favorites" :key="item.id">
                     <div class="flex items-center justify-between gap-3 p-3 rounded-2xl border border-[#eaddc2] bg-[#fbf9f4] hover:bg-[#f6ecda]/50 transition">
                         <a :href="'/manga/' + item.id" class="flex items-center gap-3 flex-1 min-w-0">
-                            <img :src="item.coverUrl || 'https://via.placeholder.com/150x200?text=No+Cover'" class="w-12 h-16 rounded-xl object-cover shadow-sm flex-shrink-0" />
+                            <img :src="item.coverUrl || 'https://via.placeholder.com/150x200?text=No+Cover'" loading="lazy" decoding="async" class="w-12 h-16 rounded-xl object-cover shadow-sm flex-shrink-0" />
                             <div class="min-w-0">
                                 <h4 class="text-sm font-bold text-[#172a37] truncate" x-text="item.title"></h4>
                                 <span class="inline-block mt-1 text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-[#0f766e]/10 text-[#0f766e]" x-text="item.status"></span>
@@ -437,7 +416,7 @@
                 <template x-for="item in visibleHistory" :key="item.id + '-' + (item.episodeId || item.chapterId || '')">
                     <div class="flex items-center justify-between gap-3 p-3 rounded-2xl border border-[#eaddc2] bg-[#fbf9f4] hover:bg-[#f6ecda]/50 transition">
                         <a :href="historyHref(item)" class="flex items-center gap-3 flex-1 min-w-0 group">
-                            <img :src="item.coverUrl || 'https://via.placeholder.com/150x200?text=No+Cover'" class="w-12 h-16 rounded-xl object-cover shadow-sm flex-shrink-0" />
+                            <img :src="item.coverUrl || 'https://via.placeholder.com/150x200?text=No+Cover'" loading="lazy" decoding="async" class="w-12 h-16 rounded-xl object-cover shadow-sm flex-shrink-0" />
                             <div class="min-w-0 flex-1">
                                 <h4 class="text-sm font-bold text-[#172a37] truncate group-hover:text-[#0f766e] transition-colors" x-text="item.title"></h4>
                                 <template x-if="!isAnimeMode">

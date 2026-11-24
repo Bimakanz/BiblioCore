@@ -35,13 +35,18 @@
                 $heroArt = $slide['bannerUrl'] ?? null;
             @endphp
             <div class="absolute inset-0 transition-opacity duration-700" :class="active === {{ $i }} ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'">
+                @if(!empty($slide['coverUrl']))
+                    <img src="{{ $slide['coverUrl'] }}" alt="{{ $slide['title'] }}"
+                         loading="{{ $i === 0 ? 'eager' : 'lazy' }}" referrerpolicy="no-referrer" decoding="async"
+                         class="absolute inset-0 h-full w-full object-cover object-top opacity-75 sm:hidden" />
+                @endif
                 @if($heroArt)
                     <img src="{{ $heroArt }}" alt="{{ $slide['title'] }} banner"
                          loading="{{ $i === 0 ? 'eager' : 'lazy' }}" referrerpolicy="no-referrer" decoding="async"
-                         class="absolute inset-0 h-full w-full object-cover opacity-70" />
+                         class="absolute inset-0 hidden h-full w-full object-cover object-center opacity-70 sm:block" />
                 @elseif(!empty($slide['coverUrl']))
                     <img src="{{ $slide['coverUrl'] }}" alt="" aria-hidden="true" referrerpolicy="no-referrer"
-                         class="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-2xl" />
+                         class="absolute inset-0 hidden h-full w-full scale-110 object-cover opacity-30 blur-2xl sm:block" />
                 @endif
                 <div class="absolute inset-0 bg-gradient-to-r from-[#172a37] via-[#172a37]/75 to-[#172a37]/15"></div>
                 <div class="absolute inset-0 bg-gradient-to-t from-[#172a37]/90 via-transparent to-transparent"></div>

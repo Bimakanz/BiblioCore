@@ -13,7 +13,7 @@
         <div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
             {{-- ===== PLAYER COLUMN ===== --}}
             <div class="min-w-0 space-y-4">
-                <div id="playerWrap" class="relative overflow-hidden rounded-[1.75rem] bg-black shadow-[0_25px_60px_-25px_rgba(0,0,0,0.7)] group">
+                <div id="playerWrap" class="relative overflow-hidden rounded-2xl sm:rounded-[1.75rem] bg-black shadow-[0_20px_50px_-24px_rgba(0,0,0,0.65)] group">
                     <video id="player" class="aspect-video w-full bg-black" crossorigin="anonymous" playsinline controls
                            poster="{{ $anime['bannerUrl'] ?: $anime['coverUrl'] }}"></video>
 
@@ -67,7 +67,7 @@
                 </p>
 
                 {{-- Control bar --}}
-                <div class="flex flex-wrap items-center gap-3 rounded-3xl border border-[#e0d9c8] bg-white p-4 shadow-sm">
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl sm:rounded-3xl border border-[#e0d9c8] bg-white p-3.5 sm:p-4 shadow-sm">
                     <div id="audioWrap" class="flex items-center gap-2">
                         <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Audio</span>
                         <div id="audioToggle" class="flex items-center gap-1 rounded-full border border-[#dcd2bd] bg-[#fbf9f4] p-1">
@@ -112,9 +112,17 @@
                     </p>
                 </div>
 
-                <div class="rounded-3xl border border-[#e0d9c8] bg-white p-5 shadow-sm">
-                    <h1 class="text-lg sm:text-xl font-bold text-[#172a37]" style="font-family: 'Plus Jakarta Sans', sans-serif;">{{ $anime['title'] }} — Episode {{ $episodeNumber }}</h1>
-                    <p class="mt-1 text-xs font-semibold text-[#84948a]">{{ $anime['format'] }} &middot; {{ $anime['status'] }} @if($anime['year']) &middot; {{ $anime['year'] }} @endif @if($anime['score']) &middot; Score {{ $anime['score'] }}/10 @endif</p>
+                <div class="rounded-2xl sm:rounded-3xl border border-[#e0d9c8] bg-white p-4 sm:p-5 shadow-sm">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h1 class="text-lg sm:text-xl font-bold text-[#172a37]">{{ $anime['title'] }}</h1>
+                        <span class="rounded-full bg-[#0f766e]/10 px-2.5 py-0.5 text-xs font-bold text-[#0f766e]">Episode {{ $episodeNumber }}</span>
+                    </div>
+                    <div class="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-[#6f7e75]">
+                        <span class="rounded-md bg-[#f6f1e8] px-2 py-0.5">{{ $anime['format'] }}</span>
+                        <span class="rounded-md bg-[#f6f1e8] px-2 py-0.5">{{ $anime['status'] }}</span>
+                        @if($anime['year'])<span class="rounded-md bg-[#f6f1e8] px-2 py-0.5">{{ $anime['year'] }}</span>@endif
+                        @if($anime['score'])<span class="rounded-md bg-[#fef3c7] px-2 py-0.5 text-[#92400e]">Score {{ $anime['score'] }}/10</span>@endif
+                    </div>
                     <p class="mt-3 text-sm leading-relaxed text-[#4c5b54] line-clamp-3">{{ $anime['description'] }}</p>
                 </div>
             </div>
@@ -1163,9 +1171,13 @@
 
         // Record the episode immediately so "Continue Watching" is populated
         // even if the viewer leaves before the first timeupdate, then keep
-        // refreshing it every few seconds for both HLS and embed playback.
+        // refreshing it every few seconds only while actively watching.
         saveProgress(false);
-        setInterval(() => saveProgress(false), 5000);
+        setInterval(() => {
+            if (document.hidden) return;
+            if (playMode !== 'embed' && video.paused) return;
+            saveProgress(false);
+        }, 5000);
 
         loadStream();
     })();

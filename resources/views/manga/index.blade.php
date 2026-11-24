@@ -32,7 +32,7 @@
                 <template x-for="item in items.slice(0, 10)" :key="item.id + '-' + (item.chapterId || '')">
                     <a :href="continueHref(item)"
                        class="group flex w-[280px] items-center gap-3 rounded-2xl border border-[#e0d9c8] bg-white/80 p-2.5 shadow-sm transition hover:border-[#0f766e]/50 hover:shadow-md sm:w-[320px]">
-                        <img :src="item.coverUrl || 'https://via.placeholder.com/60x84?text=No+Cover'" alt=""
+                        <img :src="item.coverUrl || 'https://via.placeholder.com/60x84?text=No+Cover'" alt="" loading="lazy" decoding="async"
                              class="h-[84px] w-[58px] flex-shrink-0 rounded-lg object-cover" />
                         <div class="min-w-0 flex-1">
                             <h3 class="truncate text-sm font-bold text-[#172a37]" x-text="item.title"></h3>
@@ -82,7 +82,7 @@
                          x-transition:leave="transition ease-in duration-100"
                          x-transition:leave-start="opacity-100"
                          x-transition:leave-end="opacity-0"
-                         class="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-[#dcd2bd] bg-white/95 p-2 shadow-2xl backdrop-blur-xl sm:w-72">
+                         class="absolute left-0 z-50 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-[#dcd2bd] bg-white p-2 shadow-2xl sm:left-auto sm:right-0 sm:w-72">
                         <a href="{{ route('manga.index', array_merge(request()->query(), ['genre' => null, 'page' => 1])) }}"
                            class="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition {{ empty($currentGenre) ? 'bg-[#0f766e] text-white' : 'text-[#4c5b54] hover:bg-[#f6f1e8]' }}">
                             All genres
@@ -175,25 +175,7 @@
 
         {{-- ===== PAGINATION ===== --}}
         @if(!empty($mangas) && $totalPages > 1)
-            <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
-                @if($page > 1)
-                    <a href="{{ route('manga.index', array_merge(request()->query(), ['page' => $page - 1])) }}"
-                       class="inline-flex h-9 items-center gap-1 rounded-xl border border-[#dcd2bd] bg-white/80 px-4 text-xs font-bold text-[#172a37] transition hover:border-[#0f766e]/50 hover:text-[#0f766e]">
-                        <span class="material-symbols-rounded text-base">arrow_back</span> Previous
-                    </a>
-                @endif
-
-                <span class="rounded-xl border border-[#dcd2bd] bg-white/70 px-4 py-2 font-mono text-[11px] font-semibold text-[#5f6b63]">
-                    {{ $page }} / {{ $totalPages }}
-                </span>
-
-                @if($page < $totalPages)
-                    <a href="{{ route('manga.index', array_merge(request()->query(), ['page' => $page + 1])) }}"
-                       class="inline-flex h-9 items-center gap-1 rounded-xl bg-[#0f766e] px-4 text-xs font-bold text-white transition hover:bg-[#115e59]">
-                        Next <span class="material-symbols-rounded text-base">arrow_forward</span>
-                    </a>
-                @endif
-            </div>
+            @include('partials.pagination', ['page' => $page, 'totalPages' => $totalPages, 'routeName' => 'manga.index'])
         @endif
     </div>
     <script>

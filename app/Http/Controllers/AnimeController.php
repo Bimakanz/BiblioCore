@@ -30,13 +30,23 @@ class AnimeController extends Controller
                 ->header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600');
         }
 
-        $results = Cache::remember('anime_live_search_' . md5(strtolower($query)), 3600, function () use ($query) {
+        $results = Cache::remember('anime_live_search_v2_' . md5(strtolower($query)), 3600, function () use ($query) {
             $res = $this->animeService->search($query, 1, 8);
-            return $res['data'] ?? [];
+
+            return array_map(fn ($a) => [
+                'id' => $a['id'] ?? '',
+                'title' => $a['title'] ?? 'Untitled',
+                'coverUrl' => $a['coverUrl'] ?? null,
+                'status' => $a['status'] ?? 'Ongoing',
+                'format' => $a['format'] ?? 'TV',
+                'year' => $a['year'] ?? null,
+                'episodes' => $a['episodes'] ?? null,
+                'airedEpisodes' => $a['airedEpisodes'] ?? null,
+            ], array_slice($res['data'] ?? [], 0, 8));
         });
 
-        return response()->json(['data' => array_slice($results, 0, 8)])
-            ->header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600');
+        return response()->json(['data' => $results])
+            ->header('Cache-Control', 'public, max-age=120, s-maxage=600, stale-while-revalidate=3600');
     }
 
     /**

@@ -1,12 +1,12 @@
 <a href="{{ route('anime.show', ['id' => $anime['id']]) }}"
-   class="group block overflow-hidden rounded-3xl border border-[#e0d9c8] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-18px_rgba(23,42,55,0.45)]">
+   class="card-cv group block overflow-hidden rounded-3xl border border-[#e0d9c8] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-18px_rgba(23,42,55,0.45)]">
     <div class="relative aspect-video overflow-hidden bg-[#172a37]">
         <img src="{{ $anime['bannerUrl'] ?: $anime['coverUrl'] }}" alt="{{ $anime['title'] }}" loading="lazy" decoding="async"
              class="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         <div class="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent"></div>
-        <span class="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">{{ $anime['format'] }}</span>
+        <span class="absolute left-3 top-3 rounded-full bg-black/70 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">{{ $anime['format'] }}</span>
         @if($anime['score'])
-            <span class="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+            <span class="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-0.5 text-[10px] font-bold text-white">
                 <span class="material-symbols-rounded text-xs text-[#fbbf24]">star</span>{{ $anime['score'] }}
             </span>
         @endif

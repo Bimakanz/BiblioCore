@@ -8,8 +8,10 @@
                          class="relative h-[320px] overflow-hidden rounded-2xl bg-[#172a37] shadow-[0_25px_60px_-30px_rgba(23,42,55,0.7)] sm:h-[420px] sm:rounded-3xl">
                     @foreach($hero as $i => $slide)
                         <div class="absolute inset-0 transition-opacity duration-700" :class="active === {{ $i }} ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'">
-                            <img src="{{ $slide['heroUrl'] ?: ($slide['bannerUrl'] ?: $slide['coverUrl']) }}" alt="{{ $slide['title'] }}" @if($i > 0) loading="lazy" @else fetchpriority="high" @endif decoding="async"
-                                 class="absolute inset-0 h-full w-full object-cover opacity-60" />
+                            <img src="{{ $slide['coverUrl'] ?: ($slide['bannerUrl'] ?: $slide['heroUrl']) }}" alt="{{ $slide['title'] }}" @if($i > 0) loading="lazy" @else fetchpriority="high" @endif decoding="async" referrerpolicy="no-referrer"
+                                 class="absolute inset-0 h-full w-full object-cover object-top opacity-75 sm:hidden" />
+                            <img src="{{ $slide['heroUrl'] ?: ($slide['bannerUrl'] ?: $slide['coverUrl']) }}" alt="{{ $slide['title'] }}" @if($i > 0) loading="lazy" @else fetchpriority="high" @endif decoding="async" referrerpolicy="no-referrer"
+                                 class="absolute inset-0 hidden h-full w-full object-cover object-center opacity-60 sm:block" />
                             <div class="absolute inset-0 bg-gradient-to-r from-[#172a37] via-[#172a37]/70 to-transparent"></div>
                             <div class="absolute inset-0 bg-gradient-to-t from-[#172a37]/90 via-transparent to-transparent"></div>
                             <div class="relative flex h-full flex-col justify-end gap-3 p-6 pb-14 sm:gap-4 sm:p-12 sm:pb-16">
@@ -55,7 +57,7 @@
                     <template x-for="item in items" :key="item.id">
                         <a :href="'/anime/' + item.id + '/watch?ep=' + encodeURIComponent(item.episodeId || '') + '&n=' + encodeURIComponent(item.episodeNumber || 1) + '&t=' + Math.max(0, Math.floor((item.positionSec || 0) - 5))"
                            class="group flex w-[280px] items-center gap-3 rounded-2xl border border-[#e0d9c8] bg-white/80 p-2.5 shadow-sm transition hover:border-[#0f766e]/50 hover:shadow-md sm:w-[320px]">
-                            <img :src="item.bannerUrl || item.coverUrl" alt=""
+                            <img :src="item.bannerUrl || item.coverUrl" alt="" loading="lazy" decoding="async"
                                  class="h-[76px] w-[120px] flex-shrink-0 rounded-lg object-cover" />
                             <div class="min-w-0 flex-1">
                                 <h3 class="truncate text-sm font-bold text-[#172a37]" x-text="item.title"></h3>
@@ -139,7 +141,7 @@
                     {{-- The rest of the chart, as a swipeable poster shelf. --}}
                     @if(count($rest))
                         <div class="mt-3 rounded-2xl border border-[#e0d9c8] bg-[#faf7f0] p-3 sm:p-4">
-                            <p class="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#84948a]">Ranks 4&ndash;{{ count($top10) }}</p>
+                            <p class="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#84948a]">Ranks 4 to {{ count($top10) }}</p>
                             <div class="rail-x no-scrollbar">
                                 @foreach($rest as $i => $anime)
                                     <a href="{{ route('anime.show', ['id' => $anime['id']]) }}" class="group w-[96px] sm:w-[112px] lg:w-auto lg:flex-1">
@@ -149,7 +151,7 @@
                                             <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0b1a23]/85 via-[#0b1a23]/10 to-transparent"></div>
                                             <span class="absolute bottom-1 left-1.5 font-display text-2xl font-extrabold leading-none text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)]">{{ $i + 4 }}</span>
                                             @if($anime['score'])
-                                                <span class="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-full bg-black/55 px-1.5 py-0.5 font-mono text-[9px] font-bold text-white backdrop-blur-sm">
+                                                <span class="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 font-mono text-[9px] font-bold text-white">
                                                     <span class="material-symbols-rounded text-[10px] text-[#fbbf24]">star</span>{{ $anime['score'] }}
                                                 </span>
                                             @endif
@@ -313,7 +315,7 @@
                             Genre: <span class="text-[#0f766e]">{{ $currentGenre ?: 'All Genres' }}</span>
                             <span class="material-symbols-rounded text-base transition-transform duration-200" :class="open ? 'rotate-180' : ''">expand_more</span>
                         </button>
-                        <div x-show="open" x-cloak @click.outside="open = false" class="absolute left-0 z-30 mt-2 w-56 overflow-hidden rounded-2xl border border-[#e0d9c8] bg-white p-1.5 shadow-[0_20px_45px_-18px_rgba(23,42,55,0.45)]">
+                        <div x-show="open" x-cloak @click.outside="open = false" class="absolute left-0 z-30 mt-2 w-56 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-[#e0d9c8] bg-white p-1.5 shadow-[0_20px_45px_-18px_rgba(23,42,55,0.45)]">
                             <div class="custom-scroll max-h-72 overflow-y-auto">
                                 <a href="{{ route('anime.index', array_merge(request()->except(['genre', 'page']), [])) }}" class="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition {{ !$currentGenre ? 'bg-[#0f766e] text-white' : 'text-[#4c5b54] hover:bg-[#f6f1e8]' }}">
                                     All Genres
@@ -331,7 +333,7 @@
                 </div>
 
                 @if(empty($animes))
-                    <div class="rounded-3xl border border-dashed border-[#dcd2bd] bg-white/60 py-16 text-center">
+                    <div class="rounded-3xl border border-[#dcd2bd] bg-white/70 py-16 text-center">
                         <span class="material-symbols-rounded text-4xl text-[#c1cbbb]">search_off</span>
                         <p class="mt-2 text-sm font-medium text-[#6f7e75]">No matching anime found. Try another keyword or filter.</p>
                     </div>
@@ -342,23 +344,7 @@
                         @endforeach
                     </div>
 
-                    <div class="flex items-center justify-between pt-2">
-                        @if($page > 1)
-                            <a href="{{ route('anime.index', array_merge(request()->query(), ['page' => $page - 1])) }}" class="inline-flex items-center gap-1 rounded-full border border-[#dcd2bd] bg-white px-4 py-2 text-xs font-bold text-[#172a37] transition hover:border-[#0f766e]/50">
-                                <span class="material-symbols-rounded text-base">arrow_back</span> Previous
-                            </a>
-                        @else
-                            <span></span>
-                        @endif
-                        <span class="text-xs font-semibold text-[#84948a]">Page {{ $page }} of {{ $totalPages }}</span>
-                        @if($page < $totalPages)
-                            <a href="{{ route('anime.index', array_merge(request()->query(), ['page' => $page + 1])) }}" class="inline-flex items-center gap-1 rounded-full bg-[#0f766e] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#115e59]">
-                                Next <span class="material-symbols-rounded text-base">arrow_forward</span>
-                            </a>
-                        @else
-                            <span></span>
-                        @endif
-                    </div>
+                    @include('partials.pagination', ['page' => $page, 'totalPages' => $totalPages, 'routeName' => 'anime.index'])
                 @endif
             </section>
         @endif

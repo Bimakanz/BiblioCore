@@ -31,16 +31,25 @@ class MangaController extends Controller
                 ->header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600');
         }
 
-        $cacheKey = 'live_search_'.md5(strtolower($query));
+        $cacheKey = 'live_search_v2_'.md5(strtolower($query));
         $results = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($query) {
             $res = $this->mangaService->search($query, 1, 8);
 
-            return $res['data'] ?? [];
+            return array_map(fn ($m) => [
+                'id' => $m['id'] ?? '',
+                'title' => $m['title'] ?? 'Untitled',
+                'coverUrl' => $m['coverUrl'] ?? null,
+                'status' => $m['status'] ?? 'Ongoing',
+                'format' => $m['format'] ?? 'MANGA',
+                'year' => $m['year'] ?? null,
+                'chapters' => $m['chapters'] ?? null,
+                'volumes' => $m['volumes'] ?? null,
+            ], array_slice($res['data'] ?? [], 0, 8));
         });
 
         return response()
-            ->json(['data' => array_slice($results, 0, 8)])
-            ->header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600');
+            ->json(['data' => $results])
+            ->header('Cache-Control', 'public, max-age=120, s-maxage=600, stale-while-revalidate=3600');
     }
 
     /**

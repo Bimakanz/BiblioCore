@@ -35,10 +35,10 @@ class AnimeStreamProvider
     /** Optional secondary sources (HiAnime, Consumet, ARM). */
     protected AnimeExtraSources $extra;
 
-    /** Provider priority: proven HLS + subtitle sources first. */
+    /** Provider priority: proven direct HLS + subtitle sources first; embed-heavy providers last. */
     protected array $priority = [
-        'anikoto', 'aniwaves', 'animedunya', 'anizone', 'anipm', 'animenosub',
-        'animeonsen', 'reanime', 'animegg', 'senshi', 'mkissa', 'kaa',
+        'aniwaves', 'animedunya', 'anizone', 'anipm', 'animenosub',
+        'animeonsen', 'reanime', 'animegg', 'senshi', 'mkissa', 'kaa', 'anikoto',
     ];
 
     /** Public resolver instances used when ANIME_API_URL is not configured. */
@@ -531,17 +531,22 @@ $headers = ['Accept: application/json'];
             }
         }
 
-        $cacheKey = 'anivexa_stream_' . md5($watchPath);
+        $cacheKey = 'anivexa_stream_v2_' . md5($watchPath);
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             return $cached;
         }
 
         $stream = $this->fetchStream($watchPath);
+        $fallbackEmbed = null;
+        if ($stream && ($stream['kind'] ?? 'hls') === 'embed') {
+            $fallbackEmbed = $stream;
+            $stream = null;
+        }
 
-        // Failover: after the episode's own provider, try one alternate.
-        // Every watch call costs 10-15 s upstream, so walking the complete
-        // provider list would blow the request budget long before it ends.
+        // Failover: if the episode's own provider failed OR only returned a
+        // third-party embed (which carries ads), try up to 2 alternates for a
+        // direct ad-free HLS stream before falling back to the embed.
         if (!$stream && $parsed) {
             $byProvider = Cache::get("anivexa_episodes_by_provider_{$parsed['anilistId']}_{$audio}");
             $order = is_array($byProvider) && !empty($byProvider)
@@ -552,7 +557,7 @@ $headers = ['Accept: application/json'];
                 if ($name === $parsed['provider']) {
                     continue;
                 }
-                if ($tried++ >= 1) {
+                if ($tried++ >= 2) {
                     break;
                 }
                 $number = $parsed['number'] == (int) $parsed['number']
@@ -560,12 +565,23 @@ $headers = ['Accept: application/json'];
                     : (string) $parsed['number'];
                 $alt = $this->alternativePath($parsed['anilistId'], $parsed['number'], $name, $audio)
                     ?: 'watch/' . $name . '/' . $parsed['anilistId'] . '/' . $audio . '/' . $name . '-' . $number;
-                $stream = $this->fetchStream($alt);
-                if ($stream) {
-                    $stream['provider'] = $name;
-                    break;
+                $candidate = $this->fetchStream($alt);
+                if (!$candidate) {
+                    continue;
                 }
+                $candidate['provider'] = $name;
+                if (($candidate['kind'] ?? 'hls') === 'embed') {
+                    $fallbackEmbed ??= $candidate;
+                    continue;
+                }
+                $stream = $candidate;
+                break;
             }
+        }
+
+        // Last resort: use an embed only if no direct HLS stream was found.
+        if (!$stream && $fallbackEmbed) {
+            $stream = $fallbackEmbed;
         }
 
         // Dub requested but no provider carries it: play the sub version of

@@ -171,7 +171,7 @@ class AniListProvider
      */
     public function search(string $query, int $page = 1, int $limit = 24, ?string $category = null, ?string $genre = null): array
     {
-        $cacheKey = "anilist_v2_search_" . md5("{$query}_{$page}_{$limit}_{$category}_{$genre}");
+        $cacheKey = "anilist_v3_search_" . md5("{$query}_{$page}_{$limit}_{$category}_{$genre}");
 
         return Cache::remember($cacheKey, 3600, function () use ($query, $page, $limit, $genre) {
             $variables = [
@@ -196,6 +196,8 @@ class AniListProvider
                 media(type: $type, search: $search, sort: $sort, genre: $genre, isAdult: false) {
                   id
                   format
+                  chapters
+                  volumes
                   title {
                     romaji
                     english
@@ -388,6 +390,8 @@ class AniListProvider
             'bannerUrl' => $m['bannerImage'] ?? null,
             'status' => $status,
             'year' => $m['startDate']['year'] ?? null,
+            'chapters' => $m['chapters'] ?? null,
+            'volumes' => $m['volumes'] ?? null,
             'contentRating' => 'Safe',
             'tags' => $m['genres'] ?? ['Manga'],
             'authors' => $authorStr,
