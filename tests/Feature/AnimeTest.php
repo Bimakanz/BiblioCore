@@ -79,6 +79,36 @@ class AnimeTest extends TestCase
         $response->assertNotFound();
     }
 
+    public function test_embed_response_keeps_the_burned_in_flag(): void
+    {
+        $this->mock(\App\Services\Anime\AnimeService::class, function ($mock) {
+            $mock->shouldReceive('getDetail')->andReturn(['id' => 'al_1', 'anilistId' => 1, 'episodes' => 12]);
+            $mock->shouldReceive('isUnplayable')->andReturn(false);
+            $mock->shouldReceive('markAvailable')->andReturnNull();
+        });
+
+        $this->mock(\App\Services\Anime\AnimeStreamProvider::class, function ($mock) {
+            $mock->shouldReceive('servers')->andReturn([]);
+            $mock->shouldReceive('getStream')->andReturn([
+                'provider' => 'Samehadaku',
+                'referer' => null,
+                'sources' => [['url' => 'https://www.blogger.com/video.g?token=x', 'quality' => 'auto']],
+                'subtitles' => [],
+                'kind' => 'embed',
+                'embed' => 'https://www.blogger.com/video.g?token=x',
+                'intro' => null,
+                'outro' => null,
+                'hard_sub' => true,
+            ]);
+        });
+
+        $response = $this->getJson('/anime/al_1/stream.json?ep=watch%2Fkaa%2F1%2Fsub%2Fkaa-1');
+
+        $response->assertOk()
+            ->assertJsonPath('source.type', 'embed')
+            ->assertJsonPath('hardSub', true);
+    }
+
     public function test_translated_subtitle_requires_episode_parameter(): void
     {
         $response = $this->get('/anime/subtitle/id.vtt');

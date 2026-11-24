@@ -698,9 +698,15 @@ $headers = ['Accept: application/json'];
         ];
 
         if ($source === 'animeheaven' || $source === 'samehadaku') {
-            return $source === 'animeheaven'
+            $stream = $source === 'animeheaven'
                 ? $this->extra->animeHeavenStreamFor($anime, $number)
                 : $this->extra->samehadakuStreamFor($anime, $number);
+
+            // The picker promises a file with the subtitles burned into the
+            // frames. A samehadaku iframe mirror may well be a hardsub too,
+            // but it is a third-party page, not something we can call
+            // "Burned-in" — refuse it rather than show the wrong thing.
+            return is_array($stream) && ($stream['kind'] ?? '') === 'mp4' ? $stream : null;
         }
 
         return $this->extra->hardsubStreamFor($anilistId, $number);

@@ -106,6 +106,53 @@ HTML;
         $this->assertSame('ah|ak2gr|27', $episodes[0]['id']);
     }
 
+    public function test_it_picks_the_season_row_not_the_first_season(): void
+    {
+        $provider = $this->provider([
+            'search.php' => $this->searchPage(),
+            'anime.php?hgj3i' => $this->animePage(),
+        ]);
+
+        $episodes = $provider->episodesForAniList(182255, [
+            'title' => 'Frieren: Beyond Journey\'s End Season 2',
+            'titles' => ['romaji' => 'Sousou no Frieren 2nd Season'],
+        ]);
+
+        $this->assertNotEmpty($episodes);
+        $this->assertSame('ah|hgj3i|27', $episodes[0]['id']);
+    }
+
+    public function test_a_forced_source_only_accepts_a_burned_in_file(): void
+    {
+        Cache::put('anime_titles_5', ['Some Show'], 3600);
+
+        $extra = new class extends AnimeExtraSources
+        {
+            public function animeHeavenStreamFor(array $anime, int $number): ?array
+            {
+                // Samehadaku/AnimeHeaven may answer with a third-party iframe;
+                // the picker must not label that as burned-in playback.
+                return [
+                    'sources' => [['url' => 'https://www.blogger.com/video.g?token=x']],
+                    'subtitles' => [],
+                    'kind' => 'embed',
+                    'embed' => 'https://www.blogger.com/video.g?token=x',
+                    'provider' => 'AnimeHeaven',
+                ];
+            }
+        };
+
+        $provider = new class($extra) extends AnimeStreamProvider
+        {
+            public function forced(int $id, int $number, string $source): ?array
+            {
+                return $this->hardsubFor($id, $number, $source);
+            }
+        };
+
+        $this->assertNull($provider->forced(5, 1, 'animeheaven'));
+    }
+
     public function test_it_returns_a_direct_mp4_stream(): void
     {
         $provider = $this->provider([

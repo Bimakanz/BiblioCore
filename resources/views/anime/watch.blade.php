@@ -887,9 +887,10 @@
             } else if (versionNotice) {
                 versionNotice.classList.add('hidden');
             }
-            // A burned-in copy picked automatically as the last resort should
-            // also show up in the picker, otherwise the label lies.
-            if (data.hardSub && !hardsubServer) {
+            // A burned-in MP4 picked automatically as the last resort should
+            // also show up in the picker, otherwise the label lies. Embeds are
+            // excluded: pinning ?server= would force a file we may not have.
+            if (data.hardSub && !hardsubServer && data.source.type === 'mp4') {
                 const actual = data.provider === 'AnimeHeaven' ? 'animeheaven'
                     : (data.provider === 'Samehadaku' ? 'samehadaku' : '');
                 if (actual) setHardsubServer(actual);
@@ -900,6 +901,12 @@
             if (notice) notice.classList.toggle('hidden', data.audioFallback !== 'sub');
             if (data.source.type === 'embed') {
                 buildSubtitleOptions([]);
+                if (data.hardSub) {
+                    subtitleDropdown.btn.disabled = true;
+                    subtitleDropdown.btn.title = 'Subtitles are built into this video';
+                    const subLabel = document.getElementById('subtitleBtnLabel');
+                    if (subLabel) subLabel.textContent = 'Burned-in';
+                }
                 playEmbed(data.source.url);
                 loadingEl.style.display = 'none';
                 return;
