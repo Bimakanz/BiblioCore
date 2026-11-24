@@ -228,6 +228,9 @@
 
     @php
         $isAnimeMode = request()->is('anime') || request()->is('anime/*');
+        $isAnimeHome = request()->routeIs('anime.index') && !request()->hasAny(['category', 'genre', 'q', 'search', 'page']);
+        $isMangaHome = request()->routeIs('manga.index', 'landing') && !request()->hasAny(['category', 'genre', 'q', 'search', 'page']);
+        $hasHero = $isAnimeHome || $isMangaHome;
         $homeRoute = $isAnimeMode ? route('anime.index') : route('manga.index');
         $liveSearchEndpoint = $isAnimeMode ? '/anime/api/live-search' : '/manga/api/live-search';
         $detailBase = $isAnimeMode ? '/anime/' : '/manga/';
@@ -243,39 +246,55 @@
 
     <div class="relative flex min-h-screen flex-col">
         <!-- Standard top navbar (iQIYI-inspired clean bar) -->
-        <header class="sticky top-0 z-40 border-b border-[#e0d9c8]/85 bg-[#f6f1e8]/95 backdrop-blur-sm">
+        <header @if($hasHero)
+                    x-data="{ scrolled: false }"
+                    @scroll.window="scrolled = (window.pageYOffset || document.documentElement.scrollTop) > 50"
+                    x-init="scrolled = (window.pageYOffset || document.documentElement.scrollTop) > 50"
+                    class="fixed top-0 inset-x-0 z-40 transition-all duration-300"
+                    :class="scrolled ? 'is-scrolled border-b border-[#e0d9c8]/85 bg-[#f6f1e8]/95 backdrop-blur-md shadow-sm' : 'nav-transparent border-b border-transparent bg-transparent'"
+                @else
+                    class="sticky top-0 z-40 border-b border-[#e0d9c8]/85 bg-[#f6f1e8]/95 backdrop-blur-sm"
+                @endif>
             <div class="mx-auto flex h-14 w-full max-w-[1440px] items-center gap-4 px-4 sm:px-6 lg:h-16 lg:gap-6 lg:px-7">
                 <!-- Pure text brand wordmark -->
                 <a href="{{ $homeRoute }}" class="group flex flex-shrink-0 items-baseline select-none" title="BiblioCore">
-                    <span class="text-xl font-extrabold tracking-tight text-[#0f766e] transition-colors group-hover:text-[#0d625b] lg:text-[23px]">Biblio</span><span class="text-xl font-extrabold tracking-tight text-[#172a37] lg:text-[23px]">Core</span><span class="ml-0.5 text-xl font-black text-[#f97316] lg:text-[23px]">.</span>
+                    <span class="text-xl font-extrabold tracking-tight transition-colors lg:text-[23px] {{ $hasHero ? '' : 'text-[#0f766e]' }}"
+                          @if($hasHero) :class="!scrolled ? 'text-[#2dd4bf] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]' : 'text-[#0f766e]'" @endif>Biblio</span><span class="text-xl font-extrabold tracking-tight transition-colors lg:text-[23px] {{ $hasHero ? '' : 'text-[#172a37]' }}"
+                          @if($hasHero) :class="!scrolled ? 'text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]' : 'text-[#172a37]'" @endif>Core</span><span class="ml-0.5 text-xl font-black text-[#f97316] lg:text-[23px]">.</span>
                 </a>
 
                 <!-- Desktop text nav links -->
                 <nav class="hidden items-center gap-6 lg:flex" aria-label="Main navigation">
                     <a href="{{ route('manga.index') }}"
                        class="relative py-1 text-sm font-bold transition {{ !$isAnimeMode && request('category') !== 'trending' ? 'text-[#0f766e]' : 'text-[#4c5b54] hover:text-[#172a37]' }}"
+                       @if($hasHero) :class="!scrolled ? '!text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]' : ''" @endif
                        @if(!$isAnimeMode) aria-current="page" @endif>
                         Manga
                         @if(!$isAnimeMode)
-                            <span class="absolute inset-x-0 -bottom-1 h-0.5 rounded-full bg-[#0f766e]"></span>
+                            <span class="absolute inset-x-0 -bottom-1 h-0.5 rounded-full bg-[#0f766e]"
+                                  @if($hasHero) :class="!scrolled ? '!bg-[#2dd4bf] shadow-sm' : ''" @endif></span>
                         @endif
                     </a>
                     <a href="{{ route('anime.index') }}"
                        class="relative py-1 text-sm font-bold transition {{ $isAnimeMode && request('category') !== 'trending' ? 'text-[#0f766e]' : 'text-[#4c5b54] hover:text-[#172a37]' }}"
+                       @if($hasHero) :class="!scrolled ? '!text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]' : ''" @endif
                        @if($isAnimeMode) aria-current="page" @endif>
                         Anime
                         @if($isAnimeMode)
-                            <span class="absolute inset-x-0 -bottom-1 h-0.5 rounded-full bg-[#0f766e]"></span>
+                            <span class="absolute inset-x-0 -bottom-1 h-0.5 rounded-full bg-[#0f766e]"
+                                  @if($hasHero) :class="!scrolled ? '!bg-[#2dd4bf] shadow-sm' : ''" @endif></span>
                         @endif
                     </a>
                     <a href="{{ $isAnimeMode ? route('anime.index', ['category' => 'trending']) : route('manga.index', ['category' => 'trending']) }}"
-                       class="py-1 text-sm font-bold transition {{ request('category') === 'trending' ? 'text-[#0f766e]' : 'text-[#4c5b54] hover:text-[#172a37]' }}">
+                       class="py-1 text-sm font-bold transition {{ request('category') === 'trending' ? 'text-[#0f766e]' : 'text-[#4c5b54] hover:text-[#172a37]' }}"
+                       @if($hasHero) :class="!scrolled ? '!text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] hover:!text-white/80' : ''" @endif>
                         Trending
                     </a>
 
                     <div class="relative" @click.away="moreMenuOpen = false" @keydown.escape="moreMenuOpen = false">
                         <button type="button" @click="moreMenuOpen = !moreMenuOpen"
-                                class="inline-flex items-center gap-0.5 py-1 text-sm font-bold text-[#4c5b54] transition hover:text-[#172a37]">
+                                class="inline-flex items-center gap-0.5 py-1 text-sm font-bold text-[#4c5b54] transition hover:text-[#172a37]"
+                                @if($hasHero) :class="!scrolled ? '!text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] hover:!text-white/80' : ''" @endif>
                             <span>More</span>
                             <span class="material-symbols-rounded text-[18px] transition-transform" :class="moreMenuOpen ? 'rotate-180' : ''">arrow_drop_down</span>
                         </button>
@@ -309,11 +328,12 @@
                 <!-- Right cluster: Search + Icon-label actions (History, Favorites, Settings) -->
                 <div class="ml-auto flex flex-1 items-center justify-end gap-4 lg:gap-5">
                     <div class="hidden min-w-0 flex-1 justify-end md:flex">
-                        @include('partials.live-search', ['variant' => 'topbar'])
+                        @include('partials.live-search', ['variant' => 'topbar', 'hasHero' => $hasHero])
                     </div>
 
                     <button type="button" @click="settingsModalOpen = true"
                             class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#dcd2bd] bg-white/80 text-[#4c5b54] transition hover:text-[#0f766e] lg:hidden"
+                            @if($hasHero) :class="!scrolled ? '!border-white/20 !bg-black/35 !text-white backdrop-blur-md' : ''" @endif
                             aria-label="Settings">
                         <span class="material-symbols-rounded text-[20px]">settings</span>
                     </button>
@@ -321,7 +341,10 @@
                     <div class="hidden flex-shrink-0 items-center gap-4 lg:flex">
                         <button type="button" @click="openHistory()"
                                 class="relative flex flex-col items-center justify-center gap-0.5 text-[#4c5b54] transition hover:text-[#0f766e]"
-                                :class="historyModalOpen ? 'text-[#0f766e]' : ''">
+                                :class="{
+                                    'text-[#0f766e]': historyModalOpen,
+                                    @if($hasHero) '!text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] hover:!text-[#2dd4bf]': !scrolled && !historyModalOpen @endif
+                                }">
                             <span class="material-symbols-rounded text-[21px] leading-none">history</span>
                             <span class="text-[11px] font-semibold leading-none">History</span>
                             <span class="absolute -right-1.5 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-[#0f766e] px-1 text-[9px] font-bold leading-none text-white"
@@ -330,7 +353,10 @@
 
                         <button type="button" @click="favModalOpen = true"
                                 class="relative flex flex-col items-center justify-center gap-0.5 text-[#4c5b54] transition hover:text-[#ea580c]"
-                                :class="favModalOpen ? 'text-[#ea580c]' : ''">
+                                :class="{
+                                    'text-[#ea580c]': favModalOpen,
+                                    @if($hasHero) '!text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] hover:!text-[#fb923c]': !scrolled && !favModalOpen @endif
+                                }">
                             <span class="material-symbols-rounded text-[21px] leading-none">bookmark</span>
                             <span class="text-[11px] font-semibold leading-none">Favorites</span>
                             <span class="absolute -right-1.5 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-[#ea580c] px-1 text-[9px] font-bold leading-none text-white"
@@ -339,7 +365,10 @@
 
                         <button type="button" @click="settingsModalOpen = true"
                                 class="flex flex-col items-center justify-center gap-0.5 text-[#4c5b54] transition hover:text-[#0f766e]"
-                                :class="settingsModalOpen ? 'text-[#0f766e]' : ''">
+                                :class="{
+                                    'text-[#0f766e]': settingsModalOpen,
+                                    @if($hasHero) '!text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] hover:!text-[#2dd4bf]': !scrolled && !settingsModalOpen @endif
+                                }">
                             <span class="material-symbols-rounded text-[21px] leading-none">settings</span>
                             <span class="text-[11px] font-semibold leading-none">Settings</span>
                         </button>
@@ -349,11 +378,11 @@
 
             <!-- Mobile search row: always visible -->
             <div class="px-4 pb-2.5 sm:px-6 md:hidden">
-                @include('partials.live-search', ['variant' => 'mobile'])
+                @include('partials.live-search', ['variant' => 'mobile', 'hasHero' => $hasHero])
             </div>
         </header>
 
-        <main id="siteView" class="mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 pb-28 sm:px-6 lg:px-7 lg:py-8 lg:pb-14">
+        <main id="siteView" class="{{ $hasHero ? 'w-full flex-1 pb-28 lg:pb-14' : 'mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 pb-28 sm:px-6 lg:px-7 lg:py-8 lg:pb-14' }}">
 
         {{ $slot }}
         </main>

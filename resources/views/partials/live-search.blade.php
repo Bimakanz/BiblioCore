@@ -8,6 +8,7 @@
 --}}
 @php
     $variant = $variant ?? 'topbar';
+    $hasHero = $hasHero ?? ($isAnimeHome ?? false);
     $initialQuery = (string) request('q', '');
     $queryJson = json_encode($initialQuery, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
     $inputId = $variant === 'mobile' ? 'liveSearchMobile' : 'liveSearchDesktop';
@@ -84,9 +85,14 @@
                    placeholder="{{ $searchPlaceholder }}"
                    autocomplete="off"
                    aria-label="{{ $searchPlaceholder }}"
-                   class="h-9 w-full rounded-xl border border-[#dcd2bd] bg-white/90 pl-3.5 pr-10 text-xs font-medium text-[#172a37] placeholder:text-[#84948a] transition focus:border-[#0f766e] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0f766e]/15 sm:text-[13px]" />
+                   class="h-9 w-full rounded-xl pl-3.5 pr-10 text-xs font-medium transition focus:outline-none focus:ring-2 sm:text-[13px] {{ $hasHero ? '' : 'border border-[#dcd2bd] bg-white/90 text-[#172a37] placeholder:text-[#84948a] focus:border-[#0f766e] focus:bg-white focus:ring-[#0f766e]/15' }}"
+                   @if($hasHero)
+                   :class="!scrolled ? 'border border-white/20 bg-black/35 text-white placeholder:text-white/60 focus:bg-black/50 focus:border-white/40 focus:ring-white/20' : 'border border-[#dcd2bd] bg-white/90 text-[#172a37] placeholder:text-[#84948a] focus:border-[#0f766e] focus:bg-white focus:ring-[#0f766e]/15'"
+                   @endif />
 
-            <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#5f6b63]" x-show="!loading">
+            <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 transition {{ $hasHero ? '' : 'text-[#5f6b63]' }}"
+                  @if($hasHero) :class="!scrolled ? 'text-white/75' : 'text-[#5f6b63]'" @endif
+                  x-show="!loading">
                 <span class="material-symbols-rounded block text-[19px]">search</span>
             </span>
             <span class="absolute right-3 top-1/2 -translate-y-1/2" x-show="loading" x-cloak>

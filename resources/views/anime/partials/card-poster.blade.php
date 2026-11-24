@@ -1,8 +1,11 @@
 @php
-    $meta = array_filter([
-        $anime['year'] ?? null,
-        !empty($anime['episodes']) ? $anime['episodes'] . ' EP' : null,
-    ]);
+    $parts = [];
+    if (!empty($anime['year'])) {
+        $parts[] = $anime['year'];
+    }
+    if (!empty($anime['episodes'])) {
+        $parts[] = $anime['episodes'] . ' EP';
+    }
 @endphp
 
 <a href="{{ route('anime.show', ['id' => $anime['id']]) }}"
@@ -12,10 +15,6 @@
              class="h-full w-full object-cover object-top transition duration-500 group-hover:scale-105" />
 
         <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#172a37]/75 via-transparent to-transparent"></div>
-
-        <span class="absolute left-2 top-2 rounded-full bg-[#0f766e]/95 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide text-white shadow-sm">
-            {{ $anime['format'] }}
-        </span>
 
         @if($anime['score'])
             <span class="absolute right-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white">
@@ -29,14 +28,18 @@
     </div>
 
     <div class="min-w-0">
-        <h3 class="line-clamp-2 min-h-[2.4rem] text-xs font-semibold leading-snug text-[#172a37] transition-colors group-hover:text-[#0f766e] sm:text-[13px]"
+        <h3 class="line-clamp-2 min-h-[2.2rem] text-xs font-semibold leading-snug text-[#172a37] transition-colors group-hover:text-[#0f766e] sm:text-[13px]"
             title="{{ $anime['title'] }}">{{ $anime['title'] }}</h3>
-        @if($meta)
-            <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-[#7b8a82]">
-                @foreach($meta as $part)
-                    <span>{{ $part }}</span>
-                @endforeach
-            </div>
-        @endif
+        <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-[#7b8a82]">
+            @if(!empty($anime['format']))
+                <span class="rounded px-1.5 py-0.5 anime-type-label text-[10px] font-bold uppercase tracking-wider">
+                    {{ $anime['format'] }}
+                </span>
+            @endif
+            @if(count($parts))
+                <span class="text-[#84948a]">-</span>
+                <span>{{ implode(' - ', $parts) }}</span>
+            @endif
+        </div>
     </div>
 </a>

@@ -1,14 +1,8 @@
 {{--
     Manga home hero.
-
-    Mirrors the anime home banner: wide full-bleed art, dark gradient, Trending
-    pill, title, meta pills, description, and two CTAs. Manga cards carry the
-    AniList `bannerImage` (wide 16:9-ish), so this uses that when present and
-    falls back to an ambient wash of the cover when a title has no banner.
+    Full-bleed edge-to-edge layout matching anime home.
 --}}
 @php
-    // Slide the top titles, skipping repeats (the catalog keeps MANGA and
-    // NOVEL editions of the same name as separate entries).
     $heroSlides = [];
     if ($search === '') {
         $seenHero = [];
@@ -19,7 +13,7 @@
             }
             $seenHero[$key] = true;
             $heroSlides[] = $item;
-            if (count($heroSlides) === 5) {
+            if (count($heroSlides) === 6) {
                 break;
             }
         }
@@ -27,69 +21,107 @@
 @endphp
 
 @if(count($heroSlides))
-    <section x-data="{ active: 0, total: {{ count($heroSlides) }}, timer: null, next() { this.active = (this.active + 1) % this.total }, start() { if (!this.timer && this.total > 1) this.timer = setInterval(() => this.next(), 6000) }, stop() { if (this.timer) { clearInterval(this.timer); this.timer = null } } }"
-             x-init="start()" @mouseenter="stop()" @mouseleave="start()"
-             class="relative h-[300px] overflow-hidden rounded-2xl bg-[#172a37] shadow-[0_25px_60px_-30px_rgba(23,42,55,0.7)] sm:h-[340px] sm:rounded-3xl lg:h-[360px]">
+    <section x-data="{
+            active: 0,
+            total: {{ count($heroSlides) }},
+            timer: null,
+            next() { this.active = (this.active + 1) % this.total },
+            prev() { this.active = (this.active - 1 + this.total) % this.total },
+            goTo(i) { this.active = i },
+            start() { if (!this.timer && this.total > 1) this.timer = setInterval(() => this.next(), 6000) },
+            stop() { if (this.timer) { clearInterval(this.timer); this.timer = null } }
+        }"
+        x-init="start()"
+        @mouseenter="stop()"
+        @mouseleave="start()"
+        class="relative w-full h-[76vh] min-h-[520px] max-h-[720px] sm:h-[78vh] lg:h-[80vh] overflow-hidden bg-[#0e1419]">
+
         @foreach($heroSlides as $i => $slide)
             @php
                 $heroArt = $slide['bannerUrl'] ?? null;
             @endphp
-            <div class="absolute inset-0 transition-opacity duration-700" :class="active === {{ $i }} ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'">
-                @if(!empty($slide['coverUrl']))
-                    <img src="{{ $slide['coverUrl'] }}" alt="{{ $slide['title'] }}"
-                         loading="{{ $i === 0 ? 'eager' : 'lazy' }}" referrerpolicy="no-referrer" decoding="async"
-                         class="absolute inset-0 h-full w-full object-cover object-top opacity-75 sm:hidden" />
-                @endif
+            <div class="absolute inset-0 transition-opacity duration-700 ease-in-out"
+                 :class="active === {{ $i }} ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'">
+                
+                {{-- Banner image: landscape backdrop only (no vertical cover fallback) --}}
                 @if($heroArt)
                     <img src="{{ $heroArt }}" alt="{{ $slide['title'] }} banner"
-                         loading="{{ $i === 0 ? 'eager' : 'lazy' }}" referrerpolicy="no-referrer" decoding="async"
-                         class="absolute inset-0 hidden h-full w-full object-cover object-center opacity-75 sm:block" />
-                @elseif(!empty($slide['coverUrl']))
-                    <img src="{{ $slide['coverUrl'] }}" alt="" aria-hidden="true" referrerpolicy="no-referrer" decoding="async"
-                         class="absolute inset-0 hidden h-full w-full scale-110 object-cover opacity-20 blur-2xl sm:block" />
-                    <div class="pointer-events-none absolute inset-y-0 right-0 hidden w-[46%] sm:block lg:w-[38%]"
-                         style="-webkit-mask-image: linear-gradient(to right, transparent 0%, black 32%, black 100%); mask-image: linear-gradient(to right, transparent 0%, black 32%, black 100%);">
-                        <img src="{{ $slide['coverUrl'] }}" alt="{{ $slide['title'] }}"
-                             loading="{{ $i === 0 ? 'eager' : 'lazy' }}" referrerpolicy="no-referrer" decoding="async"
-                             class="h-full w-full object-cover object-top opacity-90" />
-                    </div>
+                         @if($i > 0) loading="lazy" @else fetchpriority="high" @endif
+                         decoding="async" referrerpolicy="no-referrer"
+                         class="absolute inset-0 h-full w-full object-cover object-center" />
                 @endif
-                <div class="absolute inset-0 bg-gradient-to-r from-[#172a37] via-[#172a37]/75 to-[#172a37]/15"></div>
-                <div class="absolute inset-0 bg-gradient-to-t from-[#172a37]/90 via-transparent to-transparent"></div>
 
-                <div class="relative z-20 flex h-full flex-col justify-end gap-2.5 p-5 pb-7 sm:gap-3 sm:p-9 sm:pb-10 lg:max-w-[62%]">
-                    <div class="inline-flex w-fit items-center gap-2 rounded-full bg-[#f97316] px-3.5 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-white">
-                        <span class="material-symbols-rounded text-sm">local_fire_department</span>
-                        Trending #{{ $i + 1 }}
-                    </div>
-                    <h1 class="max-w-2xl font-display text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-4xl">
-                        {{ $slide['title'] }}
-                    </h1>
-                    <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-white/85">
-                        @if(!empty($slide['year']))
-                            <span class="rounded-full bg-white/10 px-2.5 py-1">{{ $slide['year'] }}</span>
-                        @endif
-                        <span class="rounded-full bg-white/10 px-2.5 py-1">{{ $slide['format'] ?? 'MANGA' }}</span>
-                        @if(!empty($slide['contentRating']))
-                            <span class="rounded-full bg-white/10 px-2.5 py-1">{{ $slide['contentRating'] }}</span>
-                        @endif
-                        <span class="rounded-full bg-[#0f766e] px-2.5 py-1 text-white">{{ $slide['status'] ?? 'Ongoing' }}</span>
-                    </div>
-                    <p class="max-w-2xl text-sm leading-relaxed text-white/75 line-clamp-2">
-                        {{ \Illuminate\Support\Str::limit(strip_tags($slide['description'] ?? ''), 240) }}
-                    </p>
-                    <div class="flex flex-wrap gap-3 pt-1">
-                        <a href="{{ route('manga.show', $slide['id']) }}"
-                           class="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-[#172a37] transition hover:bg-[#f97316] hover:text-white">
-                            <span class="material-symbols-rounded">menu_book</span> Read Now
-                        </a>
-                        <a href="{{ route('manga.index', ['category' => 'trending']) }}"
-                           class="inline-flex items-center gap-2 rounded-full border border-white/40 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-white/10">
-                            All Trending
-                        </a>
+                {{-- Top dark gradient for transparent navbar legibility --}}
+                <div class="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/75 via-black/35 to-transparent"></div>
+
+                {{-- Left dark gradient for text block legibility --}}
+                <div class="absolute inset-0 bg-gradient-to-r from-[#0b141a]/90 via-[#0b141a]/60 via-40% to-transparent"></div>
+
+                {{-- Text content block on the left (bottom-aligned) --}}
+                <div class="relative mx-auto flex h-full w-full max-w-[1440px] flex-col justify-end px-4 sm:px-6 lg:px-7 pt-20 pb-20 sm:pb-24 lg:pb-28 z-20">
+                    <div class="max-w-2xl space-y-3 sm:space-y-4">
+                        <div class="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#f97316] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white sm:px-3.5 sm:text-[11px] shadow-sm">
+                            <span class="material-symbols-rounded text-sm">local_fire_department</span>
+                            Trending #{{ $i + 1 }}
+                        </div>
+
+                        <h1 class="line-clamp-2 text-2xl font-extrabold leading-tight tracking-tight text-white drop-shadow-md sm:text-4xl xl:text-5xl">
+                            {{ $slide['title'] }}
+                        </h1>
+
+                        <div class="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-white/90 sm:gap-2 sm:text-xs">
+                            @if(!empty($slide['year']))
+                                <span class="rounded-full bg-white/20 px-2.5 py-0.5 backdrop-blur-md">{{ $slide['year'] }}</span>
+                            @endif
+                            <span class="rounded-full bg-white/20 px-2.5 py-0.5 backdrop-blur-md">{{ $slide['format'] ?? 'MANGA' }}</span>
+                            @if(!empty($slide['contentRating']))
+                                <span class="rounded-full bg-white/20 px-2.5 py-0.5 backdrop-blur-md">{{ $slide['contentRating'] }}</span>
+                            @endif
+                            <span class="rounded-full bg-[#0f766e] px-2.5 py-0.5 text-white shadow-sm">{{ $slide['status'] ?? 'Ongoing' }}</span>
+                        </div>
+
+                        <p class="text-xs leading-relaxed text-white/80 line-clamp-2 drop-shadow-sm sm:text-sm">
+                            {{ \Illuminate\Support\Str::limit(strip_tags($slide['description'] ?? ''), 240) }}
+                        </p>
+
+                        <div class="flex flex-wrap items-center gap-2.5 pt-1 sm:gap-3">
+                            <a href="{{ route('manga.show', $slide['id']) }}"
+                               class="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold text-[#172a37] shadow-lg transition hover:bg-[#f97316] hover:text-white sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
+                                <span class="material-symbols-rounded text-[18px] sm:text-xl">menu_book</span> Read Now
+                            </a>
+                            <a href="{{ route('manga.index', ['category' => 'trending']) }}"
+                               class="inline-flex items-center gap-1.5 rounded-full border border-white/40 bg-black/20 px-4 py-2 text-xs font-bold text-white backdrop-blur-sm transition hover:bg-white/20 sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
+                                All Trending
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
         @endforeach
+
+        {{-- Bottom fade to page background color (cream in light, navy in dark) --}}
+        <div class="pointer-events-none absolute inset-x-0 bottom-0 h-44 hero-bottom-fade z-20"></div>
+
+        {{-- Left Arrow --}}
+        <button type="button" @click="prev()" aria-label="Previous slide"
+                class="absolute left-3 lg:left-6 top-1/2 -translate-y-1/2 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/70 hover:scale-105 active:scale-95">
+            <span class="material-symbols-rounded text-2xl">chevron_left</span>
+        </button>
+
+        {{-- Right Arrow --}}
+        <button type="button" @click="next()" aria-label="Next slide"
+                class="absolute right-3 lg:right-6 top-1/2 -translate-y-1/2 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/70 hover:scale-105 active:scale-95">
+            <span class="material-symbols-rounded text-2xl">chevron_right</span>
+        </button>
+
+        {{-- Dot Indicators at bottom-right --}}
+        <div class="absolute right-6 lg:right-12 bottom-12 sm:bottom-16 z-30 flex items-center gap-1.5">
+            @foreach($heroSlides as $i => $slide)
+                <button type="button" @click="goTo({{ $i }})"
+                        :aria-label="'Go to slide {{ $i + 1 }}'"
+                        class="h-1.5 rounded-full transition-all duration-300"
+                        :class="active === {{ $i }} ? 'w-6 bg-white' : 'w-1.5 bg-white/40 hover:bg-white/70'"></button>
+            @endforeach
+        </div>
     </section>
 @endif

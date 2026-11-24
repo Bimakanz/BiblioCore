@@ -82,6 +82,26 @@ html,
     scrollbar-color: #0f766e rgba(23, 42, 55, 0.06);
 }
 
+/* Hero full-bleed bottom fade to page background */
+.hero-bottom-fade {
+    background: linear-gradient(to top, #f6f1e8 0%, rgba(246, 241, 232, 0.85) 45%, transparent 100%);
+}
+
+html.dark .hero-bottom-fade {
+    background: linear-gradient(to top, #0e1419 0%, rgba(14, 20, 25, 0.85) 45%, transparent 100%) !important;
+}
+
+/* Card anime type label: thin flat teal gradient */
+.anime-type-label {
+    background: linear-gradient(to right, rgba(15, 118, 110, 0.16), rgba(15, 118, 110, 0.05));
+    color: #0f766e;
+}
+
+html.dark .anime-type-label {
+    background: linear-gradient(to right, rgba(45, 212, 191, 0.22), rgba(45, 212, 191, 0.06)) !important;
+    color: #2dd4bf !important;
+}
+
 /* ===== Dark Mode theme (toggled via html.dark) ===== */
 html.dark {
     color-scheme: dark;
@@ -92,9 +112,20 @@ html.dark body {
     color: #e6edf3 !important;
 }
 
-html.dark header {
+html.dark header:not(.nav-transparent) {
     background-color: rgba(14, 20, 25, 0.92) !important;
     border-color: #24303c !important;
+}
+
+html.dark header.nav-transparent {
+    background-color: transparent !important;
+    border-color: transparent !important;
+}
+
+html.dark header.nav-transparent input[type="text"] {
+    background-color: rgba(0, 0, 0, 0.35) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+    color: #ffffff !important;
 }
 
 html.dark .mobile-dock {

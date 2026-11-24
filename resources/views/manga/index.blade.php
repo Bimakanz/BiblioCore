@@ -1,60 +1,68 @@
 <x-manga-layout title="BiblioManga — Read Manga & Comics Online for Free">
-    <div class="space-y-9">
+    @php
+        $isMangaHome = request()->routeIs('manga.index', 'landing') && !request()->hasAny(['category', 'genre', 'q', 'search', 'page']);
+    @endphp
 
+    @if($isMangaHome)
         @include('manga.partials.hero')
+    @endif
 
-        {{-- ===== CONTINUE READING (manga history only) ===== --}}
-        <section x-data="{
-                    items: JSON.parse(localStorage.getItem('bibliomanga_history') || '[]'),
-                    rel(item) {
-                        const raw = item.updatedAt;
-                        if (raw) {
-                            const d = Number(raw);
-                            if (d && d > 1577836800000) {
-                                const diff = Math.max(0, Date.now() - d);
-                                const m = Math.floor(diff / 60000);
-                                if (m < 1) return 'Read just now';
-                                if (m < 60) return 'Read ' + m + 'm ago';
-                                const h = Math.floor(m / 60);
-                                if (h < 24) return 'Read ' + h + 'h ago';
-                                return 'Read ' + Math.floor(h / 24) + 'd ago';
+    <div class="{{ $isMangaHome ? 'mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-7 space-y-9 -mt-16 sm:-mt-20 lg:-mt-24 relative z-20' : 'space-y-9' }}">
+
+        @if($isMangaHome)
+            {{-- ===== CONTINUE READING (manga history only) ===== --}}
+            <section x-data="{
+                        items: JSON.parse(localStorage.getItem('bibliomanga_history') || '[]'),
+                        rel(item) {
+                            const raw = item.updatedAt;
+                            if (raw) {
+                                const d = Number(raw);
+                                if (d && d > 1577836800000) {
+                                    const diff = Math.max(0, Date.now() - d);
+                                    const m = Math.floor(diff / 60000);
+                                    if (m < 1) return 'Read just now';
+                                    if (m < 60) return 'Read ' + m + 'm ago';
+                                    const h = Math.floor(m / 60);
+                                    if (h < 24) return 'Read ' + h + 'h ago';
+                                    return 'Read ' + Math.floor(h / 24) + 'd ago';
+                                }
                             }
+                            if (item.readAt && typeof item.readAt === 'string') {
+                                return 'Read ' + item.readAt;
+                            }
+                            return 'Recently read';
                         }
-                        if (item.readAt && typeof item.readAt === 'string') {
-                            return 'Read ' + item.readAt;
-                        }
-                        return 'Recently read';
-                    }
-                 }"
-                 x-show="items.length > 0" x-cloak>
-            <div class="mb-4 flex flex-wrap items-end justify-between gap-2">
-                <div>
-                    <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[#84948a]">Pick up where you left off</p>
-                    <h2 class="font-display text-xl font-bold text-[#172a37] sm:text-2xl">Continue Reading</h2>
+                     }"
+                     x-show="items.length > 0" x-cloak>
+                <div class="mb-4 flex flex-wrap items-end justify-between gap-2">
+                    <div>
+                        <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[#84948a]">Pick up where you left off</p>
+                        <h2 class="font-display text-xl font-bold text-[#172a37] sm:text-2xl">Continue Reading</h2>
+                    </div>
+                    <x-section-link @click="openHistory()">View all history</x-section-link>
                 </div>
-                <x-section-link @click="openHistory()">View all history</x-section-link>
-            </div>
 
-            <div class="rail-x no-scrollbar">
-                <template x-for="item in items.slice(0, 10)" :key="item.id + '-' + (item.chapterId || '')">
-                    <a :href="continueHref(item)"
-                       class="group flex w-[280px] items-center gap-3 rounded-2xl border border-[#e0d9c8] bg-white/80 p-2.5 shadow-sm transition hover:border-[#0f766e]/50 hover:shadow-md sm:w-[320px]">
-                        <img :src="item.coverUrl || 'https://via.placeholder.com/60x84?text=No+Cover'" alt="" loading="lazy" decoding="async"
-                             class="h-[84px] w-[58px] flex-shrink-0 rounded-lg object-cover" />
-                        <div class="min-w-0 flex-1">
-                            <h3 class="truncate text-sm font-bold text-[#172a37]" x-text="item.title"></h3>
-                            <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-[#7b8a82]">
-                                <span class="font-bold text-[#0f766e]">Ch <span x-text="item.chapterNumber || '?'"></span></span>
-                                <span x-text="rel(item)"></span>
+                <div class="rail-x no-scrollbar">
+                    <template x-for="item in items.slice(0, 10)" :key="item.id + '-' + (item.chapterId || '')">
+                        <a :href="continueHref(item)"
+                           class="group flex w-[280px] items-center gap-3 rounded-2xl border border-[#e0d9c8] bg-white/80 p-2.5 shadow-sm transition hover:border-[#0f766e]/50 hover:shadow-md sm:w-[320px]">
+                            <img :src="item.coverUrl || 'https://via.placeholder.com/60x84?text=No+Cover'" alt="" loading="lazy" decoding="async"
+                                 class="h-[84px] w-[58px] flex-shrink-0 rounded-lg object-cover" />
+                            <div class="min-w-0 flex-1">
+                                <h3 class="truncate text-sm font-bold text-[#172a37]" x-text="item.title"></h3>
+                                <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-[#7b8a82]">
+                                    <span class="font-bold text-[#0f766e]">Ch <span x-text="item.chapterNumber || '?'"></span></span>
+                                    <span x-text="rel(item)"></span>
+                                </div>
                             </div>
-                        </div>
-                        <span class="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-[#0f766e] text-white transition group-hover:bg-[#115e59]">
-                            <span class="material-symbols-rounded text-[18px]">menu_book</span>
-                        </span>
-                    </a>
-                </template>
-            </div>
-        </section>
+                            <span class="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-[#0f766e] text-white transition group-hover:bg-[#115e59]">
+                                <span class="material-symbols-rounded text-[18px]">menu_book</span>
+                            </span>
+                        </a>
+                    </template>
+                </div>
+            </section>
+        @endif
 
         {{-- ===== FILTERS ===== --}}
         <section class="space-y-4">
