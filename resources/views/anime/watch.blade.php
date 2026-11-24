@@ -66,6 +66,10 @@
                     The dub for this episode is not available yet — playing the sub version.
                 </p>
 
+                <p id="versionNotice" class="hidden rounded-2xl border border-[#bae6fd] bg-[#f0f9ff] px-4 py-2 text-xs font-semibold text-[#075985]">
+                    The burned-in copy is not available for this episode — playing the standard source instead.
+                </p>
+
                 <div id="embedWarning" class="hidden items-start gap-3 rounded-2xl border border-[#f59e0b]/45 bg-[#fffbeb] px-4 py-3 text-xs text-[#92400e] shadow-sm">
                     <span class="material-symbols-rounded mt-0.5 flex-shrink-0 text-[19px] text-[#d97706]">warning</span>
                     <div class="min-w-0 flex-1 leading-relaxed">
@@ -88,6 +92,22 @@
                                     class="rounded-full px-2.5 py-0.5 text-[11px] font-bold transition bg-[#0f766e] text-white shadow-sm">Sub</button>
                             <button type="button" id="audioDubBtn" data-audio="dub"
                                     class="rounded-full px-2.5 py-0.5 text-[11px] font-bold text-[#4c5b54] transition hover:text-[#0f766e] disabled:cursor-not-allowed disabled:opacity-40">Dub</button>
+                        </div>
+                    </div>
+
+                    <span class="hidden h-4 w-px bg-[#e0d9c8] sm:block"></span>
+
+                    {{-- Softsub (standard) or a hard-subtitled copy: the text is
+                         burned into the video, so nothing can drift or be lost. --}}
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-[10px] font-bold uppercase tracking-wide text-[#84948a]">Version</span>
+                        <div class="relative">
+                            <button type="button" id="versionBtn" class="pill-btn" title="Standard uses the softsub tracks (you can shift them). Burned-in plays a copy with the subtitles already inside the video."><span id="versionBtnLabel">Standard</span><span class="material-symbols-rounded text-[14px] opacity-60">expand_more</span></button>
+                            <div id="versionMenu" class="pill-menu hidden">
+                                <button type="button" class="pill-option is-active" data-value="">Standard</button>
+                                <button type="button" class="pill-option" data-value="animeheaven">Burned-in &middot; EN</button>
+                                <button type="button" class="pill-option" data-value="samehadaku">Burned-in &middot; ID</button>
+                            </div>
                         </div>
                     </div>
 
@@ -253,6 +273,9 @@
         try { qualityPref = parseInt(localStorage.getItem('biblioanime_quality') || '-1', 10); if (isNaN(qualityPref)) qualityPref = -1; } catch (e) {}
         let audioValue = @js($audio) === 'dub' ? 'dub' : 'sub';
         let dubAvailable = @js($dubAvailable);
+        // Burned-in copies come from separate hard-subtitle sources, picked
+        // with ?server=animeheaven|samehadaku. Empty means the normal chain.
+        let hardsubServer = @js(in_array(request()->query('server'), ['animeheaven', 'samehadaku'], true) ? request()->query('server') : '');
 
         // Custom pill dropdowns: button + menu panel (no native <select>).
         function setupDropdown(btnId, menuId, labelId, onPick) {
@@ -325,6 +348,13 @@
             if (next === audioValue) return;
             if (next === 'dub' && !dubAvailable) return;
             audioValue = next;
+            // Both burned-in libraries are sub-only, so a dub choice always
+            // goes back to the standard chain.
+            if (next === 'dub' && hardsubServer) {
+                setHardsubServer('');
+                const notice = document.getElementById('versionNotice');
+                if (notice) notice.classList.add('hidden');
+            }
             try { localStorage.setItem('biblioanime_audio', next); } catch (e) {}
             paintAudioButtons();
             goToAudio();
@@ -345,7 +375,7 @@
                     paintAudioButtons();
                     return;
                 }
-                location.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(match.id) + '&n=' + match.number + '&audio=' + audioValue;
+                location.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(match.id) + '&n=' + match.number + '&audio=' + audioValue + (hardsubServer ? '&server=' + encodeURIComponent(hardsubServer) : '');
             } catch (e) {
                 showError('Failed to load the ' + (audioValue === 'dub' ? 'Dub' : 'Sub') + '.'); 
             }
@@ -365,6 +395,55 @@
         const subtitleDropdown = setupDropdown('subtitleBtn', 'subtitleMenu', 'subtitleBtnLabel', function (v) {
             applySubtitle(parseInt(v, 10));
         });
+
+        // "Version" swaps between the soft-sub chain and a burned-in file.
+        // The choice lives in the URL so episode links and refreshes keep it.
+        function rememberServerInUrl() {
+            try {
+                const url = new URL(location.href);
+                if (hardsubServer) url.searchParams.set('server', hardsubServer);
+                else url.searchParams.delete('server');
+                history.replaceState(null, '', url);
+            } catch (e) {}
+        }
+
+        function setHardsubServer(value) {
+            hardsubServer = (value === 'animeheaven' || value === 'samehadaku') ? value : '';
+            versionDropdown.setActive(hardsubServer);
+            rememberServerInUrl();
+            refreshEpisodeLinks();
+        }
+
+        const versionDropdown = setupDropdown('versionBtn', 'versionMenu', 'versionBtnLabel', function (v) {
+            const next = (v === 'animeheaven' || v === 'samehadaku') ? v : '';
+            if (next === hardsubServer) return;
+            setHardsubServer(next);
+            document.getElementById('versionNotice').classList.add('hidden');
+            if (playMode === 'mp4') { try { video.pause(); } catch (e) {} }
+            loadStream();
+        });
+        versionDropdown.setActive(hardsubServer);
+
+        function streamUrl() {
+            return hardsubServer
+                ? STREAM_URL + (STREAM_URL.indexOf('?') === -1 ? '?' : '&') + 'server=' + encodeURIComponent(hardsubServer)
+                : STREAM_URL;
+        }
+
+        function watchHref(epId, number, audio) {
+            return '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(epId)
+                + '&n=' + number + '&audio=' + encodeURIComponent(audio)
+                + (hardsubServer ? '&server=' + encodeURIComponent(hardsubServer) : '');
+        }
+
+        // The episode list is built once; keep its links in sync with the
+        // current version so switching to a burned-in copy sticks.
+        function refreshEpisodeLinks() {
+            document.querySelectorAll('[data-ep-id]').forEach(function (a) {
+                const audio = a.dataset.epAudio || audioValue;
+                a.href = watchHref(a.dataset.epId, a.dataset.epN, audio);
+            });
+        }
 
         let hls = null;
         let intro = null;
@@ -784,7 +863,7 @@
             resumeApplied = false;
             let data = null;
             try {
-                const res = await fetch(STREAM_URL);
+                const res = await fetch(streamUrl());
                 data = await res.json();
             } catch (e) {
                 showError('Could not reach the streaming service. Check your connection and try again.');
@@ -797,6 +876,23 @@
                     showError((data && data.error) || 'All servers were tried automatically, but none could play this episode. Please try again later.');
                 }
                 return;
+            }
+            // Asked for a burned-in copy but the source did not have this
+            // episode: the backend already fell back, so tell the viewer
+            // instead of leaving a misleading "Burned-in" label.
+            const versionNotice = document.getElementById('versionNotice');
+            if (hardsubServer && !data.hardSub) {
+                setHardsubServer('');
+                if (versionNotice) versionNotice.classList.remove('hidden');
+            } else if (versionNotice) {
+                versionNotice.classList.add('hidden');
+            }
+            // A burned-in copy picked automatically as the last resort should
+            // also show up in the picker, otherwise the label lies.
+            if (data.hardSub && !hardsubServer) {
+                const actual = data.provider === 'AnimeHeaven' ? 'animeheaven'
+                    : (data.provider === 'Samehadaku' ? 'samehadaku' : '');
+                if (actual) setHardsubServer(actual);
             }
             intro = data.intro || intro;
             outro = data.outro || outro;
@@ -874,6 +970,8 @@
             // A previous hard-subtitled file may have disabled these.
             subtitleDropdown.btn.disabled = false;
             subtitleDropdown.btn.title = '';
+            qualityDropdown.btn.disabled = false;
+            qualityDropdown.btn.title = '';
             if (window.Hls && Hls.isSupported()) {
                 hls = new Hls({
                     // Long episodes (40-60 min) need a deep forward buffer so
@@ -1099,7 +1197,10 @@
                 listEl.innerHTML = '';
                 eps.forEach(function (ep) {
                     const a = document.createElement('a');
-                    a.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(ep.id) + '&n=' + ep.number + '&audio=' + encodeURIComponent(audioValue);
+                    a.dataset.epId = ep.id;
+                    a.dataset.epN = ep.number;
+                    a.dataset.epAudio = audioValue;
+                    a.href = watchHref(ep.id, ep.number, audioValue);
                     a.className = 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ' + (ep.number === EPISODE_NUMBER ? 'bg-[#0f766e] font-bold text-white' : 'font-semibold text-[#4c5b54] hover:bg-[#f6f1e8]');
                     a.innerHTML = '<span class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ' + (ep.number === EPISODE_NUMBER ? 'bg-white/20' : 'bg-[#172a37] text-white') + '"><span class="material-symbols-rounded text-sm">play_arrow</span></span><span class="min-w-0"><span class="block">Episode ' + ep.number + '</span>' + (ep.title ? '<span class="block truncate text-[11px] font-medium opacity-70">' + ep.title.replace(/</g, '&lt;') + '</span>' : '') + '</span>';
                     listEl.appendChild(a);
@@ -1110,12 +1211,18 @@
                 const prevBtn = document.getElementById('prevEpBtn');
                 const nextBtn = document.getElementById('nextEpBtn');
                 if (prev) {
-                    prevBtn.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(prev.id) + '&n=' + prev.number + '&audio=' + audioValue;
+                    prevBtn.dataset.epId = prev.id;
+                    prevBtn.dataset.epN = prev.number;
+                    prevBtn.dataset.epAudio = audioValue;
+                    prevBtn.href = watchHref(prev.id, prev.number, audioValue);
                     prevBtn.classList.remove('hidden');
                     prevBtn.classList.add('inline-flex');
                 }
                 if (next) {
-                    nextBtn.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(next.id) + '&n=' + next.number + '&audio=' + audioValue;
+                    nextBtn.dataset.epId = next.id;
+                    nextBtn.dataset.epN = next.number;
+                    nextBtn.dataset.epAudio = audioValue;
+                    nextBtn.href = watchHref(next.id, next.number, audioValue);
                     nextBtn.classList.remove('hidden');
                     nextBtn.classList.add('inline-flex');
                     nextEpisodeUrl = nextBtn.href;
