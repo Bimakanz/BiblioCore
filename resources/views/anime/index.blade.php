@@ -79,60 +79,58 @@
                 </div>
             </section>
 
-            {{-- ===== TOP 10 LEADERBOARD: PODIUM + CHART SHELF ===== --}}
+            {{-- ===== TOP 10 LEADERBOARD: TOP 3 + CHART SHELF ===== --}}
             @php
                 $top10 = array_slice($trending ?? [], 0, 10);
                 $podium = array_slice($top10, 0, 3);
                 $rest = array_slice($top10, 3);
-                $podiumLabels = ['Champion', 'Runner-up', 'Third place'];
-                $podiumOrder = ['sm:order-2', 'sm:order-1', 'sm:order-3'];
+                $rankBadgeStyles = [
+                    'bg-[#fbbf24] text-[#172a37]',
+                    'bg-[#e2e8f0] text-[#172a37]',
+                    'bg-[#f97316] text-white',
+                ];
             @endphp
             @if(count($top10))
                 <section>
                     <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
                         <div>
-                            <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[#84948a]">Trending chart</p>
+                            <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-[#84948a]">Trending chart</p>
                             <h2 class="font-display text-xl font-bold tracking-tight text-[#172a37] sm:text-2xl">Top {{ count($top10) }} right now</h2>
                         </div>
                         <x-section-link :href="route('anime.index', ['category' => 'trending'])">Full ranking</x-section-link>
                     </div>
 
-                    {{-- Podium: #1 rises above the runners-up on desktop. --}}
-                    <div class="grid gap-3 sm:grid-cols-3 sm:items-end">
+                    {{-- Top 3: balanced, clean 3-column showcase --}}
+                    <div class="grid gap-3.5 sm:grid-cols-3">
                         @foreach($podium as $i => $anime)
                             <a href="{{ route('anime.show', ['id' => $anime['id']]) }}"
-                               class="group relative flex flex-col justify-end overflow-hidden rounded-2xl border bg-[#172a37] p-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-18px_rgba(23,42,55,0.6)] sm:rounded-3xl sm:p-5 {{ $podiumOrder[$i] ?? '' }} {{ $i === 0 ? 'min-h-[220px] border-[#fbbf24]/70 ring-1 ring-[#fbbf24]/35 sm:min-h-[320px]' : 'min-h-[200px] border-[#e0d9c8] sm:min-h-[244px]' }}">
-                                <img src="{{ $anime['bannerUrl'] ?: $anime['coverUrl'] }}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"
-                                     class="absolute inset-0 h-full w-full object-cover opacity-70 transition duration-700 group-hover:scale-105 group-hover:opacity-85" />
-                                <div class="absolute inset-0 bg-gradient-to-t from-[#0b1a23] via-[#0b1a23]/72 to-[#0b1a23]/5"></div>
+                               class="group relative flex min-h-[210px] flex-col justify-between overflow-hidden rounded-2xl border border-[#e0d9c8] bg-[#172a37] p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_42px_-18px_rgba(23,42,55,0.55)] sm:min-h-[248px] sm:rounded-3xl sm:p-5">
+                                <img src="{{ $anime['bannerUrl'] ?: $anime['coverUrl'] }}" alt="{{ $anime['title'] }}" loading="lazy" decoding="async" referrerpolicy="no-referrer"
+                                     class="absolute inset-0 h-full w-full object-cover object-top opacity-85 transition duration-700 group-hover:scale-105" />
+                                <div class="absolute inset-0 bg-gradient-to-t from-[#0b1a23]/95 via-[#0b1a23]/40 to-[#0b1a23]/15"></div>
 
-                                <span aria-hidden="true"
-                                      class="pointer-events-none absolute -right-1 -top-3 select-none font-display text-[88px] font-extrabold leading-none tracking-tighter {{ $i === 0 ? 'text-[#fbbf24]/15' : 'text-white/10' }} sm:-top-4 sm:text-[108px]">
-                                    {{ $i + 1 }}
-                                </span>
-
-                                <div class="relative flex items-center gap-2">
-                                    <span class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-1.5 font-mono text-sm font-bold tabular-nums {{ $i === 0 ? 'bg-[#fbbf24] text-[#172a37]' : ($i === 1 ? 'bg-[#dcd2bd] text-[#172a37]' : 'bg-[#f97316] text-white') }}">
-                                        {{ str_pad($i + 1, 2, '0', STR_PAD_LEFT) }}
+                                <div class="relative flex items-center justify-between gap-2">
+                                    <span class="inline-flex h-7 items-center justify-center rounded-full px-2.5 text-xs font-extrabold tabular-nums shadow-sm {{ $rankBadgeStyles[$i] ?? 'bg-white text-[#172a37]' }}">
+                                        #{{ $i + 1 }}
                                     </span>
-                                    <span class="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">{{ $podiumLabels[$i] }}</span>
-                                </div>
-
-                                <h3 class="relative mt-2 line-clamp-2 font-display text-base font-bold leading-tight text-white lg:text-lg">{{ $anime['title'] }}</h3>
-
-                                <div class="relative mt-2 flex flex-wrap items-center gap-1.5 font-mono text-[10px] font-semibold text-white/80">
-                                    <span class="rounded-full bg-white/10 px-2 py-0.5">{{ $anime['format'] }}</span>
-                                    @if($anime['year'])
-                                        <span class="rounded-full bg-white/10 px-2 py-0.5">{{ $anime['year'] }}</span>
-                                    @endif
-                                    @if($anime['episodes'])
-                                        <span class="rounded-full bg-white/10 px-2 py-0.5">{{ $anime['episodes'] }} EP</span>
-                                    @endif
                                     @if($anime['score'])
-                                        <span class="ml-auto inline-flex items-center gap-1 text-xs font-bold text-white">
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-black/65 px-2.5 py-1 text-xs font-bold text-white tabular-nums">
                                             <span class="material-symbols-rounded text-[13px] text-[#fbbf24]">star</span>{{ $anime['score'] }}
                                         </span>
                                     @endif
+                                </div>
+
+                                <div class="relative mt-auto pt-12">
+                                    <h3 class="line-clamp-2 font-display text-base font-extrabold leading-snug text-white transition-colors group-hover:text-[#fde68a] lg:text-lg">{{ $anime['title'] }}</h3>
+                                    <div class="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-white/85">
+                                        <span class="rounded-md bg-white/15 px-2 py-0.5">{{ $anime['format'] }}</span>
+                                        @if($anime['year'])
+                                            <span class="rounded-md bg-white/15 px-2 py-0.5">{{ $anime['year'] }}</span>
+                                        @endif
+                                        @if($anime['episodes'])
+                                            <span class="rounded-md bg-white/15 px-2 py-0.5">{{ $anime['episodes'] }} EP</span>
+                                        @endif
+                                    </div>
                                 </div>
                             </a>
                         @endforeach
@@ -140,23 +138,34 @@
 
                     {{-- The rest of the chart, as a swipeable poster shelf. --}}
                     @if(count($rest))
-                        <div class="mt-3 rounded-2xl border border-[#e0d9c8] bg-[#faf7f0] p-3 sm:p-4">
-                            <p class="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#84948a]">Ranks 4 to {{ count($top10) }}</p>
-                            <div class="rail-x no-scrollbar">
+                        <div class="mt-4 rounded-2xl border border-[#e0d9c8] bg-white/75 p-3.5 shadow-sm sm:rounded-3xl sm:p-5">
+                            <div class="mb-3 flex items-center justify-between">
+                                <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-[#84948a]">Ranks 4 to {{ count($top10) }}</p>
+                                <span class="text-[11px] font-medium text-[#84948a] lg:hidden">Swipe &rarr;</span>
+                            </div>
+                            <div class="rail-x no-scrollbar !pb-0">
                                 @foreach($rest as $i => $anime)
-                                    <a href="{{ route('anime.show', ['id' => $anime['id']]) }}" class="group w-[96px] sm:w-[112px] lg:w-auto lg:flex-1">
-                                        <div class="relative aspect-[2/3] overflow-hidden rounded-xl border border-[#dcd2bd] bg-[#eaddc2] shadow-sm transition duration-300 group-hover:-translate-y-0.5 group-hover:border-[#0f766e]/60 group-hover:shadow-md">
-                                            <img src="{{ $anime['coverUrl'] }}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"
-                                                 class="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                                    <a href="{{ route('anime.show', ['id' => $anime['id']]) }}" class="group w-[118px] sm:w-[134px] lg:w-auto lg:flex-1">
+                                        <div class="relative aspect-[2/3] overflow-hidden rounded-xl border border-[#dcd2bd] bg-[#eaddc2] shadow-sm transition duration-300 group-hover:-translate-y-1 group-hover:border-[#0f766e]/60 group-hover:shadow-lg">
+                                            <img src="{{ $anime['coverUrl'] }}" alt="{{ $anime['title'] }}" loading="lazy" decoding="async" referrerpolicy="no-referrer"
+                                                 class="h-full w-full object-cover object-top transition duration-500 group-hover:scale-105" />
                                             <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0b1a23]/85 via-[#0b1a23]/10 to-transparent"></div>
-                                            <span class="absolute bottom-1 left-1.5 font-display text-2xl font-extrabold leading-none text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)]">{{ $i + 4 }}</span>
+                                            <span class="absolute bottom-1 left-2 font-display text-2xl font-extrabold leading-none text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.55)] tabular-nums">
+                                                {{ $i + 4 }}
+                                            </span>
                                             @if($anime['score'])
-                                                <span class="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 font-mono text-[9px] font-bold text-white">
-                                                    <span class="material-symbols-rounded text-[10px] text-[#fbbf24]">star</span>{{ $anime['score'] }}
+                                                <span class="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white tabular-nums">
+                                                    <span class="material-symbols-rounded text-[11px] text-[#fbbf24]">star</span>{{ $anime['score'] }}
                                                 </span>
                                             @endif
                                         </div>
-                                        <h4 class="mt-1.5 line-clamp-2 min-h-[2.15rem] text-[11px] font-semibold leading-snug text-[#172a37] transition-colors group-hover:text-[#0f766e]" title="{{ $anime['title'] }}">{{ $anime['title'] }}</h4>
+                                        <h4 class="mt-2 line-clamp-2 min-h-[2.1rem] text-xs font-bold leading-snug text-[#172a37] transition-colors group-hover:text-[#0f766e]" title="{{ $anime['title'] }}">{{ $anime['title'] }}</h4>
+                                        @if($anime['year'] || $anime['episodes'])
+                                            <div class="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium text-[#7b8a82]">
+                                                @if($anime['year'])<span>{{ $anime['year'] }}</span>@endif
+                                                @if($anime['episodes'])<span>{{ $anime['episodes'] }} EP</span>@endif
+                                            </div>
+                                        @endif
                                     </a>
                                 @endforeach
                             </div>
@@ -193,67 +202,77 @@
                 <section>
                     <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
                         <div>
-                            <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[#84948a]">All-time favourites</p>
+                            <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-[#84948a]">All-time favourites</p>
                             <h2 class="font-display text-xl font-bold tracking-tight text-[#172a37] sm:text-2xl">Highest rated</h2>
                         </div>
                         <x-section-link :href="route('anime.index', ['category' => 'top'])">View all</x-section-link>
                     </div>
 
-                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+                        {{-- #1 Spotlight --}}
                         <a href="{{ route('anime.show', ['id' => $topPick['id']]) }}"
-                           class="group relative flex min-h-[300px] flex-col justify-end overflow-hidden rounded-3xl border border-[#e0d9c8] bg-[#172a37] p-5 shadow-sm sm:p-7">
-                            <img src="{{ $topPick['bannerUrl'] ?: $topPick['coverUrl'] }}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"
-                                 class="absolute inset-0 h-full w-full object-cover opacity-60 transition duration-500 group-hover:scale-105" />
-                            <div class="absolute inset-0 bg-gradient-to-t from-[#172a37] via-[#172a37]/55 to-transparent"></div>
-                            <div class="relative space-y-2.5">
-                                <span class="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#fbbf24] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#172a37]">
-                                    <span class="material-symbols-rounded text-sm">workspace_premium</span>
-                                    #1 highest rated
+                           class="group relative flex min-h-[280px] flex-col justify-between overflow-hidden rounded-2xl border border-[#e0d9c8] bg-[#172a37] p-5 shadow-sm transition duration-300 hover:shadow-[0_22px_48px_-20px_rgba(23,42,55,0.6)] sm:min-h-[340px] sm:rounded-3xl sm:p-7">
+                            <img src="{{ $topPick['bannerUrl'] ?: $topPick['coverUrl'] }}" alt="{{ $topPick['title'] }}" loading="lazy" decoding="async" referrerpolicy="no-referrer"
+                                 class="absolute inset-0 h-full w-full object-cover object-top opacity-75 transition duration-700 group-hover:scale-105" />
+                            <div class="absolute inset-0 bg-gradient-to-t from-[#0b1a23]/95 via-[#0b1a23]/55 to-[#0b1a23]/15"></div>
+
+                            <div class="relative flex items-center justify-between gap-2">
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-[#fbbf24] px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-[#172a37] shadow-sm">
+                                    <span class="material-symbols-rounded text-[15px]">workspace_premium</span>
+                                    #1 Highest Rated
                                 </span>
-                                <h3 class="font-display text-2xl font-extrabold leading-tight text-white sm:text-3xl">{{ $topPick['title'] }}</h3>
-                                <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-white/85">
-                                    <span class="rounded-full bg-white/10 px-2.5 py-1">{{ $topPick['format'] }}</span>
+                                @if($topPick['score'])
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-black/65 px-3 py-1 text-sm font-extrabold text-white tabular-nums">
+                                        <span class="material-symbols-rounded text-[15px] text-[#fbbf24]">star</span>{{ number_format((float) $topPick['score'], 1) }}
+                                    </span>
+                                @endif
+                            </div>
+
+                            <div class="relative mt-auto space-y-3 pt-16">
+                                <h3 class="font-display text-2xl font-extrabold leading-tight text-white transition-colors group-hover:text-[#fde68a] sm:text-3xl">{{ $topPick['title'] }}</h3>
+                                <div class="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-white/90">
+                                    <span class="rounded-md bg-white/15 px-2.5 py-0.5">{{ $topPick['format'] }}</span>
                                     @if($topPick['year'])
-                                        <span class="rounded-full bg-white/10 px-2.5 py-1">{{ $topPick['year'] }}</span>
+                                        <span class="rounded-md bg-white/15 px-2.5 py-0.5">{{ $topPick['year'] }}</span>
                                     @endif
                                     @if($topPick['episodes'])
-                                        <span class="rounded-full bg-white/10 px-2.5 py-1">{{ $topPick['episodes'] }} EP</span>
+                                        <span class="rounded-md bg-white/15 px-2.5 py-0.5">{{ $topPick['episodes'] }} EP</span>
                                     @endif
                                 </div>
-                                @if($topPick['score'])
-                                    <div class="flex items-center gap-3 pt-1">
-                                        <span class="inline-flex items-center gap-1 font-mono text-2xl font-bold text-white">
-                                            <span class="material-symbols-rounded text-base text-[#fbbf24]">star</span>{{ $topPick['score'] }}
-                                        </span>
-                                        <span class="h-1.5 w-32 overflow-hidden rounded-full bg-white/20">
-                                            <span class="block h-full rounded-full bg-[#fbbf24]" style="width: {{ (int) round($topPick['score'] * 10) }}%"></span>
-                                        </span>
-                                    </div>
+                                @if(!empty($topPick['description']))
+                                    <p class="max-w-lg text-xs leading-relaxed text-white/75 line-clamp-2 sm:text-sm">{{ $topPick['description'] }}</p>
                                 @endif
-                                <span class="inline-flex items-center gap-1.5 pt-1 text-xs font-bold text-white/90 transition-colors group-hover:text-[#fbbf24]">
-                                    <span class="material-symbols-rounded text-base">play_circle</span> Watch now
-                                </span>
+                                <div class="pt-1">
+                                    <span class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-[#172a37] shadow-sm transition group-hover:bg-[#f97316] group-hover:text-white">
+                                        <span class="material-symbols-rounded text-[17px]">play_circle</span>
+                                        Watch Now
+                                    </span>
+                                </div>
                             </div>
                         </a>
 
-                        <div class="overflow-hidden rounded-3xl border border-[#e0d9c8] bg-white shadow-sm">
+                        {{-- Ranks #2 to #6 with poster thumbnails --}}
+                        <div class="flex flex-col justify-between overflow-hidden rounded-2xl border border-[#e0d9c8] bg-white p-2 shadow-sm sm:rounded-3xl sm:p-2.5">
                             @foreach($topRest as $i => $anime)
                                 <a href="{{ route('anime.show', ['id' => $anime['id']]) }}"
-                                   class="group flex items-center gap-3 px-4 py-3 transition hover:bg-[#faf6ee] sm:gap-4 sm:px-5 {{ $i > 0 ? 'border-t border-[#efe7d6]' : '' }}">
-                                    <div class="w-6 flex-shrink-0 text-right font-mono text-sm font-bold tabular-nums text-[#c1cbbb]">{{ $i + 2 }}</div>
+                                   class="group flex items-center gap-3 rounded-xl px-2.5 py-2 transition hover:bg-[#f6f1e8] sm:gap-3.5 sm:px-3">
+                                    <span class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[#f6f1e8] text-xs font-extrabold text-[#5f6b63] tabular-nums transition group-hover:bg-[#0f766e] group-hover:text-white">
+                                        {{ $i + 2 }}
+                                    </span>
+                                    <img src="{{ $anime['coverUrl'] }}" alt="{{ $anime['title'] }}" loading="lazy" decoding="async" referrerpolicy="no-referrer"
+                                         class="h-14 w-10 flex-shrink-0 rounded-lg border border-[#dcd2bd] object-cover object-top shadow-sm" />
                                     <div class="min-w-0 flex-1">
                                         <h3 class="truncate text-sm font-bold text-[#172a37] transition-colors group-hover:text-[#0f766e]">{{ $anime['title'] }}</h3>
-                                        <p class="mt-0.5 truncate font-mono text-[10px] text-[#84948a]">
-                                            {{ $anime['format'] }}@if($anime['year']) &middot; {{ $anime['year'] }}@endif
-                                        </p>
+                                        <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-[#7b8a82]">
+                                            <span class="rounded bg-[#f6f1e8] px-1.5 py-0.5 text-[10px] font-semibold text-[#5f6b63]">{{ $anime['format'] }}</span>
+                                            @if($anime['year'])<span>{{ $anime['year'] }}</span>@endif
+                                            @if($anime['episodes'])<span>{{ $anime['episodes'] }} EP</span>@endif
+                                        </div>
                                     </div>
                                     @if($anime['score'])
-                                        <div class="flex flex-shrink-0 items-center gap-2">
-                                            <span class="hidden h-1.5 w-10 overflow-hidden rounded-full bg-[#eaddc2] sm:block">
-                                                <span class="block h-full rounded-full bg-[#0f766e]" style="width: {{ (int) round($anime['score'] * 10) }}%"></span>
-                                            </span>
-                                            <span class="font-mono text-[11px] font-bold text-[#172a37]">{{ $anime['score'] }}</span>
-                                        </div>
+                                        <span class="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-[#fef3c7] px-2.5 py-1 text-xs font-bold text-[#92400e] tabular-nums">
+                                            <span class="material-symbols-rounded text-[13px] text-[#f59e0b]">star</span>{{ number_format((float) $anime['score'], 1) }}
+                                        </span>
                                     @endif
                                 </a>
                             @endforeach

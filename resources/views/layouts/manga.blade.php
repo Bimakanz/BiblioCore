@@ -128,11 +128,6 @@
               document.documentElement.classList.toggle('dark', this.darkMode);
               try { localStorage.setItem('biblio_theme', this.darkMode ? 'dark' : 'light'); } catch (e) {}
           },
-          animeAudioPref: localStorage.getItem('biblioanime_audio') || 'sub',
-          setAnimeAudioPref(val) {
-              this.animeAudioPref = val === 'dub' ? 'dub' : 'sub';
-              try { localStorage.setItem('biblioanime_audio', this.animeAudioPref); } catch (e) {}
-          },
           clearFavorites() {
               this.favorites = [];
               localStorage.removeItem('bibliomanga_favs');
@@ -592,26 +587,6 @@
                                 :class="darkMode ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] hover:text-[#172a37]'">
                             <span class="material-symbols-rounded text-[15px]">dark_mode</span>
                             Dark
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Default Anime Audio -->
-                <div class="flex items-center justify-between gap-3 rounded-2xl border border-[#eaddc2] bg-[#fbf9f4] p-3.5">
-                    <div>
-                        <p class="text-sm font-bold text-[#172a37]">Default Anime Audio</p>
-                        <p class="text-xs text-[#6f7e75]">Preferred audio track when watching</p>
-                    </div>
-                    <div class="flex items-center gap-1 rounded-full border border-[#dcd2bd] bg-white p-1">
-                        <button type="button" @click="setAnimeAudioPref('sub')"
-                                class="rounded-full px-3 py-1 text-xs font-bold transition"
-                                :class="animeAudioPref === 'sub' ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] hover:text-[#172a37]'">
-                            Sub
-                        </button>
-                        <button type="button" @click="setAnimeAudioPref('dub')"
-                                class="rounded-full px-3 py-1 text-xs font-bold transition"
-                                :class="animeAudioPref === 'dub' ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] hover:text-[#172a37]'">
-                            Dub
                         </button>
                     </div>
                 </div>

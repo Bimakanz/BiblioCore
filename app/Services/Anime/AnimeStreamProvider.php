@@ -546,7 +546,7 @@ $headers = ['Accept: application/json'];
             }
         }
 
-        $cacheKey = 'anivexa_stream_v2_' . md5($watchPath);
+        $cacheKey = 'anivexa_stream_v4_' . md5($watchPath);
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             return $cached;
@@ -560,8 +560,8 @@ $headers = ['Accept: application/json'];
         }
 
         // Failover: if the episode's own provider failed OR only returned a
-        // third-party embed (which carries ads), try up to 2 alternates for a
-        // direct ad-free HLS stream before falling back to the embed.
+        // third-party embed, try up to 2 alternates for a direct ad-free HLS
+        // stream before falling back to the embed.
         if (!$stream && $parsed) {
             $byProvider = Cache::get("anivexa_episodes_by_provider_{$parsed['anilistId']}_{$audio}");
             $order = is_array($byProvider) && !empty($byProvider)
@@ -723,11 +723,6 @@ $headers = ['Accept: application/json'];
                 }
                 continue;
             }
-            // Some providers only expose an embed page (Megaplay, VidWish,
-            // ...). Previously these were dropped, so a title with a working
-            // anikoto source still showed "stream unavailable". Keep the
-            // highest-priority embed as a last resort and let the player
-            // render it in a sandboxed iframe.
             if ($embed === null) {
                 $embed = $s;
                 $embed['url'] = $url;
@@ -773,9 +768,6 @@ $headers = ['Accept: application/json'];
             ]],
             'subtitles' => $isEmbed ? [] : $subtitles,
             'kind' => $isEmbed ? 'embed' : 'hls',
-            // When an HLS manifest and an embed page are both listed, keep
-            // the embed URL here so the controller can fall back to it when
-            // the CDN refuses the manifest (dead host, hotlink block, ...).
             'embed' => $isEmbed ? null : ($embed['url'] ?? null),
             'referer' => $chosen['referer'] ?? null,
             'intro' => null,

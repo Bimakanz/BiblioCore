@@ -39,14 +39,40 @@
                     </div>
                     <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#172a37]" style="font-family: 'Plus Jakarta Sans', sans-serif;">{{ $anime['title'] }}</h1>
                     @if(!empty($anime['altTitles']))
-                        <p class="text-xs text-[#84948a] line-clamp-1">{{ implode(' &middot; ', array_slice($anime['altTitles'], 0, 3)) }}</p>
+                        <p class="text-xs text-[#84948a] line-clamp-1">Also known as: {{ implode(', ', array_slice($anime['altTitles'], 0, 3)) }}</p>
                     @endif
-                    <div class="flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-1 text-sm font-semibold text-[#4c5b54]">
-                        @if($anime['score'])<span class="inline-flex items-center gap-1"><span class="material-symbols-rounded text-base text-[#f59e0b]">star</span>{{ $anime['score'] }}/10</span>@endif
-                        @if($anime['year'])<span>{{ $anime['year'] }}</span>@endif
-                        @if($anime['episodes'])<span>{{ $anime['episodes'] }} Episodes</span>@endif
-                        @if($anime['duration'])<span>{{ $anime['duration'] }} min/episode</span>@endif
-                        @if(!empty($anime['studios']))<span>{{ implode(', ', $anime['studios']) }}</span>@endif
+                    <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-xs font-semibold text-[#4c5b54]">
+                        @if($anime['score'])
+                            <span class="inline-flex items-center gap-1 rounded-xl border border-[#dcd2bd] bg-white/85 px-2.5 py-1">
+                                <span class="material-symbols-rounded text-[15px] text-[#f59e0b]">star</span>
+                                <span class="text-[#84948a]">Score:</span>
+                                <strong class="font-bold text-[#172a37]">{{ $anime['score'] }}/10</strong>
+                            </span>
+                        @endif
+                        @if($anime['year'])
+                            <span class="inline-flex items-center gap-1 rounded-xl border border-[#dcd2bd] bg-white/85 px-2.5 py-1">
+                                <span class="text-[#84948a]">Year:</span>
+                                <strong class="font-bold text-[#172a37]">{{ $anime['year'] }}</strong>
+                            </span>
+                        @endif
+                        @if($anime['episodes'])
+                            <span class="inline-flex items-center gap-1 rounded-xl border border-[#dcd2bd] bg-white/85 px-2.5 py-1">
+                                <span class="text-[#84948a]">Episodes:</span>
+                                <strong class="font-bold text-[#172a37]">{{ $anime['episodes'] }}</strong>
+                            </span>
+                        @endif
+                        @if($anime['duration'])
+                            <span class="inline-flex items-center gap-1 rounded-xl border border-[#dcd2bd] bg-white/85 px-2.5 py-1">
+                                <span class="text-[#84948a]">Duration:</span>
+                                <strong class="font-bold text-[#172a37]">{{ $anime['duration'] }} min/ep</strong>
+                            </span>
+                        @endif
+                        @if(!empty($anime['studios']))
+                            <span class="inline-flex items-center gap-1 rounded-xl border border-[#dcd2bd] bg-white/85 px-2.5 py-1">
+                                <span class="text-[#84948a]">Studio:</span>
+                                <strong class="font-bold text-[#172a37]">{{ implode(', ', $anime['studios']) }}</strong>
+                            </span>
+                        @endif
                     </div>
                     @if(!empty($anime['genres']))
                         <div class="flex flex-wrap justify-center sm:justify-start gap-1.5">

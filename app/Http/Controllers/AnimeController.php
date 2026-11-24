@@ -312,24 +312,20 @@ class AnimeController extends Controller
             ], 404)->header('Cache-Control', 'no-store');
         }
 
-        // Embed sources (Megaplay/VidWish) are rendered in a sandboxed
-        // iframe by the player. They cannot be verified or proxied, so the
-        // HLS pipeline below is skipped entirely.
+        // Embed sources (Megaplay/VidWish) are rendered in an iframe by the
+        // player with a warning banner about third-party pop-ups/redirects.
         if (($stream['kind'] ?? 'hls') === 'embed') {
             $this->animeService->markAvailable((int) preg_replace('/[^0-9]/', '', $id));
             return $this->embedResponse($stream, $server);
         }
 
         // HLS: a provider returning a URL does not prove the CDN serves it.
-        // Verify the playlist once per hour; a dead manifest is reported as
-        // unavailable instead of leaving the player on a black screen.
+        // Verify the playlist once per hour; a dead manifest falls back to the
+        // embed page if the resolver listed one.
         $vKey = 'anime_verified_' . md5($episodeId . '|' . ($stream['provider'] ?? $server ?? 'default'));
         if (!Cache::get($vKey)) {
             $check = $this->fetchRemote($stream['sources'][0]['url'], $stream['referer'] ?? null);
             if ($check === null || !str_contains($check, '#EXTM3U')) {
-                // The HLS host is dead or hotlink-blocked. If the resolver
-                // also listed an embed page for the same episode, play that
-                // instead of failing outright.
                 if (!empty($stream['embed'])) {
                     $this->animeService->markAvailable((int) preg_replace('/[^0-9]/', '', $id));
                     return $this->embedResponse($stream, $server);

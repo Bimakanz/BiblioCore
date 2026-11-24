@@ -130,18 +130,56 @@ html.dark .bg-\[\#eaddc2\] {
 }
 
 html.dark .hover\:bg-\[\#f6f1e8\]:hover,
+html.dark .hover\:bg-\[\#faf6ee\]:hover,
+html.dark .hover\:bg-\[\#fbf9f4\]:hover,
+html.dark .hover\:bg-\[\#f6ecda\]:hover,
 html.dark .hover\:bg-\[\#f6ecda\]\/60:hover,
 html.dark .hover\:bg-\[\#f6ecda\]\/50:hover,
-html.dark .hover\:bg-white:hover {
+html.dark .hover\:bg-\[\#fde68a\]\/60:hover,
+html.dark .hover\:bg-white:hover,
+html.dark .hover\:bg-white\/70:hover,
+html.dark .hover\:bg-white\/80:hover {
     background-color: #233240 !important;
+}
+
+/* Warm amber / warning surfaces in dark mode */
+html.dark .bg-\[\#fef3c7\],
+html.dark .bg-\[\#fffbeb\],
+html.dark .bg-\[\#fff7ec\],
+html.dark .bg-\[\#fff7ed\],
+html.dark .bg-\[\#fff8ec\] {
+    background-color: rgba(245, 158, 11, 0.14) !important;
+}
+
+html.dark .text-\[\#78350f\],
+html.dark .text-\[\#92400e\],
+html.dark .text-\[\#9a3412\],
+html.dark .text-\[\#b45309\] {
+    color: #fde68a !important;
 }
 
 /* Borders */
 html.dark .border-\[\#dcd2bd\],
 html.dark .border-\[\#e0d9c8\],
 html.dark .border-\[\#eaddc2\],
-html.dark .border-\[\#e6decb\] {
+html.dark .border-\[\#e6decb\],
+html.dark .border-\[\#efe7d6\],
+html.dark .border-\[\#f0d9b5\] {
     border-color: #293846 !important;
+}
+
+/* Hover text colors */
+html.dark .hover\:text-\[\#172a37\]:hover {
+    color: #ffffff !important;
+}
+
+html.dark .hover\:text-\[\#0f766e\]:hover,
+html.dark .group:hover .group-hover\:text-\[\#0f766e\] {
+    color: #2dd4bf !important;
+}
+
+html.dark .hover\:text-\[\#ea580c\]:hover {
+    color: #fb923c !important;
 }
 
 /* Text */

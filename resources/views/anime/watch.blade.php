@@ -66,50 +66,69 @@
                     The dub for this episode is not available yet — playing the sub version.
                 </p>
 
-                {{-- Control bar --}}
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl sm:rounded-3xl border border-[#e0d9c8] bg-white p-3.5 sm:p-4 shadow-sm">
-                    <div id="audioWrap" class="flex items-center gap-2">
-                        <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Audio</span>
-                        <div id="audioToggle" class="flex items-center gap-1 rounded-full border border-[#dcd2bd] bg-[#fbf9f4] p-1">
+                <div id="embedWarning" class="hidden items-start gap-3 rounded-2xl border border-[#f59e0b]/45 bg-[#fffbeb] px-4 py-3 text-xs text-[#92400e] shadow-sm">
+                    <span class="material-symbols-rounded mt-0.5 flex-shrink-0 text-[19px] text-[#d97706]">warning</span>
+                    <div class="min-w-0 flex-1 leading-relaxed">
+                        <p class="font-bold text-[#78350f]">Backup Embed Server Active (May Contain Pop-ups / Redirects)</p>
+                        <p class="mt-0.5 text-[#92400e]">
+                            Episode ini memakai player pihak ketiga yang dapat membuka tab iklan atau redirect ke situs/aplikasi lain saat diklik. Disarankan menggunakan <strong>AdBlocker</strong> atau <strong>Brave Browser</strong> di HP agar lebih aman.
+                        </p>
+                    </div>
+                    <button type="button" id="dismissEmbedWarning" class="flex-shrink-0 rounded-lg p-1 text-[#b45309] transition hover:bg-[#fde68a]/60" aria-label="Dismiss warning">
+                        <span class="material-symbols-rounded text-base">close</span>
+                    </button>
+                </div>
+
+                {{-- Control bar (compact single-row toolbar) --}}
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[#e0d9c8] bg-white px-3 py-2 shadow-sm">
+                    <div id="audioWrap" class="flex items-center gap-1.5">
+                        <span class="text-[10px] font-bold uppercase tracking-wide text-[#84948a]">Audio</span>
+                        <div id="audioToggle" class="flex items-center gap-0.5 rounded-full border border-[#dcd2bd] bg-[#fbf9f4] p-0.5">
                             <button type="button" id="audioSubBtn" data-audio="sub"
-                                    class="rounded-full px-3.5 py-1 text-xs font-bold transition bg-[#0f766e] text-white shadow-sm">Sub</button>
+                                    class="rounded-full px-2.5 py-0.5 text-[11px] font-bold transition bg-[#0f766e] text-white shadow-sm">Sub</button>
                             <button type="button" id="audioDubBtn" data-audio="dub"
-                                    class="rounded-full px-3.5 py-1 text-xs font-bold text-[#4c5b54] transition hover:text-[#0f766e] disabled:cursor-not-allowed disabled:opacity-40">Dub</button>
+                                    class="rounded-full px-2.5 py-0.5 text-[11px] font-bold text-[#4c5b54] transition hover:text-[#0f766e] disabled:cursor-not-allowed disabled:opacity-40">Dub</button>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Quality</span>
+
+                    <span class="hidden h-4 w-px bg-[#e0d9c8] sm:block"></span>
+
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-[10px] font-bold uppercase tracking-wide text-[#84948a]">Quality</span>
                         <div class="relative">
-                            <button type="button" id="qualityBtn" class="pill-btn"><span id="qualityBtnLabel">Auto</span></button>
+                            <button type="button" id="qualityBtn" class="pill-btn"><span id="qualityBtnLabel">Auto</span><span class="material-symbols-rounded text-[14px] opacity-60">expand_more</span></button>
                             <div id="qualityMenu" class="pill-menu hidden">
                                 <button type="button" class="pill-option is-active" data-value="-1">Auto</button>
                             </div>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Subtitle</span>
+
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-[10px] font-bold uppercase tracking-wide text-[#84948a]">Sub</span>
                         <div class="relative">
-                            <button type="button" id="subtitleBtn" class="pill-btn"><span id="subtitleBtnLabel">Off</span></button>
-                            <div id="subtitleMenu" class="pill-menu pill-menu-right hidden">
+                            <button type="button" id="subtitleBtn" class="pill-btn"><span id="subtitleBtnLabel">Off</span><span class="material-symbols-rounded text-[14px] opacity-60">expand_more</span></button>
+                            <div id="subtitleMenu" class="pill-menu hidden">
                                 <button type="button" class="pill-option is-active" data-value="-1">Off</button>
                             </div>
                         </div>
                     </div>
-                    <div class="flex items-center gap-1.5">
-                        <span class="text-[11px] font-bold uppercase tracking-wide text-[#84948a]">Subtitle Offset</span>
-                        <button type="button" id="subMinus"
-                                class="rounded-full border border-[#dcd2bd] bg-white px-2.5 py-1 font-mono text-xs font-bold text-[#172a37] transition hover:border-[#0f766e]/50 hover:text-[#0f766e]"
-                                title="Show subtitles 0.5s earlier — hold Shift for 0.1s">&minus;0.5s</button>
-                        <button type="button" id="subOffsetLabel"
-                                class="min-w-[46px] rounded-full px-2 py-1 text-center font-mono text-xs font-bold text-[#0f766e] transition hover:bg-[#0f766e]/10"
-                                title="Subtitle offset — tap to reset to 0s">0s</button>
-                        <button type="button" id="subPlus"
-                                class="rounded-full border border-[#dcd2bd] bg-white px-2.5 py-1 font-mono text-xs font-bold text-[#172a37] transition hover:border-[#0f766e]/50 hover:text-[#0f766e]"
-                                title="Show subtitles 0.5s later — hold Shift for 0.1s">+0.5s</button>
+
+                    <span class="hidden h-4 w-px bg-[#e0d9c8] sm:block"></span>
+
+                    <div class="flex items-center gap-1.5" title="Subtitle sync: − shows earlier, + shows later. Tap value to reset.">
+                        <span class="text-[10px] font-bold uppercase tracking-wide text-[#84948a]">Sync</span>
+                        <div class="inline-flex items-center rounded-full border border-[#dcd2bd] bg-[#fbf9f4] p-0.5">
+                            <button type="button" id="subMinus"
+                                    class="rounded-full px-2 py-0.5 text-[11px] font-bold text-[#172a37] transition hover:bg-white hover:text-[#0f766e]"
+                                    title="Show subtitles 0.5s earlier — hold Shift for 0.1s">&minus;0.5s</button>
+                            <button type="button" id="subOffsetLabel"
+                                    class="min-w-[34px] rounded-full px-1.5 py-0.5 text-center text-[11px] font-bold text-[#0f766e] tabular-nums transition hover:bg-[#0f766e]/10"
+                                    title="Subtitle offset — tap to reset to 0s">0s</button>
+                            <button type="button" id="subPlus"
+                                    class="rounded-full px-2 py-0.5 text-[11px] font-bold text-[#172a37] transition hover:bg-white hover:text-[#0f766e]"
+                                    title="Show subtitles 0.5s later — hold Shift for 0.1s">+0.5s</button>
+                        </div>
                     </div>
-                    <p class="w-full text-[10px] font-medium text-[#84948a]">
-                        Out of sync? <span class="font-bold text-[#172a37]">&minus;</span> shows the subtitles earlier, <span class="font-bold text-[#172a37]">+</span> shows them later. Tap the value to reset.
-                    </p>
                 </div>
 
                 <div class="rounded-2xl sm:rounded-3xl border border-[#e0d9c8] bg-white p-4 sm:p-5 shadow-sm">
@@ -176,7 +195,7 @@
         @media (prefers-reduced-motion: reduce) { .loader-img { animation: none; } .loader-img-1 { opacity: 0.55; } .loader-img-2 { opacity: 0; } }
         #playerWrap:fullscreen video { width: 100%; height: 100%; }
         /* Custom pill dropdowns (button + own menu panel, no native select) */
-        .pill-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 92px; border-radius: 9999px; border: 1px solid #dcd2bd; background-color: #fbf9f4; padding: 6px 16px; font-size: 12px; font-weight: 600; color: #172a37; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s; }
+        .pill-btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 68px; border-radius: 9999px; border: 1px solid #dcd2bd; background-color: #fbf9f4; padding: 4px 10px 4px 12px; font-size: 11px; font-weight: 700; color: #172a37; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s; }
         .pill-btn:hover { border-color: rgba(15, 118, 110, 0.55); background-color: #ffffff; }
         .pill-btn:focus { outline: none; border-color: #0f766e; box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.16); background-color: #ffffff; }
         .pill-btn:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -250,7 +269,22 @@
             btn.addEventListener('click', function (e) {
                 e.stopPropagation();
                 document.querySelectorAll('.pill-menu').forEach(function (m) { if (m !== menu) m.classList.add('hidden'); });
+                const opening = menu.classList.contains('hidden');
                 menu.classList.toggle('hidden');
+                if (opening) {
+                    menu.style.left = '0';
+                    menu.style.right = 'auto';
+                    const rect = menu.getBoundingClientRect();
+                    if (rect.right > window.innerWidth - 12) {
+                        menu.style.left = 'auto';
+                        menu.style.right = '0';
+                        const rect2 = menu.getBoundingClientRect();
+                        if (rect2.left < 12) {
+                            menu.style.right = 'auto';
+                            menu.style.left = (12 - rect2.left) + 'px';
+                        }
+                    }
+                }
             });
             document.addEventListener('click', function (e) {
                 if (!menu.classList.contains('hidden') && !menu.contains(e.target)) menu.classList.add('hidden');
@@ -768,9 +802,6 @@
             outro = data.outro || outro;
             const notice = document.getElementById('audioNotice');
             if (notice) notice.classList.toggle('hidden', data.audioFallback !== 'sub');
-            // Some providers only ship an embed page. The API marks those
-            // explicitly so the player can mount a sandboxed iframe instead
-            // of asking hls.js to parse an HTML page.
             if (data.source.type === 'embed') {
                 buildSubtitleOptions([]);
                 playEmbed(data.source.url);
@@ -827,6 +858,7 @@
         function attachSource(src) {
             if (hls) { try { hls.destroy(); } catch (e) {} hls = null; }
             playMode = 'hls';
+            setEmbedWarning(false);
             stopEmbedClock();
             const oldFrame = document.getElementById('embedFrame');
             if (oldFrame) oldFrame.remove();
@@ -982,9 +1014,22 @@
         });
         document.getElementById('retryBtn').addEventListener('click', loadStream);
 
-        // Embed player: providers such as anikoto only expose hosted embed
-        // pages (Megaplay/VidWish) for some titles. Mount their URL in a
-        // sandboxed iframe; HLS still wins whenever a direct manifest exists.
+        const embedWarningEl = document.getElementById('embedWarning');
+        const dismissEmbedWarningBtn = document.getElementById('dismissEmbedWarning');
+        if (dismissEmbedWarningBtn && embedWarningEl) {
+            dismissEmbedWarningBtn.addEventListener('click', function () {
+                embedWarningEl.classList.add('hidden');
+                embedWarningEl.classList.remove('flex');
+            });
+        }
+
+        function setEmbedWarning(show) {
+            if (!embedWarningEl) return;
+            embedWarningEl.classList.toggle('hidden', !show);
+            embedWarningEl.classList.toggle('flex', !!show);
+        }
+
+        // Embed player: fallback for titles that only expose hosted embed pages.
         function playEmbed(src) {
             errorEl.style.display = 'none';
             loadingEl.style.display = 'none';
@@ -1004,6 +1049,7 @@
             try { video.pause(); } catch (e) {}
             video.style.visibility = 'hidden';
             playMode = 'embed';
+            setEmbedWarning(true);
             startEmbedClock();
             saveProgress(false);
         }
