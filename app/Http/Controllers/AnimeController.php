@@ -319,6 +319,53 @@ class AnimeController extends Controller
             return $this->embedResponse($stream, $server);
         }
 
+        // Hard-subtitled sources ship one MP4 per episode: the subtitles are
+        // part of the video, so there is nothing to proxy or track.
+        if (($stream['kind'] ?? 'hls') === 'mp4') {
+            $url = (string) ($stream['sources'][0]['url'] ?? '');
+            if ($url === '') {
+                return response()->json([
+                    'error' => 'This episode is not available on any provider yet.',
+                    'unavailable' => true,
+                    'reason' => 'no_stream',
+                ], 404)->header('Cache-Control', 'no-store');
+            }
+
+            $vKey = 'anime_mp4_ok_' . md5($url);
+            if (! Cache::get($vKey) && ! app()->runningUnitTests()) {
+                if (! $this->mp4Reachable($url)) {
+                    $this->markUnavailableWhenNoEpisodes($id);
+
+                    return response()->json([
+                        'error' => 'This episode is not available on any provider yet.',
+                        'unavailable' => true,
+                        'reason' => 'dead_mp4',
+                    ], 404)->header('Cache-Control', 'no-store');
+                }
+                Cache::put($vKey, 1, 3600);
+            }
+
+            $this->animeService->markAvailable((int) preg_replace('/[^0-9]/', '', $id));
+
+            return response()->json([
+                'source' => [
+                    'url' => $url,
+                    'quality' => $stream['sources'][0]['quality'] ?? 'auto',
+                    'type' => 'mp4',
+                ],
+                'subtitles' => [],
+                'servers' => $this->streamProvider->servers(),
+                'activeServer' => $stream['provider'] ?? $server,
+                'provider' => $stream['provider'] ?? null,
+                // The player hides the subtitle/offset controls for these:
+                // the text is already in the frames and cannot be changed.
+                'hardSub' => true,
+                'audioFallback' => $stream['audio_fallback'] ?? null,
+                'intro' => $stream['intro'] ?? null,
+                'outro' => $stream['outro'] ?? null,
+            ])->header('Cache-Control', 'public, max-age=300');
+        }
+
         // HLS: a provider returning a URL does not prove the CDN serves it.
         // Verify the playlist once per hour; a dead manifest falls back to the
         // embed page if the resolver listed one.
@@ -867,6 +914,49 @@ class AnimeController extends Controller
         }
 
         return $best;
+    }
+
+    /**
+     * Cheap liveness check for a hard-subtitled MP4: HEAD first, then a small
+     * ranged GET for CDNs that reject HEAD.
+     */
+    protected function mp4Reachable(string $url): bool
+    {
+        $parts = parse_url($url);
+        $scheme = strtolower($parts['scheme'] ?? '');
+        $host = strtolower($parts['host'] ?? '');
+        if (!in_array($scheme, ['http', 'https'], true) || $host === '') {
+            return false;
+        }
+        $ip = gethostbyname($host);
+        $ipToCheck = filter_var($host, FILTER_VALIDATE_IP) ? $host : $ip;
+        if (!filter_var($ipToCheck, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return false;
+        }
+
+        foreach ([true, false] as $headOnly) {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_NOBODY, $headOnly);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_MAXREDIRS, 2);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+            if (!$headOnly) {
+                curl_setopt($ch, CURLOPT_RANGE, '0-1024');
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: video/*,*/*']);
+            }
+            curl_exec($ch);
+            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if (in_array($code, [200, 206], true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function fetchRemote(string $url, ?string $referer = null): ?string

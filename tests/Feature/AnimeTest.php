@@ -10,7 +10,7 @@ class AnimeTest extends TestCase
     {
         $response = $this->get('/');
         $response->assertOk();
-        $response->assertSee('href="' . route('anime.index') . '"', false);
+        $response->assertSee('href="'.route('anime.index').'"', false);
         $response->assertSee('Manga', false);
     }
 
@@ -18,7 +18,7 @@ class AnimeTest extends TestCase
     {
         $response = $this->get('/anime');
         $response->assertOk();
-        $response->assertSee('href="' . route('manga.index') . '"', false);
+        $response->assertSee('href="'.route('manga.index').'"', false);
         $response->assertSee('Anime', false);
     }
 
@@ -137,7 +137,7 @@ class AnimeTest extends TestCase
         $this->app->instance(\App\Services\Anime\AnimeStreamProvider::class, $mock);
 
         // A verified stream skips the playlist reachability probe.
-        \Illuminate\Support\Facades\Cache::put('anime_verified_' . md5($episodeId . '|test'), 1, 3600);
+        \Illuminate\Support\Facades\Cache::put('anime_verified_'.md5($episodeId.'|test'), 1, 3600);
     }
 
     public function test_watch_page_redirects_to_detail_without_episode(): void
@@ -145,5 +145,40 @@ class AnimeTest extends TestCase
         // Unknown anime id -> 404 before any watch rendering happens.
         $response = $this->get('/anime/al_999999999/watch');
         $response->assertNotFound();
+    }
+
+    public function test_watch_page_offers_the_burned_in_versions(): void
+    {
+        $this->mock(\App\Services\Anime\AnimeService::class, function ($mock) {
+            $mock->shouldReceive('isUnplayable')->andReturn(false);
+            $mock->shouldReceive('getDetail')->andReturn([
+                'id' => 'al_1',
+                'anilistId' => 1,
+                'title' => 'Test Anime',
+                'altTitles' => [],
+                'coverUrl' => 'https://example.com/cover.jpg',
+                'bannerUrl' => 'https://example.com/banner.jpg',
+                'duration' => 24,
+                'format' => 'TV',
+                'status' => 'FINISHED',
+                'year' => 2024,
+                'score' => 8.5,
+                'description' => 'A test anime used by the watch page tests.',
+                'genres' => [],
+            ]);
+        });
+
+        $this->mock(\App\Services\Anime\AnimeStreamProvider::class, function ($mock) {
+            $mock->shouldReceive('dubAvailable')->andReturn(false);
+            $mock->shouldReceive('servers')->andReturn([]);
+        });
+
+        $response = $this->get('/anime/al_1/watch?ep=watch%2Fkaa%2F1%2Fsub%2Fkaa-1&n=1');
+
+        $response->assertOk()
+            ->assertSee('id="versionBtn"', false)
+            ->assertSee('data-value="animeheaven"', false)
+            ->assertSee('data-value="samehadaku"', false)
+            ->assertSee('Burned-in', false);
     }
 }
