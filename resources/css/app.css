@@ -81,3 +81,138 @@ html,
     scrollbar-width: thin;
     scrollbar-color: #0f766e rgba(23, 42, 55, 0.06);
 }
+
+/* ===== Dark Mode theme (toggled via html.dark) ===== */
+html.dark {
+    color-scheme: dark;
+}
+
+html.dark body {
+    background-color: #0e1419 !important;
+    color: #e6edf3 !important;
+}
+
+html.dark header {
+    background-color: rgba(14, 20, 25, 0.92) !important;
+    border-color: #24303c !important;
+}
+
+html.dark .mobile-dock {
+    background-color: rgba(18, 25, 32, 0.96) !important;
+    border-color: #24303c !important;
+    box-shadow: 0 -8px 24px -10px rgba(0, 0, 0, 0.55) !important;
+}
+
+html.dark .mobile-dock .ring-\[\#faf7f0\] {
+    --tw-ring-color: #121920 !important;
+}
+
+/* Surfaces */
+html.dark .bg-white,
+html.dark .bg-white\/95,
+html.dark .bg-white\/90,
+html.dark .bg-white\/85,
+html.dark .bg-white\/80,
+html.dark .bg-white\/75,
+html.dark .bg-white\/70,
+html.dark .bg-white\/60,
+html.dark .bg-white\/50 {
+    background-color: #16202a !important;
+}
+
+html.dark .bg-\[\#f6f1e8\],
+html.dark .bg-\[\#faf7f0\],
+html.dark .bg-\[\#fbf9f4\],
+html.dark .bg-\[\#f1ebd8\],
+html.dark .bg-\[\#ede6d6\],
+html.dark .bg-\[\#eaddc2\] {
+    background-color: #1c2834 !important;
+}
+
+html.dark .hover\:bg-\[\#f6f1e8\]:hover,
+html.dark .hover\:bg-\[\#f6ecda\]\/60:hover,
+html.dark .hover\:bg-\[\#f6ecda\]\/50:hover,
+html.dark .hover\:bg-white:hover {
+    background-color: #233240 !important;
+}
+
+/* Borders */
+html.dark .border-\[\#dcd2bd\],
+html.dark .border-\[\#e0d9c8\],
+html.dark .border-\[\#eaddc2\],
+html.dark .border-\[\#e6decb\] {
+    border-color: #293846 !important;
+}
+
+/* Text */
+html.dark .text-\[\#172a37\],
+html.dark .text-\[\#24323f\],
+html.dark .text-\[\#263640\] {
+    color: #f0f5f9 !important;
+}
+
+html.dark .text-\[\#37474f\],
+html.dark .text-\[\#4c5b54\],
+html.dark .text-\[\#5f6b63\] {
+    color: #c2cfd9 !important;
+}
+
+html.dark .text-\[\#6f7e75\],
+html.dark .text-\[\#7b8a82\],
+html.dark .text-\[\#84948a\],
+html.dark .text-\[\#9aa29a\] {
+    color: #8c9eab !important;
+}
+
+/* Inputs & custom pill controls */
+html.dark input[type="text"],
+html.dark input[type="number"],
+html.dark .pill-btn {
+    background-color: #1c2834 !important;
+    border-color: #2b3b4a !important;
+    color: #f0f5f9 !important;
+}
+
+html.dark .pill-menu {
+    background-color: #16202a !important;
+    border-color: #293846 !important;
+}
+
+html.dark .pill-option {
+    color: #c2cfd9 !important;
+}
+
+html.dark .pill-option:hover {
+    background-color: #233240 !important;
+    color: #ffffff !important;
+}
+
+html.dark .pill-option.is-active {
+    background-color: #0f766e !important;
+    color: #ffffff !important;
+}
+
+/* Keep solid teal/orange buttons crisp in dark mode */
+html.dark .bg-\[\#0f766e\] {
+    background-color: #0f766e !important;
+}
+
+html.dark .text-\[\#0f766e\] {
+    color: #2dd4bf !important;
+}
+
+html.dark .bg-\[\#0f766e\] .text-\[\#0f766e\] {
+    color: #0f766e !important;
+}
+
+/* Scrollbar in dark mode */
+html.dark ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+html.dark,
+html.dark .custom-scroll,
+html.dark .rail-x,
+html.dark .pill-menu {
+    scrollbar-color: #14b8a6 rgba(255, 255, 255, 0.05);
+}

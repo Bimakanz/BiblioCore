@@ -204,30 +204,42 @@
          }">
 
         {{-- Back link --}}
-        <div class="flex items-center gap-2 text-xs text-[#6f7e75]">
-            <a href="{{ route('manga.index') }}" class="flex items-center gap-1 font-semibold transition hover:text-[#0f766e]">
-                <span class="material-symbols-rounded text-sm">arrow_back</span>
-                Catalog
+        <div class="flex flex-wrap items-center gap-2.5">
+            <a href="{{ route('manga.index') }}"
+               class="inline-flex items-center gap-2 rounded-full border border-[#dcd2bd] bg-white px-4 py-2 text-sm font-bold text-[#172a37] shadow-sm transition hover:border-[#0f766e] hover:text-[#0f766e]">
+                <span class="material-symbols-rounded text-[18px]">arrow_back</span>
+                <span>Back to Catalog</span>
             </a>
-            <span class="text-[#c1cbbb]">/</span>
-            <span class="max-w-[60vw] truncate font-medium text-[#172a37]">{{ $manga['title'] }}</span>
+            <span class="material-symbols-rounded text-base text-[#84948a]">chevron_right</span>
+            <span class="max-w-[65vw] truncate text-sm font-bold text-[#172a37]">{{ $manga['title'] }}</span>
         </div>
 
         {{-- Detail hero --}}
-        <section class="relative -mx-4 overflow-hidden border-b border-[#e0d9c8]/80 px-4 pb-7 pt-5 sm:-mx-6 sm:px-6 lg:-mx-7 lg:px-7 lg:pb-9 lg:pt-7">
-            @if(!empty($manga['coverUrl']))
-                <img src="{{ $manga['coverUrl'] }}" alt=""
-                     class="absolute inset-0 h-full w-full scale-110 object-cover opacity-20 blur-[3px]" />
+        <section class="relative overflow-hidden rounded-2xl bg-[#172a37] px-5 pb-7 pt-6 shadow-[0_25px_60px_-30px_rgba(23,42,55,0.65)] sm:rounded-3xl sm:px-8 sm:pb-9 sm:pt-8">
+            @php
+                $detailBanner = $manga['bannerUrl'] ?? null;
+            @endphp
+            @if($detailBanner)
+                <img src="{{ $detailBanner }}" alt="" referrerpolicy="no-referrer" decoding="async"
+                     class="absolute inset-0 h-full w-full object-cover object-center opacity-70" />
+            @elseif(!empty($manga['coverUrl']))
+                <img src="{{ $manga['coverUrl'] }}" alt="" aria-hidden="true" referrerpolicy="no-referrer" decoding="async"
+                     class="absolute inset-0 h-full w-full scale-110 object-cover opacity-20 blur-2xl" />
+                <div class="pointer-events-none absolute inset-y-0 right-0 hidden w-[42%] sm:block lg:w-[34%]"
+                     style="-webkit-mask-image: linear-gradient(to right, transparent 0%, black 35%, black 100%); mask-image: linear-gradient(to right, transparent 0%, black 35%, black 100%);">
+                    <img src="{{ $manga['coverUrl'] }}" alt="" referrerpolicy="no-referrer" decoding="async"
+                         class="h-full w-full object-cover object-top opacity-85" />
+                </div>
             @endif
-            <div class="absolute inset-0 bg-gradient-to-r from-[#f6f1e8] via-[#f6f1e8]/92 to-[#f6f1e8]/40"></div>
-            <div class="absolute inset-0 bg-gradient-to-t from-[#f6f1e8] via-transparent to-transparent"></div>
+            <div class="absolute inset-0 bg-gradient-to-r from-[#172a37]/95 via-[#172a37]/80 to-[#172a37]/30"></div>
+            <div class="absolute inset-0 bg-gradient-to-t from-[#172a37]/90 via-transparent to-transparent"></div>
 
-            <div class="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:gap-6">
-                <div class="mx-auto w-32 flex-shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-[#eaddc2] shadow-xl sm:mx-0 sm:w-40 lg:w-48">
+            <div class="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:gap-7">
+                <div class="mx-auto w-32 flex-shrink-0 overflow-hidden rounded-2xl border-2 border-white/25 bg-[#1c2834] shadow-2xl sm:mx-0 sm:w-40 lg:w-48">
                     <div class="relative aspect-[2/3] w-full">
                         @if(!empty($manga['coverUrl']))
                             <img src="{{ $manga['coverUrl'] }}" alt="{{ $manga['title'] }}" referrerpolicy="no-referrer"
-                                 class="h-full w-full object-cover"
+                                 class="h-full w-full object-cover object-top"
                                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
                             <div class="hidden h-full w-full flex-col items-center justify-center bg-gradient-to-br from-[#164e63] via-[#0f766e] to-[#134e4a] p-4 text-center text-white">
                                 <span class="material-symbols-rounded mb-2 text-4xl text-[#fde68a]">auto_stories</span>
@@ -239,7 +251,7 @@
                                 <span class="text-xs font-bold leading-snug">{{ $manga['title'] }}</span>
                             </div>
                         @endif
-                        <span class="absolute left-2 top-2 rounded-full bg-[#0f766e]/95 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide text-white">
+                        <span class="absolute left-2 top-2 rounded-full bg-[#0f766e]/95 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
                             {{ $manga['status'] }}
                         </span>
                     </div>
@@ -247,32 +259,32 @@
 
                 <div class="min-w-0 flex-1 space-y-3 text-center sm:text-left">
                     <div class="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                        <span class="rounded-full bg-[#0f766e] px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-white">{{ $manga['status'] }}</span>
-                        <span class="rounded-full border border-[#dcd2bd] bg-white/80 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-[#4c5b54]">{{ $manga['format'] ?? 'Manga' }}</span>
+                        <span class="rounded-full bg-[#0f766e] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">{{ $manga['status'] }}</span>
+                        <span class="rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white/90">{{ $manga['format'] ?? 'Manga' }}</span>
                         @if(!empty($manga['contentRating']))
-                            <span class="rounded-full border border-[#dcd2bd] bg-white/80 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-[#4c5b54]">{{ $manga['contentRating'] }}</span>
+                            <span class="rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white/90">{{ $manga['contentRating'] }}</span>
                         @endif
                         @if(!empty($manga['year']))
-                            <span class="font-mono text-[11px] text-[#84948a]">{{ $manga['year'] }}</span>
+                            <span class="rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-semibold text-white/90">{{ $manga['year'] }}</span>
                         @endif
                     </div>
 
-                    <h1 class="font-display text-2xl font-bold leading-tight tracking-tight text-[#172a37] sm:text-3xl lg:text-4xl">
+                    <h1 class="font-display text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-3xl lg:text-4xl">
                         {{ $manga['title'] }}
                     </h1>
 
                     @if(!empty($manga['altTitles']))
-                        <p class="line-clamp-2 text-xs italic text-[#6f7e75]">
-                            {{ implode(' • ', array_slice($manga['altTitles'], 0, 3)) }}
+                        <p class="line-clamp-2 text-xs italic text-white/70">
+                            {{ implode('  ', array_slice($manga['altTitles'], 0, 2)) }}
                         </p>
                     @endif
 
-                    <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-[#4c5b54] sm:justify-start">
+                    <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-white/80 sm:justify-start">
                         @if(!empty($manga['authors']))
-                            <span><span class="text-[#84948a]">Author:</span> <strong class="font-semibold text-[#172a37]">{{ $manga['authors'] }}</strong></span>
+                            <span><span class="text-white/60">Author:</span> <strong class="font-semibold text-white">{{ $manga['authors'] }}</strong></span>
                         @endif
                         @if(!empty($manga['artists']))
-                            <span><span class="text-[#84948a]">Artist:</span> <strong class="font-semibold text-[#172a37]">{{ $manga['artists'] }}</strong></span>
+                            <span><span class="text-white/60">Artist:</span> <strong class="font-semibold text-white">{{ $manga['artists'] }}</strong></span>
                         @endif
                         <span class="font-mono text-[11px] text-[#84948a]"><span x-text="counts.all"></span> chapter</span>
                     </div>

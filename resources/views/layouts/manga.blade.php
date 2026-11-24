@@ -13,7 +13,15 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
     <meta name="description" content="Read manga, manhwa, and manhua online for free on BiblioManga. Trending titles, full chapter lists, and fast updates.">
     <meta name="theme-color" content="#0f766e">
-    <meta name="color-scheme" content="light">
+    <meta name="color-scheme" content="light dark">
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('biblio_theme');
+                if (t === 'dark') document.documentElement.classList.add('dark');
+            } catch (e) {}
+        })();
+    </script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -112,6 +120,23 @@
           animeHistory: JSON.parse(localStorage.getItem('biblioanime_history') || '[]'),
           isAnimeMode: {{ request()->is('anime') || request()->is('anime/*') ? 'true' : 'false' }},
           historyModalOpen: false,
+          settingsModalOpen: false,
+          moreMenuOpen: false,
+          darkMode: localStorage.getItem('biblio_theme') === 'dark',
+          setDarkMode(on) {
+              this.darkMode = !!on;
+              document.documentElement.classList.toggle('dark', this.darkMode);
+              try { localStorage.setItem('biblio_theme', this.darkMode ? 'dark' : 'light'); } catch (e) {}
+          },
+          animeAudioPref: localStorage.getItem('biblioanime_audio') || 'sub',
+          setAnimeAudioPref(val) {
+              this.animeAudioPref = val === 'dub' ? 'dub' : 'sub';
+              try { localStorage.setItem('biblioanime_audio', this.animeAudioPref); } catch (e) {}
+          },
+          clearFavorites() {
+              this.favorites = [];
+              localStorage.removeItem('bibliomanga_favs');
+          },
           continueHref(item) {
               if (!item) return '/';
               if (item.episodeId !== undefined || item.episodeNumber !== undefined) {
@@ -222,63 +247,106 @@
     </a>
 
     <div class="relative flex min-h-screen flex-col">
-        <!-- Standard top navbar -->
-        <header class="sticky top-0 z-40 border-b border-[#e0d9c8]/80 bg-[#f6f1e8]/95 backdrop-blur-sm">
-            <div class="mx-auto flex h-14 w-full max-w-[1440px] items-center gap-3 px-4 sm:px-6 lg:h-16 lg:gap-5 lg:px-7">
-                <!-- Brand -->
-                <a href="{{ $homeRoute }}" class="flex flex-shrink-0 items-center gap-2.5" title="BiblioCore">
-                    <span class="grid h-8 w-8 place-items-center rounded-xl bg-[#0f766e] text-xs font-extrabold text-white shadow-sm lg:h-9 lg:w-9 lg:text-sm" style="font-family: 'Plus Jakarta Sans', sans-serif;">B</span>
-                    <span class="min-w-0">
-                        <span class="block text-sm font-bold tracking-tight text-[#172a37] lg:text-base">{{ $isAnimeMode ? 'BiblioAnime' : 'BiblioCore' }}</span>
-                        <span class="hidden text-[10px] font-semibold uppercase tracking-[0.16em] text-[#84948a] lg:block">Manga &amp; Anime</span>
-                    </span>
+        <!-- Standard top navbar (iQIYI-inspired clean bar) -->
+        <header class="sticky top-0 z-40 border-b border-[#e0d9c8]/85 bg-[#f6f1e8]/95 backdrop-blur-sm">
+            <div class="mx-auto flex h-14 w-full max-w-[1440px] items-center gap-4 px-4 sm:px-6 lg:h-16 lg:gap-6 lg:px-7">
+                <!-- Pure text brand wordmark -->
+                <a href="{{ $homeRoute }}" class="group flex flex-shrink-0 items-baseline select-none" title="BiblioCore">
+                    <span class="text-xl font-extrabold tracking-tight text-[#0f766e] transition-colors group-hover:text-[#0d625b] lg:text-[23px]">Biblio</span><span class="text-xl font-extrabold tracking-tight text-[#172a37] lg:text-[23px]">Core</span><span class="ml-0.5 text-xl font-black text-[#f97316] lg:text-[23px]">.</span>
                 </a>
 
-                <!-- Desktop nav links -->
-                <nav class="hidden items-center gap-1 rounded-full border border-[#dcd2bd] bg-white/75 p-1 lg:flex" aria-label="Main navigation">
+                <!-- Desktop text nav links -->
+                <nav class="hidden items-center gap-6 lg:flex" aria-label="Main navigation">
                     <a href="{{ route('manga.index') }}"
-                       class="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition {{ !$isAnimeMode ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] hover:text-[#172a37]' }}"
+                       class="relative py-1 text-sm font-bold transition {{ !$isAnimeMode && request('category') !== 'trending' ? 'text-[#0f766e]' : 'text-[#4c5b54] hover:text-[#172a37]' }}"
                        @if(!$isAnimeMode) aria-current="page" @endif>
-                        <span class="material-symbols-rounded text-[17px]">menu_book</span>
                         Manga
+                        @if(!$isAnimeMode)
+                            <span class="absolute inset-x-0 -bottom-1 h-0.5 rounded-full bg-[#0f766e]"></span>
+                        @endif
                     </a>
                     <a href="{{ route('anime.index') }}"
-                       class="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition {{ $isAnimeMode ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] hover:text-[#172a37]' }}"
+                       class="relative py-1 text-sm font-bold transition {{ $isAnimeMode && request('category') !== 'trending' ? 'text-[#0f766e]' : 'text-[#4c5b54] hover:text-[#172a37]' }}"
                        @if($isAnimeMode) aria-current="page" @endif>
-                        <span class="material-symbols-rounded text-[17px]">smart_display</span>
                         Anime
+                        @if($isAnimeMode)
+                            <span class="absolute inset-x-0 -bottom-1 h-0.5 rounded-full bg-[#0f766e]"></span>
+                        @endif
                     </a>
+                    <a href="{{ $isAnimeMode ? route('anime.index', ['category' => 'trending']) : route('manga.index', ['category' => 'trending']) }}"
+                       class="py-1 text-sm font-bold transition {{ request('category') === 'trending' ? 'text-[#0f766e]' : 'text-[#4c5b54] hover:text-[#172a37]' }}">
+                        Trending
+                    </a>
+
+                    <div class="relative" @click.away="moreMenuOpen = false" @keydown.escape="moreMenuOpen = false">
+                        <button type="button" @click="moreMenuOpen = !moreMenuOpen"
+                                class="inline-flex items-center gap-0.5 py-1 text-sm font-bold text-[#4c5b54] transition hover:text-[#172a37]">
+                            <span>More</span>
+                            <span class="material-symbols-rounded text-[18px] transition-transform" :class="moreMenuOpen ? 'rotate-180' : ''">arrow_drop_down</span>
+                        </button>
+                        <div x-show="moreMenuOpen" x-cloak
+                             x-transition:enter="transition ease-out duration-120"
+                             x-transition:enter-start="opacity-0 -translate-y-1"
+                             x-transition:enter-end="opacity-100 translate-y-0"
+                             class="absolute left-0 top-full z-50 mt-2 w-44 rounded-2xl border border-[#dcd2bd] bg-white p-1.5 shadow-xl">
+                            <a href="{{ $isAnimeMode ? route('anime.index', ['category' => 'popular']) : route('manga.index', ['category' => 'popular']) }}"
+                               class="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-[#37474f] transition hover:bg-[#f6f1e8] hover:text-[#0f766e]">
+                                Popular
+                            </a>
+                            <a href="{{ $isAnimeMode ? route('anime.index', ['category' => 'ongoing']) : route('manga.index', ['category' => 'ongoing']) }}"
+                               class="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-[#37474f] transition hover:bg-[#f6f1e8] hover:text-[#0f766e]">
+                                Ongoing
+                            </a>
+                            <a href="{{ $isAnimeMode ? route('anime.index', ['category' => 'completed']) : route('manga.index', ['category' => 'completed']) }}"
+                               class="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-[#37474f] transition hover:bg-[#f6f1e8] hover:text-[#0f766e]">
+                                Completed
+                            </a>
+                            @if($isAnimeMode)
+                                <a href="{{ route('anime.index', ['category' => 'top']) }}"
+                                   class="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-[#37474f] transition hover:bg-[#f6f1e8] hover:text-[#0f766e]">
+                                    Top Rated
+                                </a>
+                            @endif
+                        </div>
+                    </div>
                 </nav>
 
-                <!-- Search (tablet/desktop) -->
-                <div class="hidden min-w-0 flex-1 justify-center md:flex">
-                    @include('partials.live-search', ['variant' => 'topbar'])
-                </div>
+                <!-- Right cluster: Search + Icon-label actions (History, Favorites, Settings) -->
+                <div class="ml-auto flex flex-1 items-center justify-end gap-4 lg:gap-5">
+                    <div class="hidden min-w-0 flex-1 justify-end md:flex">
+                        @include('partials.live-search', ['variant' => 'topbar'])
+                    </div>
 
-                <!-- Right actions -->
-                <div class="ml-auto flex flex-shrink-0 items-center gap-2">
-                    <span class="inline-flex items-center rounded-full border border-[#dcd2bd] bg-white/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#0f766e] md:hidden">
-                        {{ $isAnimeMode ? 'Anime' : 'Manga' }}
-                    </span>
+                    <button type="button" @click="settingsModalOpen = true"
+                            class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#dcd2bd] bg-white/80 text-[#4c5b54] transition hover:text-[#0f766e] lg:hidden"
+                            aria-label="Settings">
+                        <span class="material-symbols-rounded text-[20px]">settings</span>
+                    </button>
 
-                    <div class="hidden items-center gap-2 lg:flex">
+                    <div class="hidden flex-shrink-0 items-center gap-4 lg:flex">
                         <button type="button" @click="openHistory()"
-                                class="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-bold transition"
-                                :class="historyModalOpen ? 'border-[#0f766e] bg-[#0f766e] text-white shadow-sm' : 'border-[#dcd2bd] bg-white/80 text-[#4c5b54] hover:border-[#0f766e]/50 hover:text-[#0f766e]'">
-                            <span class="material-symbols-rounded text-[17px]">history</span>
-                            <span>History</span>
-                            <span class="grid h-4 min-w-[16px] place-items-center rounded-full px-1 text-[9px] font-bold leading-none"
-                                  :class="historyModalOpen ? 'bg-white text-[#0f766e]' : 'bg-[#0f766e] text-white'"
+                                class="relative flex flex-col items-center justify-center gap-0.5 text-[#4c5b54] transition hover:text-[#0f766e]"
+                                :class="historyModalOpen ? 'text-[#0f766e]' : ''">
+                            <span class="material-symbols-rounded text-[21px] leading-none">history</span>
+                            <span class="text-[11px] font-semibold leading-none">History</span>
+                            <span class="absolute -right-1.5 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-[#0f766e] px-1 text-[9px] font-bold leading-none text-white"
                                   x-show="visibleHistory.length > 0" x-text="visibleHistory.length"></span>
                         </button>
+
                         <button type="button" @click="favModalOpen = true"
-                                class="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-bold transition"
-                                :class="favModalOpen ? 'border-[#ea580c] bg-[#ea580c] text-white shadow-sm' : 'border-[#dcd2bd] bg-white/80 text-[#4c5b54] hover:border-[#ea580c]/50 hover:text-[#ea580c]'">
-                            <span class="material-symbols-rounded text-[17px]">bookmark</span>
-                            <span>Favorites</span>
-                            <span class="grid h-4 min-w-[16px] place-items-center rounded-full px-1 text-[9px] font-bold leading-none"
-                                  :class="favModalOpen ? 'bg-white text-[#ea580c]' : 'bg-[#ea580c] text-white'"
+                                class="relative flex flex-col items-center justify-center gap-0.5 text-[#4c5b54] transition hover:text-[#ea580c]"
+                                :class="favModalOpen ? 'text-[#ea580c]' : ''">
+                            <span class="material-symbols-rounded text-[21px] leading-none">bookmark</span>
+                            <span class="text-[11px] font-semibold leading-none">Favorites</span>
+                            <span class="absolute -right-1.5 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-[#ea580c] px-1 text-[9px] font-bold leading-none text-white"
                                   x-show="favorites.length > 0" x-text="favorites.length"></span>
+                        </button>
+
+                        <button type="button" @click="settingsModalOpen = true"
+                                class="flex flex-col items-center justify-center gap-0.5 text-[#4c5b54] transition hover:text-[#0f766e]"
+                                :class="settingsModalOpen ? 'text-[#0f766e]' : ''">
+                            <span class="material-symbols-rounded text-[21px] leading-none">settings</span>
+                            <span class="text-[11px] font-semibold leading-none">Settings</span>
                         </button>
                     </div>
                 </div>
@@ -296,39 +364,58 @@
         </main>
     </div>
 
-    <!-- Mobile bottom navigation (floating dock) -->
-    <nav class="fixed inset-x-3 bottom-safe z-40 mx-auto max-w-md rounded-2xl border border-[#dcd2bd] bg-[#fbf9f4]/95 px-2 py-1.5 shadow-[0_14px_34px_-12px_rgba(23,42,55,0.32)] backdrop-blur-md lg:hidden"
+    <!-- Mobile bottom navigation (sleek docked bar) -->
+    <nav class="mobile-dock fixed inset-x-0 bottom-0 z-40 border-t border-[#e0d9c8] bg-[#faf7f0]/95 shadow-[0_-6px_24px_-12px_rgba(23,42,55,0.16)] backdrop-blur-md pb-safe lg:hidden"
          aria-label="Navigasi utama">
-        <div class="grid grid-cols-4 gap-1">
+        <div class="mx-auto grid max-w-md grid-cols-4">
             <a href="{{ route('manga.index') }}"
-               class="flex flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition {{ !$isAnimeMode ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] active:bg-[#eaddc2]/60' }}"
+               class="relative flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 text-[10px] transition active:scale-95 {{ !$isAnimeMode ? 'font-bold text-[#0f766e]' : 'font-medium text-[#6f7e75]' }}"
                @if(!$isAnimeMode) aria-current="page" @endif>
-                <span class="material-symbols-rounded text-[20px] leading-none">menu_book</span>
+                @if(!$isAnimeMode)
+                    <span class="absolute top-0 h-[2.5px] w-8 rounded-b-full bg-[#0f766e]"></span>
+                @endif
+                <span class="grid h-7 w-12 place-items-center rounded-full transition {{ !$isAnimeMode ? 'bg-[#0f766e]/12' : '' }}">
+                    <span class="material-symbols-rounded text-[21px] leading-none">menu_book</span>
+                </span>
                 <span>Manga</span>
             </a>
+
             <a href="{{ route('anime.index') }}"
-               class="flex flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition {{ $isAnimeMode ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] active:bg-[#eaddc2]/60' }}"
+               class="relative flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 text-[10px] transition active:scale-95 {{ $isAnimeMode ? 'font-bold text-[#0f766e]' : 'font-medium text-[#6f7e75]' }}"
                @if($isAnimeMode) aria-current="page" @endif>
-                <span class="material-symbols-rounded text-[20px] leading-none">smart_display</span>
+                @if($isAnimeMode)
+                    <span class="absolute top-0 h-[2.5px] w-8 rounded-b-full bg-[#0f766e]"></span>
+                @endif
+                <span class="grid h-7 w-12 place-items-center rounded-full transition {{ $isAnimeMode ? 'bg-[#0f766e]/12' : '' }}">
+                    <span class="material-symbols-rounded text-[21px] leading-none">smart_display</span>
+                </span>
                 <span>Anime</span>
             </a>
+
             <button type="button" @click="openHistory()"
-                    class="relative flex flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition"
-                    :class="historyModalOpen ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] active:bg-[#eaddc2]/60'">
-                <span class="material-symbols-rounded text-[20px] leading-none">history</span>
+                    class="relative flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 text-[10px] transition active:scale-95"
+                    :class="historyModalOpen ? 'font-bold text-[#0f766e]' : 'font-medium text-[#6f7e75]'">
+                <span x-show="historyModalOpen" x-cloak class="absolute top-0 h-[2.5px] w-8 rounded-b-full bg-[#0f766e]"></span>
+                <span class="relative grid h-7 w-12 place-items-center rounded-full transition"
+                      :class="historyModalOpen ? 'bg-[#0f766e]/12' : ''">
+                    <span class="material-symbols-rounded text-[21px] leading-none">history</span>
+                    <span class="absolute right-1.5 top-0 grid h-4 min-w-[16px] place-items-center rounded-full bg-[#0f766e] px-1 text-[9px] font-bold leading-none text-white ring-2 ring-[#faf7f0]"
+                          x-show="visibleHistory.length > 0" x-text="visibleHistory.length"></span>
+                </span>
                 <span>History</span>
-                <span class="absolute right-2.5 top-1 grid min-w-[16px] h-4 px-1 place-items-center rounded-full text-[9px] font-bold leading-none"
-                      :class="historyModalOpen ? 'bg-white text-[#0f766e]' : 'bg-[#0f766e] text-white'"
-                      x-show="visibleHistory.length > 0" x-text="visibleHistory.length"></span>
             </button>
+
             <button type="button" @click="favModalOpen = true"
-                    class="relative flex flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 text-[10px] font-bold transition"
-                    :class="favModalOpen ? 'bg-[#ea580c] text-white shadow-sm' : 'text-[#5f6b63] active:bg-[#eaddc2]/60'">
-                <span class="material-symbols-rounded text-[20px] leading-none">bookmark</span>
+                    class="relative flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 text-[10px] transition active:scale-95"
+                    :class="favModalOpen ? 'font-bold text-[#ea580c]' : 'font-medium text-[#6f7e75]'">
+                <span x-show="favModalOpen" x-cloak class="absolute top-0 h-[2.5px] w-8 rounded-b-full bg-[#ea580c]"></span>
+                <span class="relative grid h-7 w-12 place-items-center rounded-full transition"
+                      :class="favModalOpen ? 'bg-[#ea580c]/12' : ''">
+                    <span class="material-symbols-rounded text-[21px] leading-none">bookmark</span>
+                    <span class="absolute right-1.5 top-0 grid h-4 min-w-[16px] place-items-center rounded-full bg-[#ea580c] px-1 text-[9px] font-bold leading-none text-white ring-2 ring-[#faf7f0]"
+                          x-show="favorites.length > 0" x-text="favorites.length"></span>
+                </span>
                 <span>Favorites</span>
-                <span class="absolute right-2.5 top-1 grid min-w-[16px] h-4 px-1 place-items-center rounded-full text-[9px] font-bold leading-none"
-                      :class="favModalOpen ? 'bg-white text-[#ea580c]' : 'bg-[#ea580c] text-white'"
-                      x-show="favorites.length > 0" x-text="favorites.length"></span>
             </button>
         </div>
     </nav>
@@ -460,6 +547,89 @@
 
                 <div x-show="visibleHistory.length > 0" class="pt-1 text-right">
                     <button type="button" @click="clearVisibleHistory()" class="text-xs font-bold text-[#ea580c] hover:underline">Clear all history</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div x-cloak x-show="settingsModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+         @keydown.escape.window="settingsModalOpen = false"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+        <div class="w-full max-w-md rounded-3xl border border-[#dcd2bd] bg-white p-6 shadow-2xl space-y-5"
+             @click.away="settingsModalOpen = false">
+            <div class="flex items-center justify-between border-b border-[#e0d9c8] pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-rounded text-[#0f766e]">settings</span>
+                    <h3 class="text-lg font-bold text-[#172a37]">Settings</h3>
+                </div>
+                <button type="button" @click="settingsModalOpen = false" class="text-gray-400 hover:text-gray-600 transition">
+                    <span class="material-symbols-rounded">close</span>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Appearance / Dark Mode -->
+                <div class="flex items-center justify-between gap-3 rounded-2xl border border-[#eaddc2] bg-[#fbf9f4] p-3.5">
+                    <div>
+                        <p class="text-sm font-bold text-[#172a37]">Appearance</p>
+                        <p class="text-xs text-[#6f7e75]">Switch between Light and Dark mode</p>
+                    </div>
+                    <div class="flex items-center gap-1 rounded-full border border-[#dcd2bd] bg-white p-1">
+                        <button type="button" @click="setDarkMode(false)"
+                                class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold transition"
+                                :class="!darkMode ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] hover:text-[#172a37]'">
+                            <span class="material-symbols-rounded text-[15px]">light_mode</span>
+                            Light
+                        </button>
+                        <button type="button" @click="setDarkMode(true)"
+                                class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold transition"
+                                :class="darkMode ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] hover:text-[#172a37]'">
+                            <span class="material-symbols-rounded text-[15px]">dark_mode</span>
+                            Dark
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Default Anime Audio -->
+                <div class="flex items-center justify-between gap-3 rounded-2xl border border-[#eaddc2] bg-[#fbf9f4] p-3.5">
+                    <div>
+                        <p class="text-sm font-bold text-[#172a37]">Default Anime Audio</p>
+                        <p class="text-xs text-[#6f7e75]">Preferred audio track when watching</p>
+                    </div>
+                    <div class="flex items-center gap-1 rounded-full border border-[#dcd2bd] bg-white p-1">
+                        <button type="button" @click="setAnimeAudioPref('sub')"
+                                class="rounded-full px-3 py-1 text-xs font-bold transition"
+                                :class="animeAudioPref === 'sub' ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] hover:text-[#172a37]'">
+                            Sub
+                        </button>
+                        <button type="button" @click="setAnimeAudioPref('dub')"
+                                class="rounded-full px-3 py-1 text-xs font-bold transition"
+                                :class="animeAudioPref === 'dub' ? 'bg-[#0f766e] text-white shadow-sm' : 'text-[#5f6b63] hover:text-[#172a37]'">
+                            Dub
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Local data management -->
+                <div class="space-y-2 rounded-2xl border border-[#eaddc2] bg-[#fbf9f4] p-3.5">
+                    <p class="text-sm font-bold text-[#172a37]">Saved Data</p>
+                    <p class="text-xs text-[#6f7e75]">History and favorites are stored locally in your browser.</p>
+                    <div class="flex flex-wrap gap-2 pt-1.5">
+                        <button type="button" @click="clearHistory(); clearAnimeHistory()"
+                                class="rounded-xl border border-[#dcd2bd] bg-white px-3 py-1.5 text-xs font-bold text-[#37474f] transition hover:border-[#ea580c] hover:text-[#ea580c]">
+                            Clear History
+                        </button>
+                        <button type="button" @click="clearFavorites()"
+                                class="rounded-xl border border-[#dcd2bd] bg-white px-3 py-1.5 text-xs font-bold text-[#37474f] transition hover:border-[#ea580c] hover:text-[#ea580c]">
+                            Clear Favorites
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

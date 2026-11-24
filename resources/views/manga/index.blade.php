@@ -6,17 +6,24 @@
         {{-- ===== CONTINUE READING (manga history only) ===== --}}
         <section x-data="{
                     items: JSON.parse(localStorage.getItem('bibliomanga_history') || '[]'),
-                    rel(ts) {
-                        if (!ts) return 'saved';
-                        const d = Number(ts) || Date.parse(ts);
-                        if (!d) return 'saved';
-                        const diff = Math.max(0, Date.now() - d);
-                        const m = Math.floor(diff / 60000);
-                        if (m < 1) return 'just now';
-                        if (m < 60) return m + 'm ago';
-                        const h = Math.floor(m / 60);
-                        if (h < 24) return h + 'h ago';
-                        return Math.floor(h / 24) + 'd ago';
+                    rel(item) {
+                        const raw = item.updatedAt;
+                        if (raw) {
+                            const d = Number(raw);
+                            if (d && d > 1577836800000) {
+                                const diff = Math.max(0, Date.now() - d);
+                                const m = Math.floor(diff / 60000);
+                                if (m < 1) return 'Read just now';
+                                if (m < 60) return 'Read ' + m + 'm ago';
+                                const h = Math.floor(m / 60);
+                                if (h < 24) return 'Read ' + h + 'h ago';
+                                return 'Read ' + Math.floor(h / 24) + 'd ago';
+                            }
+                        }
+                        if (item.readAt && typeof item.readAt === 'string') {
+                            return 'Read ' + item.readAt;
+                        }
+                        return 'Recently read';
                     }
                  }"
                  x-show="items.length > 0" x-cloak>
@@ -36,10 +43,9 @@
                              class="h-[84px] w-[58px] flex-shrink-0 rounded-lg object-cover" />
                         <div class="min-w-0 flex-1">
                             <h3 class="truncate text-sm font-bold text-[#172a37]" x-text="item.title"></h3>
-                            <div class="mt-1 flex items-center gap-2 font-mono text-[11px] text-[#84948a]">
-                                <span class="font-semibold text-[#0f766e]">CH <span x-text="item.chapterNumber || '?'"></span></span>
-                                <span class="h-1 w-1 rounded-full bg-[#c1cbbb]"></span>
-                                <span x-text="rel(item.readAt || item.updatedAt)"></span>
+                            <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-[#7b8a82]">
+                                <span class="font-bold text-[#0f766e]">Ch <span x-text="item.chapterNumber || '?'"></span></span>
+                                <span x-text="rel(item)"></span>
                             </div>
                         </div>
                         <span class="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-[#0f766e] text-white transition group-hover:bg-[#115e59]">

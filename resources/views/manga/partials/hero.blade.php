@@ -43,15 +43,21 @@
                 @if($heroArt)
                     <img src="{{ $heroArt }}" alt="{{ $slide['title'] }} banner"
                          loading="{{ $i === 0 ? 'eager' : 'lazy' }}" referrerpolicy="no-referrer" decoding="async"
-                         class="absolute inset-0 hidden h-full w-full object-cover object-center opacity-70 sm:block" />
+                         class="absolute inset-0 hidden h-full w-full object-cover object-center opacity-75 sm:block" />
                 @elseif(!empty($slide['coverUrl']))
-                    <img src="{{ $slide['coverUrl'] }}" alt="" aria-hidden="true" referrerpolicy="no-referrer"
-                         class="absolute inset-0 hidden h-full w-full scale-110 object-cover opacity-30 blur-2xl sm:block" />
+                    <img src="{{ $slide['coverUrl'] }}" alt="" aria-hidden="true" referrerpolicy="no-referrer" decoding="async"
+                         class="absolute inset-0 hidden h-full w-full scale-110 object-cover opacity-20 blur-2xl sm:block" />
+                    <div class="pointer-events-none absolute inset-y-0 right-0 hidden w-[46%] sm:block lg:w-[38%]"
+                         style="-webkit-mask-image: linear-gradient(to right, transparent 0%, black 32%, black 100%); mask-image: linear-gradient(to right, transparent 0%, black 32%, black 100%);">
+                        <img src="{{ $slide['coverUrl'] }}" alt="{{ $slide['title'] }}"
+                             loading="{{ $i === 0 ? 'eager' : 'lazy' }}" referrerpolicy="no-referrer" decoding="async"
+                             class="h-full w-full object-cover object-top opacity-90" />
+                    </div>
                 @endif
                 <div class="absolute inset-0 bg-gradient-to-r from-[#172a37] via-[#172a37]/75 to-[#172a37]/15"></div>
                 <div class="absolute inset-0 bg-gradient-to-t from-[#172a37]/90 via-transparent to-transparent"></div>
 
-                <div class="relative flex h-full flex-col justify-end gap-2.5 p-5 pb-7 sm:gap-3 sm:p-9 sm:pb-10 lg:max-w-[62%]">
+                <div class="relative z-20 flex h-full flex-col justify-end gap-2.5 p-5 pb-7 sm:gap-3 sm:p-9 sm:pb-10 lg:max-w-[62%]">
                     <div class="inline-flex w-fit items-center gap-2 rounded-full bg-[#f97316] px-3.5 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-white">
                         <span class="material-symbols-rounded text-sm">local_fire_department</span>
                         Trending #{{ $i + 1 }}

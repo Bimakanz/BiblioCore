@@ -13,7 +13,7 @@
     $inputId = $variant === 'mobile' ? 'liveSearchMobile' : 'liveSearchDesktop';
 @endphp
 
-<div class="relative w-full {{ $variant === 'topbar' ? 'max-w-[540px]' : '' }}"
+<div class="relative w-full {{ $variant === 'topbar' ? 'max-w-[260px] xl:max-w-[320px]' : '' }}"
      x-data="{
         query: {{ $queryJson }},
         results: [],
@@ -74,7 +74,6 @@
             <input type="hidden" name="category" value="{{ request('category') }}">
         @endif
         <div class="relative w-full">
-            <span class="material-symbols-rounded pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[19px] text-[#84948a]">search</span>
             <input type="text"
                    id="{{ $inputId }}"
                    name="q"
@@ -85,9 +84,12 @@
                    placeholder="{{ $searchPlaceholder }}"
                    autocomplete="off"
                    aria-label="{{ $searchPlaceholder }}"
-                   class="h-10 w-full rounded-xl border border-[#dcd2bd] bg-white/85 pl-10 pr-10 text-xs font-medium text-[#172a37] placeholder:text-[#9aa29a] transition focus:border-[#0f766e] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0f766e]/15 sm:text-sm" />
+                   class="h-9 w-full rounded-xl border border-[#dcd2bd] bg-white/90 pl-3.5 pr-10 text-xs font-medium text-[#172a37] placeholder:text-[#84948a] transition focus:border-[#0f766e] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0f766e]/15 sm:text-[13px]" />
 
-            <span class="absolute right-3.5 top-1/2 -translate-y-1/2" x-show="loading" x-cloak>
+            <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#5f6b63]" x-show="!loading">
+                <span class="material-symbols-rounded block text-[19px]">search</span>
+            </span>
+            <span class="absolute right-3 top-1/2 -translate-y-1/2" x-show="loading" x-cloak>
                 <span class="block h-4 w-4 animate-spin rounded-full border-2 border-[#0f766e] border-t-transparent"></span>
             </span>
         </div>

@@ -1,13 +1,24 @@
 <x-manga-layout title="{{ $anime['title'] }} — BiblioAnime">
-    <div class="relative">
+    <div class="space-y-4">
+        {{-- Back link --}}
+        <div class="flex flex-wrap items-center gap-2.5">
+            <a href="{{ route('anime.index') }}"
+               class="inline-flex items-center gap-2 rounded-full border border-[#dcd2bd] bg-white px-4 py-2 text-sm font-bold text-[#172a37] shadow-sm transition hover:border-[#0f766e] hover:text-[#0f766e]">
+                <span class="material-symbols-rounded text-[18px]">arrow_back</span>
+                <span>Back to Anime</span>
+            </a>
+            <span class="material-symbols-rounded text-base text-[#84948a]">chevron_right</span>
+            <span class="max-w-[65vw] truncate text-sm font-bold text-[#172a37]">{{ $anime['title'] }}</span>
+        </div>
+
         {{-- Banner --}}
-        <div class="relative h-52 sm:h-72 overflow-hidden bg-[#172a37]">
+        <div class="relative h-52 sm:h-72 overflow-hidden rounded-2xl sm:rounded-3xl bg-[#172a37]">
             @if($anime['bannerUrl'])
-                <img src="{{ $anime['bannerUrl'] }}" alt="" class="h-full w-full object-cover" />
+                <img src="{{ $anime['bannerUrl'] }}" alt="" referrerpolicy="no-referrer" decoding="async" class="h-full w-full object-cover object-center" />
             @else
-                <img src="{{ $anime['coverUrl'] }}" alt="" class="h-full w-full object-cover opacity-40 blur-[2px] scale-105" />
+                <img src="{{ $anime['coverUrl'] }}" alt="" referrerpolicy="no-referrer" decoding="async" class="h-full w-full object-cover object-[center_22%] opacity-75" />
             @endif
-            <div class="absolute inset-0 bg-gradient-to-t from-[#f6f1e8] via-transparent to-transparent"></div>
+            <div class="absolute inset-0 bg-gradient-to-t from-[#172a37]/80 via-transparent to-transparent"></div>
         </div>
 
         <div class="mx-auto w-full max-w-7xl px-4 sm:px-6">

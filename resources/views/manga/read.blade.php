@@ -160,6 +160,7 @@
                     source: this.currentChapter.provider || 'MangaDex',
                     language: this.currentChapter.language || 'id',
                     readPath: this.currentChapter.readPath || null,
+                    updatedAt: Date.now(),
                     readAt: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) + ', ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                 });
                 if (hist.length > 50) hist = hist.slice(0, 50);
