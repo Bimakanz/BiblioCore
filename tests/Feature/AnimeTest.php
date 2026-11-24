@@ -234,7 +234,7 @@ class AnimeTest extends TestCase
         $response->assertNotFound();
     }
 
-    public function test_watch_page_offers_the_burned_in_versions(): void
+    public function test_watch_page_plays_burned_in_files_with_the_native_player(): void
     {
         $this->mock(\App\Services\Anime\AnimeService::class, function ($mock) {
             $mock->shouldReceive('isUnplayable')->andReturn(false);
@@ -263,9 +263,8 @@ class AnimeTest extends TestCase
         $response = $this->get('/anime/al_1/watch?ep=watch%2Fkaa%2F1%2Fsub%2Fkaa-1&n=1');
 
         $response->assertOk()
-            ->assertSee('id="versionBtn"', false)
-            ->assertSee('data-value="animeheaven"', false)
-            ->assertSee('data-value="samehadaku"', false)
+            // Burned-in copies are an automatic last resort, not a picker.
+            ->assertDontSee('id="versionBtn"', false)
             ->assertSee('Burned-in', false)
             // The MP4 CDNs do not allow our origin through CORS, so the native
             // element must drop the anonymous mode or playback stays black.

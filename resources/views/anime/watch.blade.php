@@ -66,10 +66,6 @@
                     The dub for this episode is not available yet — playing the sub version.
                 </p>
 
-                <p id="versionNotice" class="hidden rounded-2xl border border-[#bae6fd] bg-[#f0f9ff] px-4 py-2 text-xs font-semibold text-[#075985]">
-                    The burned-in copy is not available for this episode — playing the standard source instead.
-                </p>
-
                 <div id="embedWarning" class="hidden items-start gap-3 rounded-2xl border border-[#f59e0b]/45 bg-[#fffbeb] px-4 py-3 text-xs text-[#92400e] shadow-sm">
                     <span class="material-symbols-rounded mt-0.5 flex-shrink-0 text-[19px] text-[#d97706]">warning</span>
                     <div class="min-w-0 flex-1 leading-relaxed">
@@ -257,9 +253,6 @@
         try { qualityPref = parseInt(localStorage.getItem('biblioanime_quality') || '-1', 10); if (isNaN(qualityPref)) qualityPref = -1; } catch (e) {}
         let audioValue = @js($audio) === 'dub' ? 'dub' : 'sub';
         let dubAvailable = @js($dubAvailable);
-        // Burned-in copies come from separate hard-subtitle sources, picked
-        // with ?server=animeheaven|samehadaku. Empty means the normal chain.
-        let hardsubServer = @js(in_array(request()->query('server'), ['animeheaven', 'samehadaku'], true) ? request()->query('server') : '');
 
         // Custom pill dropdowns: button + menu panel (no native <select>).
         function setupDropdown(btnId, menuId, labelId, onPick) {
@@ -332,13 +325,6 @@
             if (next === audioValue) return;
             if (next === 'dub' && !dubAvailable) return;
             audioValue = next;
-            // Both burned-in libraries are sub-only, so a dub choice always
-            // goes back to the standard chain.
-            if (next === 'dub' && hardsubServer) {
-                setHardsubServer('');
-                const notice = document.getElementById('versionNotice');
-                if (notice) notice.classList.add('hidden');
-            }
             try { localStorage.setItem('biblioanime_audio', next); } catch (e) {}
             paintAudioButtons();
             goToAudio();
@@ -359,7 +345,7 @@
                     paintAudioButtons();
                     return;
                 }
-                location.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(match.id) + '&n=' + match.number + '&audio=' + audioValue + (hardsubServer ? '&server=' + encodeURIComponent(hardsubServer) : '');
+                location.href = '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(match.id) + '&n=' + match.number + '&audio=' + audioValue;
             } catch (e) {
                 showError('Failed to load the ' + (audioValue === 'dub' ? 'Dub' : 'Sub') + '.'); 
             }
@@ -379,10 +365,6 @@
         const subtitleDropdown = setupDropdown('subtitleBtn', 'subtitleMenu', 'subtitleBtnLabel', function (v) {
             applySubtitle(parseInt(v, 10));
         });
-
-        function setHardsubServer(value) {
-            hardsubServer = '';
-        }
 
         function streamUrl() {
             return STREAM_URL;
@@ -836,24 +818,6 @@
                 }
                 return;
             }
-            // Asked for a burned-in copy but the source did not have this
-            // episode: the backend already fell back, so tell the viewer
-            // instead of leaving a misleading "Burned-in" label.
-            const versionNotice = document.getElementById('versionNotice');
-            if (hardsubServer && !data.hardSub) {
-                setHardsubServer('');
-                if (versionNotice) versionNotice.classList.remove('hidden');
-            } else if (versionNotice) {
-                versionNotice.classList.add('hidden');
-            }
-            // A burned-in MP4 picked automatically as the last resort should
-            // also show up in the picker, otherwise the label lies. Embeds are
-            // excluded: pinning ?server= would force a file we may not have.
-            if (data.hardSub && !hardsubServer && data.source.type === 'mp4') {
-                const actual = data.provider === 'AnimeHeaven' ? 'animeheaven'
-                    : (data.provider === 'Samehadaku' ? 'samehadaku' : '');
-                if (actual) setHardsubServer(actual);
-            }
             intro = data.intro || intro;
             outro = data.outro || outro;
             const notice = document.getElementById('audioNotice');
@@ -1043,16 +1007,14 @@
         }
 
         // A burned-in file that the browser refuses (CDN moved, hotlink
-        // block, unsupported codec) must not leave a silent black frame:
-        // drop the pinned version and let the standard chain take over.
+        // block, unsupported codec) must not leave a silent black frame. Such a
+        // file is already the last-resort source, so there is nothing left to
+        // retry: say so instead of hanging on a black screen.
         video.addEventListener('error', function () {
             if (playMode !== 'mp4' || mp4Failed) return;
             if (!video.error || video.error.code === 1) return;
             mp4Failed = true;
-            setHardsubServer('');
-            const notice = document.getElementById('versionNotice');
-            if (notice) notice.classList.remove('hidden');
-            loadStream();
+            showError('This episode\'s video could not be loaded. Please try again later.');
         });
 
         video.addEventListener('loadedmetadata', function () {            // Re-assert the chosen subtitle track: browsers may reset a
