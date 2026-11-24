@@ -466,6 +466,39 @@ class AnimeController extends Controller
             }
         }
 
+        // Always offer Indonesian (Auto) translated from the best English track
+        // when the provider does not already ship a native Indonesian track.
+        $hasIndo = false;
+        foreach ($subtitles as $sub) {
+            if ($this->subtitleLanguageFromLabel($sub['label'] ?? null) === 'id') {
+                $hasIndo = true;
+                break;
+            }
+        }
+        if (!$hasIndo && !empty($stream['subtitles'])) {
+            $indoSourceIdx = null;
+            foreach ($englishLabelIndexes as $i) {
+                if (isset($stream['subtitles'][$i]['url'])) {
+                    $indoSourceIdx = $i;
+                    break;
+                }
+            }
+            if ($indoSourceIdx === null) {
+                $indoSourceIdx = $this->pickTranslationSource($stream['subtitles']);
+            }
+            if ($indoSourceIdx !== null) {
+                $idToken = $this->signProxyPayload([
+                    'u' => $stream['subtitles'][$indoSourceIdx]['url'],
+                    'r' => $stream['referer'] ?? null,
+                ]);
+                $subtitles[] = [
+                    'lang' => 'id',
+                    'label' => 'Indonesian (Auto)',
+                    'url' => route('anime.subtitle.id', ['ep' => $episodeId, 't' => $idToken]),
+                ];
+            }
+        }
+
         $playlistToken = $this->signProxyPayload([
             'u' => $stream['sources'][0]['url'],
             'r' => $stream['referer'] ?? null,
@@ -766,18 +799,22 @@ class AnimeController extends Controller
     /** Indonesian subtitle generated from the English track (cached 30 days). */
     public function translatedSubtitle(Request $request): Response
     {
-        $episodeId = (string) $request->query('ep', '');
-        if ($episodeId === '') {
-            abort(400, 'Invalid episode');
-        }
-
-        $stream = $this->streamProvider->getStream($episodeId);
         $englishUrl = null;
-        foreach (($stream['subtitles'] ?? []) as $sub) {
-            $langLower = strtolower($sub['lang']);
-            if (str_starts_with($langLower, 'english') || $langLower === 'en') {
-                $englishUrl = $sub['url'];
-                break;
+        $tokenData = $this->verifyProxyPayload((string) $request->query('t', ''));
+        if ($tokenData && !empty($tokenData['u'])) {
+            $englishUrl = (string) $tokenData['u'];
+        } else {
+            $episodeId = (string) $request->query('ep', '');
+            if ($episodeId === '') {
+                abort(400, 'Invalid episode');
+            }
+            $stream = $this->streamProvider->getStream($episodeId);
+            foreach (($stream['subtitles'] ?? []) as $sub) {
+                $langLower = strtolower($sub['lang']);
+                if (str_starts_with($langLower, 'english') || $langLower === 'en') {
+                    $englishUrl = $sub['url'];
+                    break;
+                }
             }
         }
         if (!$englishUrl) {

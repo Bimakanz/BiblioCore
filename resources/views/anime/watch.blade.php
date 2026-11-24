@@ -97,22 +97,6 @@
 
                     <span class="hidden h-4 w-px bg-[#e0d9c8] sm:block"></span>
 
-                    {{-- Softsub (standard) or a hard-subtitled copy: the text is
-                         burned into the video, so nothing can drift or be lost. --}}
-                    <div class="flex items-center gap-1.5">
-                        <span class="text-[10px] font-bold uppercase tracking-wide text-[#84948a]">Version</span>
-                        <div class="relative">
-                            <button type="button" id="versionBtn" class="pill-btn" title="Standard uses the softsub tracks (you can shift them). Burned-in plays a copy with the subtitles already inside the video."><span id="versionBtnLabel">Standard</span><span class="material-symbols-rounded text-[14px] opacity-60">expand_more</span></button>
-                            <div id="versionMenu" class="pill-menu hidden">
-                                <button type="button" class="pill-option is-active" data-value="">Standard</button>
-                                <button type="button" class="pill-option" data-value="animeheaven">Burned-in &middot; EN</button>
-                                <button type="button" class="pill-option" data-value="samehadaku">Burned-in &middot; ID</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <span class="hidden h-4 w-px bg-[#e0d9c8] sm:block"></span>
-
                     <div class="flex items-center gap-1.5">
                         <span class="text-[10px] font-bold uppercase tracking-wide text-[#84948a]">Quality</span>
                         <div class="relative">
@@ -396,44 +380,17 @@
             applySubtitle(parseInt(v, 10));
         });
 
-        // "Version" swaps between the soft-sub chain and a burned-in file.
-        // The choice lives in the URL so episode links and refreshes keep it.
-        function rememberServerInUrl() {
-            try {
-                const url = new URL(location.href);
-                if (hardsubServer) url.searchParams.set('server', hardsubServer);
-                else url.searchParams.delete('server');
-                history.replaceState(null, '', url);
-            } catch (e) {}
-        }
-
         function setHardsubServer(value) {
-            hardsubServer = (value === 'animeheaven' || value === 'samehadaku') ? value : '';
-            versionDropdown.setActive(hardsubServer);
-            rememberServerInUrl();
-            refreshEpisodeLinks();
+            hardsubServer = '';
         }
-
-        const versionDropdown = setupDropdown('versionBtn', 'versionMenu', 'versionBtnLabel', function (v) {
-            const next = (v === 'animeheaven' || v === 'samehadaku') ? v : '';
-            if (next === hardsubServer) return;
-            setHardsubServer(next);
-            document.getElementById('versionNotice').classList.add('hidden');
-            if (playMode === 'mp4') { try { video.pause(); } catch (e) {} }
-            loadStream();
-        });
-        versionDropdown.setActive(hardsubServer);
 
         function streamUrl() {
-            return hardsubServer
-                ? STREAM_URL + (STREAM_URL.indexOf('?') === -1 ? '?' : '&') + 'server=' + encodeURIComponent(hardsubServer)
-                : STREAM_URL;
+            return STREAM_URL;
         }
 
         function watchHref(epId, number, audio) {
             return '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(epId)
-                + '&n=' + number + '&audio=' + encodeURIComponent(audio)
-                + (hardsubServer ? '&server=' + encodeURIComponent(hardsubServer) : '');
+                + '&n=' + number + '&audio=' + encodeURIComponent(audio);
         }
 
         // The episode list is built once; keep its links in sync with the
