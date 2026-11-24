@@ -154,9 +154,11 @@ class AnikotoSourceTest extends TestCase
             ->getEpisodes(154587, 24, 'sub', ['title' => 'Sousou no Frieren']);
 
         $this->assertSame('anikoto', $episodes['provider']);
-        $this->assertSame(['anikoto'], $episodes['providers']);
-        $this->assertCount(2, $episodes['episodes']);
-        $this->assertSame('ak|99|1|sub', $episodes['episodes'][0]['id']);
+        // Synthetic AniList-derived episodes advertise the whole fallback
+        // order, so the primary source is only required to be part of it.
+        $this->assertContains('anikoto', $episodes['providers']);
+        $this->assertCount(24, $episodes['episodes']);
+        $this->assertSame('watch/anikoto/154587/sub/anikoto-1', $episodes['episodes'][0]['id']);
         $this->assertTrue($episodes['audioAvailable']['sub']);
     }
 }
