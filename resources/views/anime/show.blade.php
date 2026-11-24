@@ -1,115 +1,147 @@
 <x-manga-layout title="{{ $anime['title'] }} — BiblioAnime">
-    <div class="space-y-4">
-        {{-- Back link --}}
-        <div class="flex flex-wrap items-center gap-2.5">
-            <a href="{{ route('anime.index') }}"
-               class="inline-flex items-center gap-2 rounded-full border border-[#dcd2bd] bg-white px-4 py-2 text-sm font-bold text-[#172a37] shadow-sm transition hover:border-[#0f766e] hover:text-[#0f766e]">
-                <span class="material-symbols-rounded text-[18px]">arrow_back</span>
-                <span>Back to Anime</span>
-            </a>
-            <span class="material-symbols-rounded text-base text-[#84948a]">chevron_right</span>
-            <span class="max-w-[65vw] truncate text-sm font-bold text-[#172a37]">{{ $anime['title'] }}</span>
-        </div>
+    <div class="w-full">
+        {{-- Detail Header (Full-bleed edge-to-edge) --}}
+        <section class="relative w-full overflow-hidden bg-transparent">
+            {{-- Backdrop container with mask-image for seamless fade in both light & dark --}}
+            <div class="absolute inset-0 detail-header-mask">
+                @php
+                    $detailBanner = $anime['bannerUrl'] ?? null;
+                @endphp
+                @if($detailBanner)
+                    <img src="{{ $detailBanner }}" alt="" referrerpolicy="no-referrer" decoding="async"
+                         class="h-full w-full object-cover object-center" />
+                @else
+                    <div class="h-full w-full bg-gradient-to-br from-[#172a37] via-[#111e28] to-[#0e1419]"></div>
+                @endif
 
-        {{-- Banner --}}
-        <div class="relative h-52 sm:h-72 overflow-hidden rounded-2xl sm:rounded-3xl bg-[#172a37]">
-            @if($anime['bannerUrl'])
-                <img src="{{ $anime['bannerUrl'] }}" alt="" referrerpolicy="no-referrer" decoding="async" class="h-full w-full object-cover object-center" />
-            @else
-                <img src="{{ $anime['coverUrl'] }}" alt="" referrerpolicy="no-referrer" decoding="async" class="h-full w-full object-cover object-[center_22%] opacity-75" />
-            @endif
-            <div class="absolute inset-0 bg-gradient-to-t from-[#172a37]/80 via-transparent to-transparent"></div>
-        </div>
+                {{-- Subtle general darkening (reduced ~35%) --}}
+                <div class="absolute inset-0 bg-[#0e1419]/25"></div>
 
-        <div class="mx-auto w-full max-w-7xl px-4 sm:px-6">
-            {{-- Header card --}}
-            <div class="relative -mt-24 sm:-mt-32 flex flex-col gap-6 sm:flex-row">
-                <img src="{{ $anime['coverUrl'] }}" alt="{{ $anime['title'] }}"
-                     class="w-36 sm:w-48 aspect-[3/4] rounded-3xl border-4 border-white object-cover shadow-xl flex-shrink-0 mx-auto sm:mx-0" />
-                <div class="flex-1 space-y-3 pt-2 sm:pt-24 text-center sm:text-left">
-                    <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                        <span class="rounded-full bg-[#0f766e] px-3 py-0.5 text-[11px] font-bold text-white">{{ $anime['status'] }}</span>
-                        <span class="rounded-full bg-[#172a37] px-3 py-0.5 text-[11px] font-bold text-white">{{ $anime['format'] }}</span>
-                        @if($anime['season'])<span class="rounded-full bg-white border border-[#dcd2bd] px-3 py-0.5 text-[11px] font-bold text-[#4c5b54]">{{ $anime['season'] }}</span>@endif
-                        @if($anime['nextAiring'])
-                            <span class="rounded-full bg-[#f97316]/10 border border-[#f97316]/30 px-3 py-0.5 text-[11px] font-bold text-[#ea580c]">
-                                Episode {{ $anime['nextAiring']['episode'] }} airs in {{ (int) floor($anime['nextAiring']['timeUntilAiring'] / 86400) }}d {{ (int) floor(($anime['nextAiring']['timeUntilAiring'] % 86400) / 3600) }}h
-                            </span>
-                        @endif
-                    </div>
-                    <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#172a37]" style="font-family: 'Plus Jakarta Sans', sans-serif;">{{ $anime['title'] }}</h1>
-                    @if(!empty($anime['altTitles']))
-                        <p class="text-xs text-[#84948a] line-clamp-1">Also known as: {{ implode(', ', array_slice($anime['altTitles'], 0, 3)) }}</p>
-                    @endif
-                    <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-xs font-semibold text-[#4c5b54]">
-                        @if($anime['score'])
-                            <span class="inline-flex items-center gap-1 rounded-xl border border-[#dcd2bd] bg-white/85 px-2.5 py-1">
-                                <span class="material-symbols-rounded text-[15px] text-[#f59e0b]">star</span>
-                                <span class="text-[#84948a]">Score:</span>
-                                <strong class="font-bold text-[#172a37]">{{ $anime['score'] }}/10</strong>
-                            </span>
-                        @endif
-                        @if($anime['year'])
-                            <span class="inline-flex items-center gap-1 rounded-xl border border-[#dcd2bd] bg-white/85 px-2.5 py-1">
-                                <span class="text-[#84948a]">Year:</span>
-                                <strong class="font-bold text-[#172a37]">{{ $anime['year'] }}</strong>
-                            </span>
-                        @endif
-                        @if($anime['episodes'])
-                            <span class="inline-flex items-center gap-1 rounded-xl border border-[#dcd2bd] bg-white/85 px-2.5 py-1">
-                                <span class="text-[#84948a]">Episodes:</span>
-                                <strong class="font-bold text-[#172a37]">{{ $anime['episodes'] }}</strong>
-                            </span>
-                        @endif
-                        @if($anime['duration'])
-                            <span class="inline-flex items-center gap-1 rounded-xl border border-[#dcd2bd] bg-white/85 px-2.5 py-1">
-                                <span class="text-[#84948a]">Duration:</span>
-                                <strong class="font-bold text-[#172a37]">{{ $anime['duration'] }} min/ep</strong>
-                            </span>
-                        @endif
-                        @if(!empty($anime['studios']))
-                            <span class="inline-flex items-center gap-1 rounded-xl border border-[#dcd2bd] bg-white/85 px-2.5 py-1">
-                                <span class="text-[#84948a]">Studio:</span>
-                                <strong class="font-bold text-[#172a37]">{{ implode(', ', $anime['studios']) }}</strong>
-                            </span>
-                        @endif
-                    </div>
-                    @if(!empty($anime['genres']))
-                        <div class="flex flex-wrap justify-center sm:justify-start gap-1.5">
-                            @foreach($anime['genres'] as $genre)
-                                <a href="{{ route('anime.index', ['genre' => $genre]) }}" class="rounded-full bg-white border border-[#dcd2bd] px-3 py-1 text-[11px] font-semibold text-[#4c5b54] transition hover:border-[#0f766e]/50 hover:text-[#0f766e]">{{ $genre }}</a>
-                            @endforeach
-                        </div>
-                    @endif
+                {{-- Dark gradient on the left for text legibility, fading out smoothly towards center-right --}}
+                <div class="absolute inset-0 bg-gradient-to-r from-[#0e1419]/90 via-[#0e1419]/55 via-45% to-transparent"></div>
 
-                    {{-- Resume (client-side, from biblioanime_history) --}}
-                    @if($available)
-                    <div x-data="{ entry: (JSON.parse(localStorage.getItem('biblioanime_history') || '[]')).find(h => h.id === '{{ $anime['id'] }}') || null, fmt(s) { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = String(s % 60).padStart(2, '0'); return h > 0 ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; }, rel(ts) { const d = Number(ts) || (ts ? Date.parse(ts) : 0); if (!d) return 'just now'; const diff = Math.max(0, Date.now() - d); const m = Math.floor(diff / 60000); if (m < 1) return 'just now'; if (m < 60) return m + 'm ago'; const h = Math.floor(m / 60); if (h < 24) return h + 'h ago'; return Math.floor(h / 24) + 'd ago'; } }" x-cloak>
-                        <template x-if="entry">
-                            <a :href="'/anime/{{ $anime['id'] }}/watch?ep=' + encodeURIComponent(entry.episodeId || '') + '&n=' + encodeURIComponent(entry.episodeNumber || 1) + '&t=' + Math.max(0, Math.floor((entry.positionSec || 0) - 5))"
-                               class="inline-flex flex-wrap items-center gap-2 rounded-full bg-[#f97316] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#ea580c]">
-                                <span class="material-symbols-rounded">resume</span>
-                                Resume Episode <span x-text="entry.episodeNumber"></span>
-                                <span class="text-[11px] font-semibold text-white/80" x-text="entry.durationSec > 0 ? fmt(entry.positionSec) + ' / ' + fmt(entry.durationSec) : ''"></span>
-                                <span class="text-[11px] font-semibold text-white/80" x-text="rel(entry.updatedAt || entry.watchedAt)"></span>
-                            </a>
-                        </template>
-                    </div>
-                    @else
-                    <div class="w-full max-w-2xl rounded-2xl border border-[#f0d9b5] bg-[#fff8ec] px-5 py-4 text-left">
-                        <p class="flex items-center gap-2 text-sm font-bold text-[#b45309]">
-                            <span class="material-symbols-rounded text-base">info</span>
-                            Not available to watch
-                        </p>
-                        <p class="mt-1 text-xs leading-relaxed text-[#8a6d3b]">
-                            {{ request('unavailable') ? 'No server can play this title right now.' : 'This title has no digital release yet, so there is no video source to play. Titles without video are no longer shown in search or the catalog.' }}
-                        </p>
-                    </div>
-                    @endif
-                </div>
+                {{-- Subtle top dark gradient for transparent navbar legibility --}}
+                <div class="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 via-black/20 to-transparent"></div>
             </div>
 
-            <div class="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+            {{-- Header Content --}}
+            <div class="relative z-30 mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-7 pt-20 sm:pt-24 lg:pt-28 pb-36 sm:pb-40 lg:pb-44">
+                {{-- Breadcrumb inside header --}}
+                <div class="mb-6 flex flex-wrap items-center gap-2 text-xs">
+                    <a href="{{ route('anime.index') }}"
+                       class="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/25 px-3 py-1.5 font-semibold text-white/90 backdrop-blur-md transition hover:bg-black/40 hover:text-white">
+                        <span class="material-symbols-rounded text-[16px]">arrow_back</span>
+                        <span>Back to Anime</span>
+                    </a>
+                    <span class="material-symbols-rounded text-sm text-white/40">chevron_right</span>
+                    <span class="max-w-[60vw] truncate font-medium text-white/70">{{ $anime['title'] }}</span>
+                </div>
+
+                <div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:gap-8">
+                    {{-- Vertical Cover --}}
+                    <div class="mx-auto w-36 sm:w-44 lg:w-52 flex-shrink-0 overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-white/20 bg-[#1c2834] shadow-2xl">
+                        <div class="relative aspect-[3/4] w-full">
+                            <img src="{{ $anime['coverUrl'] }}" alt="{{ $anime['title'] }}" referrerpolicy="no-referrer"
+                                 class="h-full w-full object-cover" />
+                        </div>
+                    </div>
+
+                    {{-- Metadata & Title --}}
+                    <div class="min-w-0 flex-1 space-y-3.5 text-center sm:text-left">
+                        <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                            <span class="rounded-full bg-[#0f766e] px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm">{{ $anime['status'] }}</span>
+                            <span class="rounded-full border border-white/15 bg-white/10 px-2.5 py-0.5 text-[11px] font-bold text-white/90 backdrop-blur-sm">{{ $anime['format'] }}</span>
+                            @if($anime['season'])<span class="rounded-full border border-white/15 bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold text-white/90 backdrop-blur-sm">{{ $anime['season'] }}</span>@endif
+                            @if($anime['nextAiring'])
+                                <span class="rounded-full bg-[#f97316]/20 border border-[#f97316]/40 px-2.5 py-0.5 text-[11px] font-bold text-[#fdba74] backdrop-blur-sm">
+                                    Episode {{ $anime['nextAiring']['episode'] }} airs in {{ (int) floor($anime['nextAiring']['timeUntilAiring'] / 86400) }}d {{ (int) floor(($anime['nextAiring']['timeUntilAiring'] % 86400) / 3600) }}h
+                                </span>
+                            @endif
+                        </div>
+
+                        <h1 class="font-display text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-3xl lg:text-4xl drop-shadow-sm">
+                            {{ $anime['title'] }}
+                        </h1>
+
+                        @if(!empty($anime['altTitles']))
+                            <p class="text-xs text-white/70 line-clamp-1">Also known as: {{ implode(', ', array_slice($anime['altTitles'], 0, 3)) }}</p>
+                        @endif
+
+                        <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-xs font-semibold">
+                            @if($anime['score'])
+                                <span class="inline-flex items-center gap-1 rounded-xl border border-white/15 bg-white/10 px-2.5 py-1 text-white backdrop-blur-sm">
+                                    <span class="material-symbols-rounded text-[15px] text-[#f59e0b]">star</span>
+                                    <span class="text-white/60">Score:</span>
+                                    <strong class="font-bold text-white">{{ $anime['score'] }}/10</strong>
+                                </span>
+                            @endif
+                            @if($anime['year'])
+                                <span class="inline-flex items-center gap-1 rounded-xl border border-white/15 bg-white/10 px-2.5 py-1 text-white backdrop-blur-sm">
+                                    <span class="text-white/60">Year:</span>
+                                    <strong class="font-bold text-white">{{ $anime['year'] }}</strong>
+                                </span>
+                            @endif
+                            @if($anime['episodes'])
+                                <span class="inline-flex items-center gap-1 rounded-xl border border-white/15 bg-white/10 px-2.5 py-1 text-white backdrop-blur-sm">
+                                    <span class="text-white/60">Episodes:</span>
+                                    <strong class="font-bold text-white">{{ $anime['episodes'] }}</strong>
+                                </span>
+                            @endif
+                            @if($anime['duration'])
+                                <span class="inline-flex items-center gap-1 rounded-xl border border-white/15 bg-white/10 px-2.5 py-1 text-white backdrop-blur-sm">
+                                    <span class="text-white/60">Duration:</span>
+                                    <strong class="font-bold text-white">{{ $anime['duration'] }} min/ep</strong>
+                                </span>
+                            @endif
+                            @if(!empty($anime['studios']))
+                                <span class="inline-flex items-center gap-1 rounded-xl border border-white/15 bg-white/10 px-2.5 py-1 text-white backdrop-blur-sm">
+                                    <span class="text-white/60">Studio:</span>
+                                    <strong class="font-bold text-white">{{ implode(', ', $anime['studios']) }}</strong>
+                                </span>
+                            @endif
+                        </div>
+
+                        @if(!empty($anime['genres']))
+                            <div class="flex flex-wrap justify-center sm:justify-start gap-1.5 pt-1">
+                                @foreach($anime['genres'] as $genre)
+                                    <a href="{{ route('anime.index', ['genre' => $genre]) }}"
+                                       class="rounded-full border border-white/20 bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white/90 backdrop-blur-sm transition hover:border-[#0f766e] hover:bg-[#0f766e]/30 hover:text-white">{{ $genre }}</a>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        {{-- Resume (client-side, from biblioanime_history) --}}
+                        @if($available)
+                        <div x-data="{ entry: (JSON.parse(localStorage.getItem('biblioanime_history') || '[]')).find(h => h.id === '{{ $anime['id'] }}') || null, fmt(s) { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = String(s % 60).padStart(2, '0'); return h > 0 ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; }, rel(ts) { const d = Number(ts) || (ts ? Date.parse(ts) : 0); if (!d) return 'just now'; const diff = Math.max(0, Date.now() - d); const m = Math.floor(diff / 60000); if (m < 1) return 'just now'; if (m < 60) return m + 'm ago'; const h = Math.floor(m / 60); if (h < 24) return h + 'h ago'; return Math.floor(h / 24) + 'd ago'; } }" x-cloak class="pt-1">
+                            <template x-if="entry">
+                                <a :href="'/anime/{{ $anime['id'] }}/watch?ep=' + encodeURIComponent(entry.episodeId || '') + '&n=' + encodeURIComponent(entry.episodeNumber || 1) + '&t=' + Math.max(0, Math.floor((entry.positionSec || 0) - 5))"
+                                   class="inline-flex flex-wrap items-center gap-2 rounded-full bg-[#f97316] px-5 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-[#ea580c]">
+                                    <span class="material-symbols-rounded">resume</span>
+                                    Resume Episode <span x-text="entry.episodeNumber"></span>
+                                    <span class="text-[11px] font-semibold text-white/80" x-text="entry.durationSec > 0 ? fmt(entry.positionSec) + ' / ' + fmt(entry.durationSec) : ''"></span>
+                                    <span class="text-[11px] font-semibold text-white/80" x-text="rel(entry.updatedAt || entry.watchedAt)"></span>
+                                </a>
+                            </template>
+                        </div>
+                        @else
+                        <div class="w-full max-w-2xl rounded-2xl border border-amber-500/30 bg-black/40 px-5 py-4 text-left backdrop-blur-sm">
+                            <p class="flex items-center gap-2 text-sm font-bold text-amber-300">
+                                <span class="material-symbols-rounded text-base">info</span>
+                                Not available to watch
+                            </p>
+                            <p class="mt-1 text-xs leading-relaxed text-amber-100/80">
+                                {{ request('unavailable') ? 'No server can play this title right now.' : 'This title has no digital release yet, so there is no video source to play. Titles without video are no longer shown in search or the catalog.' }}
+                            </p>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        {{-- Main Content Container (Synopsis, Episodes, etc.) --}}
+        <div class="mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-7 pt-2 sm:pt-4 pb-12 space-y-8">
+            <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
                 <div class="min-w-0 space-y-6">
                     {{-- Synopsis --}}
                     <section class="rounded-2xl border border-[#e0d9c8] bg-white/85 p-5 shadow-sm">

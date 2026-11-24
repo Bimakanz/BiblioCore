@@ -230,7 +230,9 @@
         $isAnimeMode = request()->is('anime') || request()->is('anime/*');
         $isAnimeHome = request()->routeIs('anime.index') && !request()->hasAny(['category', 'genre', 'q', 'search', 'page']);
         $isMangaHome = request()->routeIs('manga.index', 'landing') && !request()->hasAny(['category', 'genre', 'q', 'search', 'page']);
-        $hasHero = $isAnimeHome || $isMangaHome;
+        $isAnimeDetail = request()->routeIs('anime.show');
+        $isMangaDetail = request()->routeIs('manga.show');
+        $hasHero = $isAnimeHome || $isMangaHome || $isAnimeDetail || $isMangaDetail;
         $homeRoute = $isAnimeMode ? route('anime.index') : route('manga.index');
         $liveSearchEndpoint = $isAnimeMode ? '/anime/api/live-search' : '/manga/api/live-search';
         $detailBase = $isAnimeMode ? '/anime/' : '/manga/';

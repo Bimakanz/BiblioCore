@@ -104,7 +104,7 @@
         @touchstart.passive="stop()"
         @touchend.passive="start()"
         @touchcancel.passive="start()"
-        class="relative w-full h-[76vh] min-h-[520px] max-h-[720px] sm:h-[78vh] lg:h-[80vh] overflow-hidden bg-[#0e1419]">
+        class="relative w-full h-[520px] sm:h-[560px] lg:h-[600px] overflow-hidden bg-transparent">
 
         @foreach($heroSlides as $i => $slide)
             @php
@@ -113,22 +113,29 @@
             <div class="absolute inset-0 transition-opacity duration-700 ease-in-out"
                  :class="active === {{ $i }} ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'">
                 
-                {{-- Banner image: landscape backdrop only (no vertical cover fallback) --}}
-                @if($heroArt)
-                    <img src="{{ $heroArt }}" alt="{{ $slide['title'] }} banner"
-                         @if($i > 0) loading="lazy" @else fetchpriority="high" @endif
-                         decoding="async" referrerpolicy="no-referrer"
-                         class="absolute inset-0 h-full w-full object-cover object-center" />
-                @endif
+                {{-- 1. Backdrop image & overlays with bottom mask fade (fades to transparent at bottom 30%) --}}
+                <div class="absolute inset-0 hero-backdrop-mask">
+                    @if($heroArt)
+                        <img src="{{ $heroArt }}" alt="{{ $slide['title'] }} banner"
+                             @if($i > 0) loading="lazy" @else fetchpriority="high" @endif
+                             decoding="async" referrerpolicy="no-referrer"
+                             class="absolute inset-0 h-full w-full object-cover object-center" />
+                    @else
+                        <div class="absolute inset-0 bg-gradient-to-br from-[#172a37] via-[#111e28] to-[#0e1419]"></div>
+                    @endif
 
-                {{-- Top dark gradient for transparent navbar legibility --}}
-                <div class="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/75 via-black/35 to-transparent"></div>
+                    {{-- Top dark gradient for transparent navbar legibility --}}
+                    <div class="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/80 via-black/40 to-transparent z-10"></div>
 
-                {{-- Left dark gradient for text block legibility --}}
-                <div class="absolute inset-0 bg-gradient-to-r from-[#0b141a]/90 via-[#0b141a]/60 via-40% to-transparent"></div>
+                    {{-- Left dark gradient for text block legibility --}}
+                    <div class="absolute inset-0 bg-gradient-to-r from-[#0b141a]/95 via-[#0b141a]/65 via-45% to-transparent z-10"></div>
+                </div>
 
-                {{-- Text content block on the left (bottom-aligned) --}}
-                <div class="relative mx-auto flex h-full w-full max-w-[1440px] flex-col justify-end px-4 sm:px-6 lg:px-7 pt-20 pb-20 sm:pb-24 lg:pb-28 z-20">
+                {{-- 2. Bottom fade for light mode --}}
+                <div class="pointer-events-none absolute inset-x-0 bottom-0 h-28 sm:h-32 hero-bottom-fade z-20"></div>
+
+                {{-- 3. Text content block on the left (bottom-aligned, z-index paling atas) --}}
+                <div class="relative mx-auto flex h-full w-full max-w-[1440px] flex-col justify-end px-4 sm:px-6 lg:px-7 pt-20 pb-14 sm:pb-16 lg:pb-16 z-30">
                     <div class="max-w-2xl space-y-3 sm:space-y-4">
                         <div class="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#f97316] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white sm:px-3.5 sm:text-[11px] shadow-sm">
                             <span class="material-symbols-rounded text-sm">local_fire_department</span>
@@ -169,11 +176,8 @@
             </div>
         @endforeach
 
-        {{-- Bottom fade to page background color (cream in light, navy in dark) --}}
-        <div class="pointer-events-none absolute inset-x-0 bottom-0 h-44 hero-bottom-fade z-20"></div>
-
-        {{-- Dot Indicators at bottom-right --}}
-        <div class="absolute right-6 lg:right-12 bottom-12 sm:bottom-16 z-30 flex items-center gap-1.5">
+        {{-- Dot Indicators at bottom-right, aligned with buttons, inside hero, above fade --}}
+        <div class="absolute right-6 lg:right-12 bottom-[60px] sm:bottom-[70px] lg:bottom-[72px] z-40 flex items-center gap-1.5">
             @foreach($heroSlides as $i => $slide)
                 <button type="button" @click="goTo({{ $i }})"
                         :aria-label="'Go to slide {{ $i + 1 }}'"

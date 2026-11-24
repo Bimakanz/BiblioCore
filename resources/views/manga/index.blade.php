@@ -7,7 +7,7 @@
         @include('manga.partials.hero')
     @endif
 
-    <div class="{{ $isMangaHome ? 'mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-7 space-y-9 -mt-16 sm:-mt-20 lg:-mt-24 relative z-20' : 'space-y-9' }}">
+    <div class="{{ $isMangaHome ? 'mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-7 space-y-9 pt-3 sm:pt-4 relative z-20' : 'space-y-9' }}">
 
         @if($isMangaHome)
             {{-- ===== CONTINUE READING (manga history only) ===== --}}
@@ -39,7 +39,7 @@
                         <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[#84948a]">Pick up where you left off</p>
                         <h2 class="font-display text-xl font-bold text-[#172a37] sm:text-2xl">Continue Reading</h2>
                     </div>
-                    <x-section-link @click="openHistory()">View all history</x-section-link>
+                    <x-section-link @click="openHistory()" class="!bg-white !border-[#e0d9c8] !text-[#0f766e] dark:!bg-[#172a37] dark:!border-[#223440] dark:!text-[#2dd4bf] relative z-30 shadow-sm">View all history</x-section-link>
                 </div>
 
                 <div class="rail-x no-scrollbar">

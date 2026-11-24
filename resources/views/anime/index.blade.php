@@ -85,27 +85,36 @@
                 @touchstart.passive="stop()"
                 @touchend.passive="start()"
                 @touchcancel.passive="start()"
-                class="relative w-full h-[76vh] min-h-[520px] max-h-[720px] sm:h-[78vh] lg:h-[80vh] overflow-hidden bg-[#0e1419]">
+                class="relative w-full h-[520px] sm:h-[560px] lg:h-[600px] overflow-hidden bg-transparent">
 
                 @foreach($hero as $i => $slide)
                     <div class="absolute inset-0 transition-opacity duration-700 ease-in-out"
                          :class="active === {{ $i }} ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'">
-                        {{-- Full-bleed backdrop image --}}
-                        <img src="{{ $slide['heroUrl'] ?: ($slide['bannerUrl'] ?: $slide['coverUrl']) }}"
-                             alt="{{ $slide['title'] }}"
-                             @if($i > 0) loading="lazy" @else fetchpriority="high" @endif
-                             decoding="async"
-                             referrerpolicy="no-referrer"
-                             class="absolute inset-0 h-full w-full object-cover object-center" />
+                        {{-- 1. Backdrop image & overlays with bottom mask fade (fades to transparent at bottom 30%) --}}
+                        <div class="absolute inset-0 hero-backdrop-mask">
+                            @if($slide['heroUrl'] || $slide['bannerUrl'])
+                                <img src="{{ $slide['heroUrl'] ?: $slide['bannerUrl'] }}"
+                                     alt="{{ $slide['title'] }}"
+                                     @if($i > 0) loading="lazy" @else fetchpriority="high" @endif
+                                     decoding="async"
+                                     referrerpolicy="no-referrer"
+                                     class="absolute inset-0 h-full w-full object-cover object-center" />
+                            @else
+                                <div class="absolute inset-0 bg-gradient-to-br from-[#172a37] via-[#111e28] to-[#0e1419]"></div>
+                            @endif
 
-                        {{-- Top dark gradient for transparent navbar legibility --}}
-                        <div class="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/75 via-black/35 to-transparent"></div>
+                            {{-- Top dark gradient for transparent navbar legibility --}}
+                            <div class="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/80 via-black/40 to-transparent z-10"></div>
 
-                        {{-- Left dark gradient for text block legibility --}}
-                        <div class="absolute inset-0 bg-gradient-to-r from-[#0b141a]/90 via-[#0b141a]/60 via-40% to-transparent"></div>
+                            {{-- Left dark gradient for text block legibility --}}
+                            <div class="absolute inset-0 bg-gradient-to-r from-[#0b141a]/95 via-[#0b141a]/65 via-45% to-transparent z-10"></div>
+                        </div>
 
-                        {{-- Text content block on the left (bottom-aligned) --}}
-                        <div class="relative mx-auto flex h-full w-full max-w-[1440px] flex-col justify-end px-4 sm:px-6 lg:px-7 pt-20 pb-20 sm:pb-24 lg:pb-28 z-20">
+                        {{-- 2. Bottom fade for light mode --}}
+                        <div class="pointer-events-none absolute inset-x-0 bottom-0 h-28 sm:h-32 hero-bottom-fade z-20"></div>
+
+                        {{-- 3. Text content block on the left (bottom-aligned, z-index paling atas) --}}
+                        <div class="relative mx-auto flex h-full w-full max-w-[1440px] flex-col justify-end px-4 sm:px-6 lg:px-7 pt-20 pb-14 sm:pb-16 lg:pb-16 z-30">
                             <div class="max-w-2xl space-y-3 sm:space-y-4">
                                 <div class="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#f97316] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white sm:px-3.5 sm:text-[11px] shadow-sm">
                                     <span class="material-symbols-rounded text-sm">local_fire_department</span>
@@ -151,11 +160,8 @@
                     </div>
                 @endforeach
 
-                {{-- Bottom fade to page background color (cream in light, navy in dark) --}}
-                <div class="pointer-events-none absolute inset-x-0 bottom-0 h-44 hero-bottom-fade z-20"></div>
-
-                {{-- Dot Indicators at bottom-right --}}
-                <div class="absolute right-6 lg:right-12 bottom-12 sm:bottom-16 z-30 flex items-center gap-1.5">
+                {{-- Dot Indicators at bottom-right, aligned with buttons, inside hero, above fade --}}
+                <div class="absolute right-6 lg:right-12 bottom-[60px] sm:bottom-[70px] lg:bottom-[72px] z-40 flex items-center gap-1.5">
                     @foreach($hero as $i => $slide)
                         <button type="button" @click="goTo({{ $i }})"
                                 :aria-label="'Go to slide {{ $i + 1 }}'"
@@ -167,7 +173,58 @@
         @endif
 
         {{-- ===== MAIN HOME CONTENT ===== --}}
-        <div class="mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-7 space-y-9 -mt-16 sm:-mt-20 lg:-mt-24 relative z-20">
+        <div class="mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-7 space-y-9 pt-3 sm:pt-4 relative z-20">
+
+            {{-- ===== CONTINUE WATCHING (anime history, matching manga continue reading) ===== --}}
+            <section x-data="{
+                        items: JSON.parse(localStorage.getItem('biblioanime_history') || '[]'),
+                        rel(item) {
+                            const raw = item.updatedAt || item.watchedAt;
+                            if (raw) {
+                                const d = Number(raw) || (raw ? Date.parse(raw) : 0);
+                                if (d && d > 1577836800000) {
+                                    const diff = Math.max(0, Date.now() - d);
+                                    const m = Math.floor(diff / 60000);
+                                    if (m < 1) return 'Watched just now';
+                                    if (m < 60) return 'Watched ' + m + 'm ago';
+                                    const h = Math.floor(m / 60);
+                                    if (h < 24) return 'Watched ' + h + 'h ago';
+                                    return 'Watched ' + Math.floor(h / 24) + 'd ago';
+                                }
+                            }
+                            return 'Watched recently';
+                        }
+                     }"
+                     x-show="items.length > 0" x-cloak>
+                <div class="mb-4 flex flex-wrap items-end justify-between gap-2">
+                    <div>
+                        <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[#84948a]">Pick up where you left off</p>
+                        <h2 class="font-display text-xl font-bold text-[#172a37] sm:text-2xl">Continue Watching</h2>
+                    </div>
+                    <x-section-link @click="openHistory()" class="!bg-white !border-[#e0d9c8] !text-[#0f766e] dark:!bg-[#172a37] dark:!border-[#223440] dark:!text-[#2dd4bf] relative z-30 shadow-sm">View all history</x-section-link>
+                </div>
+
+                <div class="rail-x no-scrollbar">
+                    <template x-for="item in items.slice(0, 10)" :key="item.id + '-' + (item.episodeId || '')">
+                        <a :href="'/anime/' + item.id + '/watch?ep=' + encodeURIComponent(item.episodeId || '') + '&n=' + encodeURIComponent(item.episodeNumber || 1) + '&t=' + Math.max(0, Math.floor((item.positionSec || 0) - 5))"
+                           class="group flex w-[280px] items-center gap-3 rounded-2xl border border-[#e0d9c8] bg-white/80 p-2.5 shadow-sm transition hover:border-[#0f766e]/50 hover:shadow-md sm:w-[320px]">
+                            <img :src="item.coverUrl || item.bannerUrl || 'https://via.placeholder.com/60x84?text=No+Cover'" alt="" loading="lazy" decoding="async"
+                                 class="h-[84px] w-[58px] flex-shrink-0 rounded-lg object-cover" />
+                            <div class="min-w-0 flex-1">
+                                <h3 class="truncate text-sm font-bold text-[#172a37]" x-text="item.title"></h3>
+                                <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-[#7b8a82]">
+                                    <span class="font-bold text-[#0f766e]">Ep <span x-text="item.episodeNumber || '1'"></span></span>
+                                    <span>&middot;</span>
+                                    <span x-text="rel(item)"></span>
+                                </div>
+                            </div>
+                            <span class="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-[#0f766e] text-white transition group-hover:bg-[#115e59]">
+                                <span class="material-symbols-rounded text-[18px]">play_arrow</span>
+                            </span>
+                        </a>
+                    </template>
+                </div>
+            </section>
 
             @php
                 $nowAiring = array_slice($seasonPopular ?? [], 0, 6);
@@ -307,42 +364,7 @@
                 </section>
             @endif
 
-            {{-- 4. CONTINUE WATCHING (localStorage) --}}
-            <section x-data="{ items: JSON.parse(localStorage.getItem('biblioanime_history') || '[]'), fmt(s) { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = String(s % 60).padStart(2, '0'); return h > 0 ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; }, rel(ts) { const d = Number(ts) || (ts ? Date.parse(ts) : 0); if (!d || d < 1577836800000) return 'Watched recently'; const diff = Math.max(0, Date.now() - d); const m = Math.floor(diff / 60000); if (m < 1) return 'Watched just now'; if (m < 60) return 'Watched ' + m + 'm ago'; const h = Math.floor(m / 60); if (h < 24) return 'Watched ' + h + 'h ago'; return 'Watched ' + Math.floor(h / 24) + 'd ago'; } }" x-show="items.length > 0" x-cloak>
-                <div class="mb-4 flex flex-wrap items-end justify-between gap-2">
-                    <div>
-                        <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[#84948a]">Pick up where you left off</p>
-                        <h2 class="font-display text-xl font-bold text-[#172a37] sm:text-2xl">Continue Watching</h2>
-                    </div>
-                    <span class="text-xs font-semibold text-[#84948a]">Your last position is saved automatically</span>
-                </div>
-                <div class="rail-x no-scrollbar">
-                    <template x-for="item in items" :key="item.id">
-                        <a :href="'/anime/' + item.id + '/watch?ep=' + encodeURIComponent(item.episodeId || '') + '&n=' + encodeURIComponent(item.episodeNumber || 1) + '&t=' + Math.max(0, Math.floor((item.positionSec || 0) - 5))"
-                           class="group flex w-[280px] items-center gap-3 rounded-2xl border border-[#e0d9c8] bg-white/80 p-2.5 shadow-sm transition hover:border-[#0f766e]/50 hover:shadow-md sm:w-[320px]">
-                            <img :src="item.bannerUrl || item.coverUrl" alt="" loading="lazy" decoding="async"
-                                 class="h-[76px] w-[120px] flex-shrink-0 rounded-lg object-cover" />
-                            <div class="min-w-0 flex-1">
-                                <h3 class="truncate text-sm font-bold text-[#172a37]" x-text="item.title"></h3>
-                                <div class="mt-1 flex items-center gap-2 font-mono text-[11px] text-[#84948a]">
-                                    <span class="font-semibold text-[#0f766e]">EP <span x-text="item.episodeNumber"></span></span>
-                                    <span class="h-1 w-1 rounded-full bg-[#c1cbbb]"></span>
-                                    <span x-text="rel(item.updatedAt || item.watchedAt)"></span>
-                                </div>
-                                <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[#eaddc2]">
-                                    <div class="h-full rounded-full bg-[#f97316]" :style="'width: ' + (item.durationSec > 0 ? Math.min(100, Math.round(100 * (item.positionSec || 0) / item.durationSec)) : 0) + '%'"></div>
-                                </div>
-                                <p class="mt-1 font-mono text-[10px] text-[#84948a]" x-text="fmt(item.positionSec) + ' / ' + fmt(item.durationSec)"></p>
-                            </div>
-                            <span class="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-[#0f766e] text-white transition group-hover:bg-[#115e59]">
-                                <span class="material-symbols-rounded text-[18px]">play_arrow</span>
-                            </span>
-                        </a>
-                    </template>
-                </div>
-            </section>
-
-            {{-- 5. HIGHEST RATED: FEATURED + RANKED LIST --}}
+            {{-- 4. HIGHEST RATED: FEATURED + RANKED LIST --}}
             @php
                 $topPick = $topRated[0] ?? null;
                 $topRest = array_slice($topRated ?? [], 1, 5);
