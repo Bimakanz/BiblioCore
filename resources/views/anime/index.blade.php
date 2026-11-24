@@ -5,7 +5,7 @@
             {{-- ===== HERO SLIDER: Trending/Popular with HD images ===== --}}
             @if(!empty($hero))
                 <section x-data="{ active: 0, total: {{ count($hero) }}, timer: null, next() { this.active = (this.active + 1) % this.total }, start() { if (!this.timer && this.total > 1) this.timer = setInterval(() => this.next(), 6000) }, stop() { if (this.timer) { clearInterval(this.timer); this.timer = null } } }" x-init="start()" @mouseenter="stop()" @mouseleave="start()"
-                         class="relative h-[320px] overflow-hidden rounded-2xl bg-[#172a37] shadow-[0_25px_60px_-30px_rgba(23,42,55,0.7)] sm:h-[420px] sm:rounded-3xl">
+                         class="relative h-[360px] overflow-hidden rounded-2xl bg-[#172a37] shadow-[0_25px_60px_-30px_rgba(23,42,55,0.7)] sm:h-[420px] sm:rounded-3xl">
                     @foreach($hero as $i => $slide)
                         <div class="absolute inset-0 transition-opacity duration-700" :class="active === {{ $i }} ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'">
                             <img src="{{ $slide['coverUrl'] ?: ($slide['bannerUrl'] ?: $slide['heroUrl']) }}" alt="{{ $slide['title'] }}" @if($i > 0) loading="lazy" @else fetchpriority="high" @endif decoding="async" referrerpolicy="no-referrer"
@@ -14,27 +14,27 @@
                                  class="absolute inset-0 hidden h-full w-full object-cover object-center opacity-60 sm:block" />
                             <div class="absolute inset-0 bg-gradient-to-r from-[#172a37] via-[#172a37]/70 to-transparent"></div>
                             <div class="absolute inset-0 bg-gradient-to-t from-[#172a37]/90 via-transparent to-transparent"></div>
-                            <div class="relative flex h-full flex-col justify-end gap-3 p-6 pb-14 sm:gap-4 sm:p-12 sm:pb-16">
-                                <div class="inline-flex w-fit items-center gap-2 rounded-full bg-[#f97316] px-3.5 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-white">
+                            <div class="relative flex h-full flex-col justify-end gap-2.5 p-5 pb-6 sm:gap-4 sm:p-12 sm:pb-12">
+                                <div class="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#f97316] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white sm:px-3.5 sm:text-[11px]">
                                     <span class="material-symbols-rounded text-sm">local_fire_department</span>
                                     Trending #{{ $i + 1 }}
                                 </div>
-                                <h1 class="max-w-2xl text-3xl md:text-4xl xl:text-5xl font-extrabold tracking-tight text-white" style="font-family: 'Plus Jakarta Sans', sans-serif;">
+                                <h1 class="max-w-2xl line-clamp-2 text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-4xl xl:text-5xl">
                                     {{ $slide['title'] }}
                                 </h1>
-                                <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-white/85">
-                                    @if($slide['score'])<span class="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1"><span class="material-symbols-rounded text-sm text-[#fbbf24]">star</span>{{ $slide['score'] }}</span>@endif
-                                    @if($slide['year'])<span class="rounded-full bg-white/10 px-2.5 py-1">{{ $slide['year'] }}</span>@endif
-                                    <span class="rounded-full bg-white/10 px-2.5 py-1">{{ $slide['format'] }}</span>
-                                    @if($slide['episodes'])<span class="rounded-full bg-white/10 px-2.5 py-1">{{ $slide['episodes'] }} Episodes</span>@endif
-                                    <span class="rounded-full bg-[#0f766e] px-2.5 py-1 text-white">{{ $slide['status'] }}</span>
+                                <div class="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-white/85 sm:gap-2 sm:text-xs">
+                                    @if($slide['score'])<span class="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5"><span class="material-symbols-rounded text-sm text-[#fbbf24]">star</span>{{ $slide['score'] }}</span>@endif
+                                    @if($slide['year'])<span class="rounded-full bg-white/15 px-2.5 py-0.5">{{ $slide['year'] }}</span>@endif
+                                    <span class="rounded-full bg-white/15 px-2.5 py-0.5">{{ $slide['format'] }}</span>
+                                    @if($slide['episodes'])<span class="rounded-full bg-white/15 px-2.5 py-0.5">{{ $slide['episodes'] }} EP</span>@endif
+                                    <span class="rounded-full bg-[#0f766e] px-2.5 py-0.5 text-white">{{ $slide['status'] }}</span>
                                 </div>
-                                <p class="max-w-2xl text-sm leading-relaxed text-white/75 line-clamp-2">{{ $slide['description'] }}</p>
-                                <div class="flex flex-wrap gap-3 pt-1">
-                                    <a href="{{ route('anime.show', ['id' => $slide['id']]) }}" class="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-[#172a37] transition hover:bg-[#f97316] hover:text-white">
-                                        <span class="material-symbols-rounded">play_circle</span> Watch Now
+                                <p class="max-w-2xl text-xs leading-relaxed text-white/75 line-clamp-2 sm:text-sm">{{ $slide['description'] }}</p>
+                                <div class="flex flex-wrap items-center gap-2.5 pt-1 sm:gap-3">
+                                    <a href="{{ route('anime.show', ['id' => $slide['id']]) }}" class="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold text-[#172a37] transition hover:bg-[#f97316] hover:text-white sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
+                                        <span class="material-symbols-rounded text-[18px] sm:text-xl">play_circle</span> Watch Now
                                     </a>
-                                    <a href="{{ route('anime.index', ['category' => 'trending']) }}" class="inline-flex items-center gap-2 rounded-full border border-white/40 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-white/10">
+                                    <a href="{{ route('anime.index', ['category' => 'trending']) }}" class="inline-flex items-center gap-1.5 rounded-full border border-white/40 px-4 py-2 text-xs font-bold text-white transition hover:bg-white/10 sm:gap-2 sm:px-5 sm:py-2.5 sm:text-sm">
                                         All Trending
                                     </a>
                                 </div>

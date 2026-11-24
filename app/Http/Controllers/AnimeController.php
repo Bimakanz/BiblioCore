@@ -402,10 +402,14 @@ class AnimeController extends Controller
 
         $subtitles = [];
         foreach ($stream['subtitles'] as $i => $sub) {
+            $subToken = $this->signProxyPayload([
+                'u' => $sub['url'],
+                'r' => $stream['referer'] ?? null,
+            ]);
             $subtitles[] = [
                 'lang' => $sub['lang'],
                 'label' => $sub['label'],
-                'url' => route('anime.proxy.subtitle', ['k' => $proxyKey, 'idx' => $i]),
+                'url' => route('anime.proxy.subtitle', ['k' => $proxyKey, 'idx' => $i, 't' => $subToken]),
             ];
         }
 
@@ -450,18 +454,26 @@ class AnimeController extends Controller
         if (!$hasEnglish && !empty($stream['subtitles'])) {
             $sourceIdx = $this->pickTranslationSource($stream['subtitles']);
             if ($sourceIdx !== null) {
+                $autoToken = $this->signProxyPayload([
+                    'u' => $stream['subtitles'][$sourceIdx]['url'],
+                    'r' => $stream['referer'] ?? null,
+                ]);
                 $subtitles[] = [
                     'lang' => 'en',
                     'label' => 'English (Auto)',
-                    'url' => route('anime.subtitle.en-auto', ['k' => $proxyKey, 'idx' => $sourceIdx]),
+                    'url' => route('anime.subtitle.en-auto', ['k' => $proxyKey, 'idx' => $sourceIdx, 't' => $autoToken]),
                 ];
             }
         }
 
+        $playlistToken = $this->signProxyPayload([
+            'u' => $stream['sources'][0]['url'],
+            'r' => $stream['referer'] ?? null,
+        ]);
 
         return response()->json([
             'source' => [
-                'url' => route('anime.proxy.playlist', ['k' => $proxyKey]),
+                'url' => route('anime.proxy.playlist', ['k' => $proxyKey, 't' => $playlistToken]),
                 'quality' => $stream['sources'][0]['quality'] ?? 'auto',
                 'type' => 'hls',
             ],
@@ -582,11 +594,49 @@ class AnimeController extends Controller
             ->header('Cache-Control', 'public, max-age=21600');
     }
 
-    /** Playlist proxy: rewrites nested playlists through us, segments stay on the CDN. */
+    /** Build an HMAC-signed, URL-safe token so proxy URLs work across stateless Vercel lambdas. */
+    protected function signProxyPayload(array $payload): string
+    {
+        $json = json_encode($payload, JSON_UNESCAPED_SLASHES);
+        $b64 = rtrim(strtr(base64_encode((string) $json), '+/', '-_'), '=');
+        $sig = substr(hash_hmac('sha256', $b64, (string) config('app.key')), 0, 24);
+
+        return $b64 . '.' . $sig;
+    }
+
+    /** Verify an HMAC-signed proxy token; returns null if missing or tampered. */
+    protected function verifyProxyPayload(string $token): ?array
+    {
+        $parts = explode('.', $token, 2);
+        if (count($parts) !== 2 || $parts[0] === '' || $parts[1] === '') {
+            return null;
+        }
+        $expected = substr(hash_hmac('sha256', $parts[0], (string) config('app.key')), 0, 24);
+        if (!hash_equals($expected, $parts[1])) {
+            return null;
+        }
+        $raw = base64_decode(strtr($parts[0], '-_', '+/'), true);
+        if ($raw === false) {
+            return null;
+        }
+        $data = json_decode($raw, true);
+
+        return is_array($data) ? $data : null;
+    }
+
+    /** Playlist proxy: rewrites nested playlists and segments with stateless signed URLs. */
     public function playlistProxy(Request $request): Response
     {
-        $key = (string) $request->query('k', '');
-        $entry = Cache::get('anime_proxy_' . $key);
+        $tokenData = $this->verifyProxyPayload((string) $request->query('t', ''));
+        if ($tokenData && !empty($tokenData['u'])) {
+            $entry = [
+                'playlist' => (string) $tokenData['u'],
+                'referer' => $tokenData['r'] ?? null,
+            ];
+        } else {
+            $key = (string) $request->query('k', '');
+            $entry = Cache::get('anime_proxy_' . $key);
+        }
         if (!$entry || empty($entry['playlist'])) {
             abort(404, 'Stream session not found or expired. Reload the page.');
         }
@@ -604,6 +654,7 @@ class AnimeController extends Controller
         }
 
         $base = $entry['playlist'];
+        $referer = $entry['referer'] ?? null;
         $lines = explode("\n", $content);
         foreach ($lines as &$line) {
             $trim = trim($line);
@@ -613,33 +664,19 @@ class AnimeController extends Controller
             if ($trim[0] !== '#') {
                 $absolute = $this->resolveUrl($base, $trim);
                 if (str_contains($absolute, '.m3u8')) {
-                    $subKey = md5($absolute);
-                    Cache::put('anime_proxy_' . $subKey, [
-                        'playlist' => $absolute,
-                        'referer' => $entry['referer'] ?? null,
-                        'subtitles' => [],
-                    ], 900);
-                    $line = route('anime.proxy.playlist', ['k' => $subKey]);
+                    $subToken = $this->signProxyPayload(['u' => $absolute, 'r' => $referer]);
+                    $line = route('anime.proxy.playlist', ['t' => $subToken]);
                 } else {
-                    // Segments MUST go through our segment proxy: the CDN
-                    // locks Access-Control-Allow-Origin to its own site, so
-                    // browsers reject direct segment fetches (CORS) even
-                    // though servers/curl see a plain 200.
-                    $line = $this->segmentProxyUrl($absolute, $entry['referer'] ?? null);
+                    $line = $this->segmentProxyUrl($absolute, $referer);
                 }
             } elseif (str_contains($trim, 'URI="')) {
-                $line = preg_replace_callback('/URI="([^"]+)"/', function ($m) use ($base, $entry) {
+                $line = preg_replace_callback('/URI="([^"]+)"/', function ($m) use ($base, $referer) {
                     $absolute = $this->resolveUrl($base, $m[1]);
                     if (str_contains($absolute, '.m3u8')) {
-                        $subKey = md5($absolute);
-                        Cache::put('anime_proxy_' . $subKey, [
-                            'playlist' => $absolute,
-                            'referer' => $entry['referer'] ?? null,
-                            'subtitles' => [],
-                        ], 900);
-                        return 'URI="' . route('anime.proxy.playlist', ['k' => $subKey]) . '"';
+                        $subToken = $this->signProxyPayload(['u' => $absolute, 'r' => $referer]);
+                        return 'URI="' . route('anime.proxy.playlist', ['t' => $subToken]) . '"';
                     }
-                    return 'URI="' . $this->segmentProxyUrl($absolute, $entry['referer'] ?? null) . '"';
+                    return 'URI="' . $this->segmentProxyUrl($absolute, $referer) . '"';
                 }, $line);
             }
         }
@@ -650,28 +687,36 @@ class AnimeController extends Controller
             ->header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
     }
 
-    /** Register a segment/key URL in the server-side registry and return its proxy URL. */
+    /** Return a stateless HMAC-signed proxy URL for a segment or encryption key. */
     protected function segmentProxyUrl(string $absolute, ?string $referer): string
     {
-        $segKey = md5($absolute);
-        Cache::put('anime_segment_' . $segKey, [
-            'url' => $absolute,
-            'referer' => $referer,
-        ], 86400);
+        $segToken = $this->signProxyPayload([
+            'u' => $absolute,
+            'r' => $referer,
+        ]);
 
-        return route('anime.proxy.segment', ['k' => $segKey]);
+        return route('anime.proxy.segment', ['t' => $segToken]);
     }
 
     /**
      * Segment/key proxy. Required for playback: the video CDN sends
      * Access-Control-Allow-Origin locked to its own site, so a browser
      * (unlike curl) is CORS-blocked from fetching segments directly.
-     * Only URLs registered server-side by playlistProxy are served.
+     * Stateless HMAC-signed tokens ensure requests succeed across any
+     * Vercel serverless container without relying on local /tmp cache.
      */
     public function segmentProxy(Request $request): Response
     {
-        $key = (string) $request->query('k', '');
-        $entry = Cache::get('anime_segment_' . $key);
+        $tokenData = $this->verifyProxyPayload((string) $request->query('t', ''));
+        if ($tokenData && !empty($tokenData['u'])) {
+            $entry = [
+                'url' => (string) $tokenData['u'],
+                'referer' => $tokenData['r'] ?? null,
+            ];
+        } else {
+            $key = (string) $request->query('k', '');
+            $entry = Cache::get('anime_segment_' . $key);
+        }
         if (!$entry || empty($entry['url'])) {
             abort(404, 'Segment not found or expired. Reload the page.');
         }
@@ -693,15 +738,22 @@ class AnimeController extends Controller
     /** Subtitle proxy (same-origin VTT for the player track elements). */
     public function subtitleProxy(Request $request): Response
     {
-        $key = (string) $request->query('k', '');
-        $idx = (int) $request->query('idx', -1);
-        $entry = Cache::get('anime_proxy_' . $key);
-        $url = $entry['subtitles'][$idx] ?? null;
+        $tokenData = $this->verifyProxyPayload((string) $request->query('t', ''));
+        if ($tokenData && !empty($tokenData['u'])) {
+            $url = (string) $tokenData['u'];
+            $referer = $tokenData['r'] ?? null;
+        } else {
+            $key = (string) $request->query('k', '');
+            $idx = (int) $request->query('idx', -1);
+            $entry = Cache::get('anime_proxy_' . $key);
+            $url = $entry['subtitles'][$idx] ?? null;
+            $referer = $entry['referer'] ?? null;
+        }
         if (!$url) {
             abort(404, 'Subtitle not found.');
         }
 
-        $content = $this->fetchRemote($url, $entry['referer'] ?? null);
+        $content = $this->fetchRemote($url, $referer);
         if ($content === null) {
             abort(502, 'Unable to fetch the subtitle.');
         }
@@ -750,10 +802,15 @@ class AnimeController extends Controller
      */
     public function autoEnglishSubtitle(Request $request): \Symfony\Component\HttpFoundation\Response
     {
-        $key = (string) $request->query('k', '');
-        $idx = (int) $request->query('idx', -1);
-        $entry = Cache::get('anime_proxy_' . $key);
-        $url = $entry['subtitles'][$idx] ?? null;
+        $tokenData = $this->verifyProxyPayload((string) $request->query('t', ''));
+        if ($tokenData && !empty($tokenData['u'])) {
+            $url = (string) $tokenData['u'];
+        } else {
+            $key = (string) $request->query('k', '');
+            $idx = (int) $request->query('idx', -1);
+            $entry = Cache::get('anime_proxy_' . $key);
+            $url = $entry['subtitles'][$idx] ?? null;
+        }
         if (!$url) {
             abort(404, 'Subtitle not found.');
         }
