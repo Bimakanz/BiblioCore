@@ -35,11 +35,10 @@ class AnimeStreamProvider
     /** Optional secondary sources (HiAnime, Consumet, ARM). */
     protected AnimeExtraSources $extra;
 
-    /** Provider priority: live-verified direct HLS (.m3u8) providers first. */
+    /** Provider priority: verified unencrypted direct HLS (.m3u8) first. */
     protected array $priority = [
-        'reanime', 'kaa', 'anikoto',
-        'aniwaves', 'animedunya', 'anizone', 'anipm', 'animenosub',
-        'animeonsen', 'animegg', 'senshi', 'mkissa',
+        'anikoto', 'aniwaves', 'animedunya', 'anizone', 'anipm', 'animenosub',
+        'animeonsen', 'animegg', 'senshi', 'mkissa', 'kaa', 'reanime',
     ];
 
     /** Public resolver instances used when ANIME_API_URL is not configured. */
@@ -263,7 +262,7 @@ $headers = ['Accept: application/json'];
             $this->extra->rememberTitles($anilistId, $anime);
         }
 
-        $cacheKey = "anivexa_episodes_v2_{$anilistId}_{$audio}";
+        $cacheKey = "anivexa_episodes_v3_{$anilistId}_{$audio}";
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && !empty($cached['episodes'])
             && ($expected === null || $expected <= 0 || count($cached['episodes']) >= $expected)) {
@@ -595,7 +594,7 @@ $headers = ['Accept: application/json'];
             }
         }
 
-        $cacheKey = 'anivexa_stream_v5_' . md5($watchPath);
+        $cacheKey = 'anivexa_stream_v6_' . md5($watchPath);
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             return $cached;
@@ -751,6 +750,11 @@ $headers = ['Accept: application/json'];
 
     protected function isHlsStream(array $stream, string $url): bool
     {
+        // Encrypted manifests (e.g. reanime's playlist_key) cannot be parsed
+        // as plain #EXTM3U by hls.js or our playlist proxy.
+        if (!empty($stream['playlist_key'])) {
+            return false;
+        }
         $type = strtolower((string) ($stream['type'] ?? ''));
         return $type === 'hls' || $type === 'm3u8'
             || str_contains($url, '.m3u8')
