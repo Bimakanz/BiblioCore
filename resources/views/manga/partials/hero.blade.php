@@ -25,15 +25,85 @@
             active: 0,
             total: {{ count($heroSlides) }},
             timer: null,
-            next() { this.active = (this.active + 1) % this.total },
-            prev() { this.active = (this.active - 1 + this.total) % this.total },
-            goTo(i) { this.active = i },
-            start() { if (!this.timer && this.total > 1) this.timer = setInterval(() => this.next(), 6000) },
-            stop() { if (this.timer) { clearInterval(this.timer); this.timer = null } }
+            visHandler: null,
+            reducedQuery: null,
+            reducedHandler: null,
+            isReducedMotion() {
+                return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+            },
+            next() {
+                this.active = (this.active + 1) % this.total;
+            },
+            goTo(i) {
+                this.active = i;
+                this.stop();
+                this.start();
+            },
+            start() {
+                if (this.isReducedMotion() || document.hidden || this.total <= 1) return;
+                if (!this.timer) {
+                    this.timer = setInterval(() => this.next(), 6000);
+                }
+            },
+            stop() {
+                if (this.timer) {
+                    clearInterval(this.timer);
+                    this.timer = null;
+                }
+            },
+            init() {
+                this.visHandler = () => {
+                    if (document.hidden) {
+                        this.stop();
+                    } else {
+                        this.start();
+                    }
+                };
+                document.addEventListener('visibilitychange', this.visHandler);
+
+                if (window.matchMedia) {
+                    this.reducedQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+                    this.reducedHandler = (e) => {
+                        if (e.matches) {
+                            this.stop();
+                        } else {
+                            this.start();
+                        }
+                    };
+                    if (this.reducedQuery.addEventListener) {
+                        this.reducedQuery.addEventListener('change', this.reducedHandler);
+                    } else if (this.reducedQuery.addListener) {
+                        this.reducedQuery.addListener(this.reducedHandler);
+                    }
+                }
+
+                if (typeof this.$cleanup === 'function') {
+                    this.$cleanup(() => this.destroy());
+                }
+
+                this.start();
+            },
+            destroy() {
+                this.stop();
+                if (this.visHandler) {
+                    document.removeEventListener('visibilitychange', this.visHandler);
+                    this.visHandler = null;
+                }
+                if (this.reducedQuery && this.reducedHandler) {
+                    if (this.reducedQuery.removeEventListener) {
+                        this.reducedQuery.removeEventListener('change', this.reducedHandler);
+                    } else if (this.reducedQuery.removeListener) {
+                        this.reducedQuery.removeListener(this.reducedHandler);
+                    }
+                    this.reducedHandler = null;
+                }
+            }
         }"
-        x-init="start()"
         @mouseenter="stop()"
         @mouseleave="start()"
+        @touchstart.passive="stop()"
+        @touchend.passive="start()"
+        @touchcancel.passive="start()"
         class="relative w-full h-[76vh] min-h-[520px] max-h-[720px] sm:h-[78vh] lg:h-[80vh] overflow-hidden bg-[#0e1419]">
 
         @foreach($heroSlides as $i => $slide)
@@ -101,18 +171,6 @@
 
         {{-- Bottom fade to page background color (cream in light, navy in dark) --}}
         <div class="pointer-events-none absolute inset-x-0 bottom-0 h-44 hero-bottom-fade z-20"></div>
-
-        {{-- Left Arrow --}}
-        <button type="button" @click="prev()" aria-label="Previous slide"
-                class="absolute left-3 lg:left-6 top-1/2 -translate-y-1/2 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/70 hover:scale-105 active:scale-95">
-            <span class="material-symbols-rounded text-2xl">chevron_left</span>
-        </button>
-
-        {{-- Right Arrow --}}
-        <button type="button" @click="next()" aria-label="Next slide"
-                class="absolute right-3 lg:right-6 top-1/2 -translate-y-1/2 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/70 hover:scale-105 active:scale-95">
-            <span class="material-symbols-rounded text-2xl">chevron_right</span>
-        </button>
 
         {{-- Dot Indicators at bottom-right --}}
         <div class="absolute right-6 lg:right-12 bottom-12 sm:bottom-16 z-30 flex items-center gap-1.5">
