@@ -35,10 +35,11 @@ class AnimeStreamProvider
     /** Optional secondary sources (HiAnime, Consumet, ARM). */
     protected AnimeExtraSources $extra;
 
-    /** Provider priority: proven direct HLS + subtitle sources first; embed-heavy providers last. */
+    /** Provider priority: live-verified direct HLS (.m3u8) providers first. */
     protected array $priority = [
+        'reanime', 'kaa', 'anikoto',
         'aniwaves', 'animedunya', 'anizone', 'anipm', 'animenosub',
-        'animeonsen', 'reanime', 'animegg', 'senshi', 'mkissa', 'kaa', 'anikoto',
+        'animeonsen', 'animegg', 'senshi', 'mkissa',
     ];
 
     /** Public resolver instances used when ANIME_API_URL is not configured. */
@@ -262,7 +263,7 @@ $headers = ['Accept: application/json'];
             $this->extra->rememberTitles($anilistId, $anime);
         }
 
-        $cacheKey = "anivexa_episodes_{$anilistId}_{$audio}";
+        $cacheKey = "anivexa_episodes_v2_{$anilistId}_{$audio}";
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && !empty($cached['episodes'])
             && ($expected === null || $expected <= 0 || count($cached['episodes']) >= $expected)) {
@@ -594,7 +595,7 @@ $headers = ['Accept: application/json'];
             }
         }
 
-        $cacheKey = 'anivexa_stream_v4_' . md5($watchPath);
+        $cacheKey = 'anivexa_stream_v5_' . md5($watchPath);
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             return $cached;
