@@ -2,6 +2,8 @@
 
 use App\Services\Manga\MangaService;
 use App\Services\Manga\Providers\AniListProvider;
+use App\Services\Manga\Providers\AsuraScansProvider;
+use App\Services\Manga\Providers\AtsumaruProvider;
 use App\Services\Manga\Providers\KomikIndoProvider;
 use App\Services\Manga\Providers\KomikuProvider;
 use App\Services\Manga\Providers\MangaDexProvider;
@@ -131,9 +133,16 @@ test('multi provider aggregator merges, deduplicates and sorts chapters', functi
         fakeChapter('mp_4', '4', 'en'),
     ]);
     $multiSource->shouldReceive('getEnglishChapters')->once()->andReturn([]);
+
+    // The last two English sources must not reach the network in a unit test.
+    $asura = Mockery::mock(AsuraScansProvider::class);
+    $asura->shouldReceive('getChapters')->once()->andReturn([]);
+    $atsumaru = Mockery::mock(AtsumaruProvider::class);
+    $atsumaru->shouldReceive('getChapters')->once()->andReturn([]);
+
     $mangaNato->shouldReceive('getChapters')->once()->andReturn([]);
 
-    $service = new MangaService($aniList, $mangaDex, $komiku, $komikIndo, $mangaPill, $mangaNato, $multiSource);
+    $service = new MangaService($aniList, $mangaDex, $komiku, $komikIndo, $mangaPill, $mangaNato, $multiSource, $asura, $atsumaru);
 
     $chapters = $service->getChapters('test-manga');
 

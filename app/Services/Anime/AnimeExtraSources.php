@@ -23,11 +23,32 @@ class AnimeExtraSources
 
     protected ?string $arm;
 
-    public function __construct()
+    /** Anivexa base, used for the /map cross-id endpoint. */
+    protected ?string $resolver;
+
+    protected AnikotoSource $anikoto;
+
+    public function __construct(?AnikotoSource $anikoto = null)
     {
-        $this->hianime = $this->normalise(env('HIANIME_API_URL', 'https://api-aniwatch.onrender.com'));
+        // HiAnime shut down in 2026 and the old public wrapper now answers
+        // 503 "Service Suspended". The code path stays available for a
+        // self-hosted instance, but it is opt-in so a dead host never costs
+        // a timeout on every playback fallback.
+        $this->hianime = $this->normalise(env('HIANIME_API_URL'));
         $this->consumet = $this->normalise(env('CONSUMET_BASE_URL'));
         $this->arm = $this->normalise(env('ARM_API_URL', 'https://arm.haglund.dev'));
+        $this->resolver = $this->normalise(env('ANIME_API_URL', 'https://anivexa-api-nine.vercel.app'));
+        if ($this->resolver !== null && $this->isLocalHost($this->resolver)) {
+            $this->resolver = 'https://anivexa-api-nine.vercel.app';
+        }
+        $this->anikoto = $anikoto ?? new AnikotoSource();
+    }
+
+    protected function isLocalHost(string $url): bool
+    {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+
+        return in_array($host, ['127.0.0.1', 'localhost', '::1', '0.0.0.0'], true);
     }
 
     protected function normalise(?string $url): ?string
@@ -51,16 +72,66 @@ class AnimeExtraSources
         return is_array($data) ? $data : null;
     }
 
-    /** AniList -> MAL / AniDB / TMDB ids (ARM API). */
+    /**
+     * Cross-platform ids for an AniList title.
+     *
+     * Anivexa's /map endpoint answers with MAL, AniDB, Kitsu, TMDB and IMDb
+     * in one call, so it is tried first; the ARM API remains as a fallback
+     * for resolver builds that do not expose the route yet.
+     */
     public function ids(int $anilistId): array
     {
-        if (! $this->arm) {
+        if ($anilistId <= 0) {
             return [];
         }
 
-        return Cache::remember("anime_arm_ids_{$anilistId}", 2592000, function () use ($anilistId) {
-            return $this->get($this->arm . '/api/v2/ids?source=anilist&id=' . $anilistId) ?? [];
+        return Cache::remember("anime_cross_ids_{$anilistId}", 2592000, function () use ($anilistId) {
+            $ids = [];
+
+            if ($this->resolver) {
+                $data = $this->get($this->resolver.'/map/'.$anilistId);
+                $map = $data['mappings'] ?? null;
+                if (is_array($map)) {
+                    foreach (['malId', 'aniId', 'anidbId', 'kitsuId', 'themoviedbId', 'imdbId'] as $field) {
+                        if (! empty($map[$field])) {
+                            $ids[$field] = $map[$field];
+                        }
+                    }
+                }
+            }
+
+            if ($this->arm && empty($ids['malId'])) {
+                $arm = $this->get($this->arm.'/api/v2/ids?source=anilist&id='.$anilistId);
+                if (is_array($arm)) {
+                    foreach ($arm as $field => $value) {
+                        if (! isset($ids[$field]) && ! empty($value)) {
+                            $ids[$field] = $value;
+                        }
+                    }
+                }
+            }
+
+            return $ids;
         });
+    }
+
+    /**
+     * Anikoto episodes (MegaPlay library) for one audio track. Episode ids
+     * look like "ak|{seriesId}|{number}|{audio}" so the resolver routes the
+     * playback request back here.
+     *
+     * @param  array<string, mixed>  $anime
+     * @return array<int, array<string, mixed>>
+     */
+    public function anikotoEpisodes(array $anime, int $anilistId, string $audio): array
+    {
+        return $this->anikoto->episodesForAniList($anilistId, $audio, $anime);
+    }
+
+    /** Resolve an "ak|..." reference into a MegaPlay embed. */
+    public function anikotoStream(string $reference): ?array
+    {
+        return $this->anikoto->streamFor($reference);
     }
 
     /** Best-effort HiAnime slug lookup, cached for a day. */
