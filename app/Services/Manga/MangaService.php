@@ -5,6 +5,7 @@ namespace App\Services\Manga;
 use App\Services\Manga\Contracts\MangaProviderInterface;
 use App\Services\Manga\Providers\AniListProvider;
 use App\Services\Manga\Providers\AsuraScansProvider;
+use App\Services\Manga\Providers\AtsumaruProvider;
 use App\Services\Manga\Providers\MangaDexProvider;
 use App\Services\Manga\Providers\KomikuProvider;
 use App\Services\Manga\Providers\KomikIndoProvider;
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\Log;
 class MangaService
 {
     /** Cache namespace for aggregated chapter lists. Bump after parser changes. */
-    public const CACHE_VERSION = 'v12';
+    public const CACHE_VERSION = 'v13';
 
     protected AniListProvider $aniListProvider;
     protected MangaDexProvider $mangaDexProvider;
@@ -27,6 +28,7 @@ class MangaService
     protected MangaNatoProvider $mangaNatoProvider;
     protected MultiSourceProvider $multiSourceProvider;
     protected AsuraScansProvider $asuraScansProvider;
+    protected AtsumaruProvider $atsumaruProvider;
 
     public function __construct(
         ?AniListProvider $aniList = null,
@@ -36,7 +38,8 @@ class MangaService
         ?MangaPillProvider $mangaPill = null,
         ?MangaNatoProvider $mangaNato = null,
         ?MultiSourceProvider $multiSource = null,
-        ?AsuraScansProvider $asuraScans = null
+        ?AsuraScansProvider $asuraScans = null,
+        ?AtsumaruProvider $atsumaru = null
     ) {
         $this->aniListProvider = $aniList ?? new AniListProvider();
         $this->mangaDexProvider = $mangaDex ?? new MangaDexProvider();
@@ -46,6 +49,7 @@ class MangaService
         $this->mangaNatoProvider = $mangaNato ?? new MangaNatoProvider();
         $this->multiSourceProvider = $multiSource ?? new MultiSourceProvider();
         $this->asuraScansProvider = $asuraScans ?? new AsuraScansProvider();
+        $this->atsumaruProvider = $atsumaru ?? new AtsumaruProvider();
     }
 
     /**
@@ -190,8 +194,9 @@ class MangaService
 
     /**
      * Multi-Source Hybrid Aggregator:
-     * Combines 3 English sources (MangaDex, MangaPill, MangaNato) and
-     * 3 Indonesian sources (Komiku, KomikIndo, MangaDex ID).
+     * Combines English sources (MangaDex, MangaPill, WeebCentral/MangaHere,
+     * Asura Scans, Atsumaru, MangaNato) and Indonesian sources (Komiku,
+     * KomikIndo, Bacakomik, WestManga, Shinigami ID).
      * If one source has missing or DMCA'd chapters, other sources complement each other.
      */
     public function getChapters(string $id, ?string $language = null, ?bool &$partial = null): array
@@ -323,7 +328,7 @@ class MangaService
                 }
             }
 
-            // 3. English Sources (MangaPill + MangaNato + WeebCentral + MangaHere)
+            // 3. English Sources (MangaPill + WeebCentral/MangaHere + Asura + Atsumaru + MangaNato)
             $enChapters = [];
             if ((! $language || $language === 'en') && $dexEnCount < $enoughChapters && $hasTime()) {
                 // English Source 1: MangaPill (comprehensive English archive)
@@ -356,7 +361,17 @@ class MangaService
                     Log::warning("Asura Scans chapter fetch failed: " . $e->getMessage());
                 }
 
-                // English Source 4: MangaNato (fallback)
+                // English Source 4: Atsumaru (WebP pages, modern catalogue)
+                try {
+                    if ($hasTime() && count($enChapters) + $dexEnCount < $enoughChapters) {
+                        $atsu = $this->atsumaruProvider->getChapters($title, $altTitles);
+                        $enChapters = array_merge($enChapters, $atsu);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("Atsumaru chapter fetch failed: " . $e->getMessage());
+                }
+
+                // English Source 5: MangaNato (fallback)
                 try {
                     if ($hasTime() && count($enChapters) + $dexEnCount < $enoughChapters) {
                         $nato = $this->mangaNatoProvider->getChapters($title, $altTitles);
@@ -494,6 +509,9 @@ class MangaService
             }
             if ($source === 'Asura Scans' || str_starts_with($chapterId, 'as_')) {
                 return $this->asuraScansProvider->getChapterPages($chapterId);
+            }
+            if ($source === 'Atsumaru' || str_starts_with($chapterId, 'atsu_')) {
+                return $this->atsumaruProvider->getChapterPages($chapterId);
             }
 
             return $this->mangaDexProvider->getChapterPages($chapterId);

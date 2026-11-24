@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Anime\AnimeExtraSources;
 use App\Services\Anime\AnimeService;
 use App\Services\Anime\AnimeStreamProvider;
 use App\Services\Anime\SubtitleLanguageDetector;
@@ -19,6 +20,7 @@ class AnimeController extends Controller
         protected AnimeStreamProvider $streamProvider,
         protected SubtitleTranslator $subtitleTranslator,
         protected SubtitleLanguageDetector $subtitleLanguageDetector,
+        protected AnimeExtraSources $extraSources,
     ) {}
 
     /** Instant live search for the header search bar (anime mode). */
@@ -468,6 +470,14 @@ class AnimeController extends Controller
         $episode = max(1, (int) $request->query('n', 1));
         $anime = $this->animeService->getDetail($id);
         $malId = $anime['malId'] ?? null;
+
+        // AniList sometimes ships an entry without idMal (newly added
+        // seasons, regional re-releases). Ask the resolver's /map endpoint
+        // before giving up on skip times.
+        if (! $malId) {
+            $anilistId = (int) ($anime['anilistId'] ?? preg_replace('/[^0-9]/', '', $id));
+            $malId = $this->extraSources->ids($anilistId)['malId'] ?? null;
+        }
 
         if (!$malId) {
             return response()->json(['intro' => null, 'outro' => null]);

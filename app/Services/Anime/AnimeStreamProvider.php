@@ -316,16 +316,20 @@ $headers = ['Accept: application/json'];
             }
         }
 
-        // Secondary sources are only worth their latency when the resolver
-        // aggregate is unknown/empty. With a known AniList count the local
-        // episode list already covers every aired episode.
-        $needsExtra = $expected === null && (empty($byNumber)
-            || ($audio === 'dub' && empty($audioAvailable['dub'])));
+        // Secondary sources are worth their latency whenever the resolver
+        // produced no episode list at all, or when the requested dub track is
+        // missing. A known AniList count no longer skips them: a title the
+        // resolver does not carry would otherwise fall back to a synthetic
+        // list that is guaranteed to fail on playback.
+        $extraProvider = null;
+        $needsExtra = empty($byNumber) || ($audio === 'dub' && empty($audioAvailable['dub']));
         if ($needsExtra) {
-            foreach (['hianime', 'consumet'] as $source) {
-                $list = $source === 'hianime'
-                    ? $this->extra->hianimeEpisodes($anime ?? [], $audio)
-                    : $this->extra->consumetEpisodes($anime ?? [], $audio);
+            foreach (['anikoto', 'hianime', 'consumet'] as $source) {
+                $list = match ($source) {
+                    'anikoto' => $this->extra->anikotoEpisodes($anime ?? [], $anilistId, $audio),
+                    'hianime' => $this->extra->hianimeEpisodes($anime ?? [], $audio),
+                    default => $this->extra->consumetEpisodes($anime ?? [], $audio),
+                };
                 foreach ($list as $ep) {
                     if (! isset($byNumber[$ep['number']])) {
                         $byNumber[$ep['number']] = $ep;
@@ -333,6 +337,7 @@ $headers = ['Accept: application/json'];
                 }
                 if (! empty($list)) {
                     $audioAvailable[$audio] = true;
+                    $extraProvider = $source;
                 }
             }
         }
@@ -366,10 +371,14 @@ $headers = ['Accept: application/json'];
         Cache::put("anivexa_audio_{$anilistId}", $audioAvailable, 21600);
 
         ksort($byNumber);
-        $primary = array_key_first($byProvider);
+        $primary = array_key_first($byProvider) ?: $extraProvider;
+        $providers = array_keys($byProvider);
+        if (empty($providers) && $extraProvider !== null) {
+            $providers = [$extraProvider];
+        }
         $result = [
             'provider' => $primary,
-            'providers' => array_keys($byProvider),
+            'providers' => $providers,
             'episodes' => array_values($byNumber),
             'audio' => $audio,
             'audioAvailable' => $audioAvailable,
@@ -491,7 +500,9 @@ $headers = ['Accept: application/json'];
         if (! str_contains($reference, '|')) {
             return null;
         }
-        if (! str_starts_with($reference, 'hn|') && ! str_starts_with($reference, 'cs|')) {
+        if (! str_starts_with($reference, 'hn|')
+            && ! str_starts_with($reference, 'cs|')
+            && ! str_starts_with($reference, 'ak|')) {
             return null;
         }
 
@@ -501,9 +512,13 @@ $headers = ['Accept: application/json'];
             return $cached;
         }
 
-        $stream = str_starts_with($reference, 'hn|')
-            ? $this->extra->hianimeStream($reference, 'sub')
-            : $this->extra->consumetStream($reference);
+        if (str_starts_with($reference, 'ak|')) {
+            $stream = $this->extra->anikotoStream($reference);
+        } elseif (str_starts_with($reference, 'hn|')) {
+            $stream = $this->extra->hianimeStream($reference, 'sub');
+        } else {
+            $stream = $this->extra->consumetStream($reference);
+        }
 
         if ($stream) {
             Cache::put($cacheKey, $stream, 3600);
