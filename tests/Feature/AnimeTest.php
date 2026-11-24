@@ -79,6 +79,63 @@ class AnimeTest extends TestCase
         $response->assertNotFound();
     }
 
+    public function test_file_proxy_rejects_unknown_key(): void
+    {
+        $response = $this->get('/anime/proxy/file?k=unknownkey');
+        $response->assertNotFound();
+    }
+
+    public function test_animeheaven_mp4_is_served_through_the_file_proxy(): void
+    {
+        $this->mock(\App\Services\Anime\AnimeService::class, function ($mock) {
+            $mock->shouldReceive('markAvailable')->andReturnNull();
+        });
+
+        $this->mock(\App\Services\Anime\AnimeStreamProvider::class, function ($mock) {
+            $mock->shouldReceive('getStream')->once()->andReturn([
+                'provider' => 'AnimeHeaven',
+                'referer' => null,
+                'sources' => [['url' => 'https://ct.animeheaven.me/video.mp4?token=abc', 'quality' => 'auto']],
+                'subtitles' => [],
+                'kind' => 'mp4',
+                'embed' => null,
+                'intro' => null,
+                'outro' => null,
+                'hard_sub' => true,
+            ]);
+            $mock->shouldReceive('servers')->andReturn([]);
+        });
+
+        $response = $this->getJson('/anime/al_1/stream.json?ep=watch%2Fkaa%2F1%2Fsub%2Fkaa-1&server=animeheaven');
+
+        $response->assertOk()
+            ->assertJsonPath('source.type', 'mp4')
+            ->assertJsonPath('hardSub', true);
+
+        // The CDN 403s cross-site media requests, so the browser must get our
+        // own range-capable proxy URL instead of the raw file. The token is
+        // signed so every range request works on any serverless container.
+        $url = (string) $response->json('source.url');
+        $this->assertStringContainsString('/anime/proxy/file?t=', $url);
+
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+        $this->assertArrayHasKey('t', $query);
+        $this->assertStringContainsString('.', $query['t']);
+    }
+
+    public function test_file_proxy_range_bounds(): void
+    {
+        $controller = $this->app->make(\App\Http\Controllers\AnimeController::class);
+        $method = new \ReflectionMethod($controller, 'fileBounds');
+        $method->setAccessible(true);
+
+        $this->assertSame([0, 999, 200], $method->invoke($controller, '', 1000));
+        $this->assertSame([0, 999, 206], $method->invoke($controller, 'bytes=0-', 1000));
+        $this->assertSame([100, 199, 206], $method->invoke($controller, 'bytes=100-199', 1000));
+        $this->assertSame([900, 999, 206], $method->invoke($controller, 'bytes=-100', 1000));
+        $this->assertSame([null, 0, 416], $method->invoke($controller, 'bytes=1000-', 1000));
+    }
+
     public function test_embed_response_keeps_the_burned_in_flag(): void
     {
         $this->mock(\App\Services\Anime\AnimeService::class, function ($mock) {
@@ -209,6 +266,9 @@ class AnimeTest extends TestCase
             ->assertSee('id="versionBtn"', false)
             ->assertSee('data-value="animeheaven"', false)
             ->assertSee('data-value="samehadaku"', false)
-            ->assertSee('Burned-in', false);
+            ->assertSee('Burned-in', false)
+            // The MP4 CDNs do not allow our origin through CORS, so the native
+            // element must drop the anonymous mode or playback stays black.
+            ->assertSee("video.removeAttribute('crossorigin')", false);
     }
 }

@@ -419,6 +419,8 @@
         let playMode = 'hls';
         let embedWatchSeconds = 0;
         let embedClock = null;
+        // Guards the MP4 error fallback so one dead file never reloads twice.
+        let mp4Failed = false;
 
         function readHistory() {
             try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch (e) { return []; }
@@ -930,6 +932,10 @@
             stopEmbedClock();
             const oldFrame = document.getElementById('embedFrame');
             if (oldFrame) oldFrame.remove();
+            // HLS segments are fetched by hls.js through XHR and our own proxy,
+            // so the element keeps the anonymous CORS mode it was built with.
+            video.setAttribute('crossorigin', 'anonymous');
+            mp4Failed = false;
             video.style.visibility = '';
             // A previous hard-subtitled file may have disabled these.
             subtitleDropdown.btn.disabled = false;
@@ -1018,6 +1024,13 @@
             stopEmbedClock();
             const oldFrame = document.getElementById('embedFrame');
             if (oldFrame) oldFrame.remove();
+            // The Samehadaku CDN sends no Access-Control-Allow-Origin (the
+            // AnimeHeaven file is proxied through our own origin for the same
+            // reason), so with crossorigin="anonymous" the browser refuses the
+            // file and the player stays black at 0:00. The native element must
+            // fetch it as an ordinary media resource.
+            video.removeAttribute('crossorigin');
+            mp4Failed = false;
             video.style.visibility = '';
             qualityDropdown.btn.disabled = true;
             qualityDropdown.btn.title = 'This source is a single file';
@@ -1028,6 +1041,19 @@
             video.src = src;
             video.play().catch(function () {});
         }
+
+        // A burned-in file that the browser refuses (CDN moved, hotlink
+        // block, unsupported codec) must not leave a silent black frame:
+        // drop the pinned version and let the standard chain take over.
+        video.addEventListener('error', function () {
+            if (playMode !== 'mp4' || mp4Failed) return;
+            if (!video.error || video.error.code === 1) return;
+            mp4Failed = true;
+            setHardsubServer('');
+            const notice = document.getElementById('versionNotice');
+            if (notice) notice.classList.remove('hidden');
+            loadStream();
+        });
 
         video.addEventListener('loadedmetadata', function () {            // Re-assert the chosen subtitle track: browsers may reset a
             // freshly added track to hidden/disabled while its VTT loads,

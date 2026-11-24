@@ -15,6 +15,9 @@ use Illuminate\Support\Facades\Log;
 
 class AnimeController extends Controller
 {
+    /** Largest slice the MP4 proxy streams in one request (8 MiB). */
+    protected const FILE_CHUNK = 8 * 1024 * 1024;
+
     public function __construct(
         protected AnimeService $animeService,
         protected AnimeStreamProvider $streamProvider,
@@ -347,9 +350,32 @@ class AnimeController extends Controller
 
             $this->animeService->markAvailable((int) preg_replace('/[^0-9]/', '', $id));
 
+            // AnimeHeaven's file CDN rejects cross-site media requests with
+            // HTTP 403 (it checks Sec-Fetch-Site), so the browser cannot open
+            // the file directly even though a server-side fetch succeeds. Route
+            // its MP4s through our range-capable proxy instead.
+            $playbackUrl = $url;
+            $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+            if (str_ends_with($host, 'animeheaven.me')) {
+                $entry = ['url' => $url, 'referer' => $stream['referer'] ?? null];
+                // Stateless signed token: each range request may land on a
+                // different serverless container, so it cannot rely on /tmp.
+                $fileToken = $this->signProxyPayload([
+                    'u' => $entry['url'],
+                    'r' => $entry['referer'],
+                ]);
+                Cache::put('anime_file_' . md5($url), $entry, 21600);
+                // The cache key is a belt-and-braces fallback for deployments
+                // where APP_KEY is only available to the HTTP runtime.
+                $playbackUrl = route('anime.proxy.file', [
+                    't' => $fileToken,
+                    'k' => md5($url),
+                ]);
+            }
+
             return response()->json([
                 'source' => [
-                    'url' => $url,
+                    'url' => $playbackUrl,
                     'quality' => $stream['sources'][0]['quality'] ?? 'auto',
                     'type' => 'mp4',
                 ],
@@ -766,6 +792,196 @@ class AnimeController extends Controller
             ->header('Content-Type', $type)
             ->header('Cache-Control', 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800')
             ->header('CDN-Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    }
+
+    /**
+     * Range-capable proxy for a burned-in MP4.
+     *
+     * AnimeHeaven's file CDN answers 403 to a browser's cross-site media
+     * request (it inspects Sec-Fetch-Site), so the file looks dead in the
+     * player while a plain server-side fetch works. Only URLs registered by
+     * streamJson() are served, never arbitrary user input.
+     */
+    public function fileProxy(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $tokenData = $this->verifyProxyPayload((string) $request->query('t', ''));
+        if ($tokenData && ! empty($tokenData['u'])) {
+            $entry = [
+                'url' => (string) $tokenData['u'],
+                'referer' => $tokenData['r'] ?? null,
+            ];
+        } else {
+            $key = (string) $request->query('k', '');
+            $entry = Cache::get('anime_file_' . $key);
+        }
+        if (! is_array($entry) || empty($entry['url'])) {
+            abort(404, 'File session not found or expired. Reload the page.');
+        }
+
+        [$total, $ranges] = $this->probeFile($entry);
+
+        [$start, $end, $status] = $this->fileBounds((string) $request->header('Range', ''), $total);
+        if ($start === null) {
+            abort(416, 'Requested range not satisfiable.');
+        }
+        // A file served without range support must be sent whole; pretending
+        // to answer 206 would desynchronise the browser's buffer.
+        if (! $ranges) {
+            [$start, $end, $status] = [0, max(0, $total - 1), 200];
+        } elseif ($status === 206 && $end - $start + 1 > self::FILE_CHUNK) {
+            // Answer one bounded slice per request. The browser asks for the
+            // rest as it plays, and no single function invocation has to
+            // stream a 250 MB episode inside the platform's time limit.
+            $end = $start + self::FILE_CHUNK - 1;
+        }
+
+        $length = $total > 0 ? $end - $start + 1 : null;
+        $rangeHeader = $status === 206 ? "bytes={$start}-{$end}" : null;
+
+        $headers = [
+            'Content-Type' => 'video/mp4',
+            'Accept-Ranges' => $ranges ? 'bytes' : 'none',
+            'Cache-Control' => 'private, max-age=0, no-store',
+        ];
+        if ($length !== null) {
+            $headers['Content-Length'] = (string) $length;
+        }
+        if ($status === 206 && $length !== null) {
+            $headers['Content-Range'] = "bytes {$start}-{$end}/{$total}";
+        }
+
+        return response()->stream(
+            fn () => $this->streamFile($entry, $rangeHeader),
+            $status,
+            $headers
+        );
+    }
+
+    /**
+     * Total size and range support, learned with a two-byte request so the
+     * proxy can answer Content-Length/Content-Range before streaming.
+     *
+     * @param  array<string, mixed>  $entry
+     * @return array{0: int, 1: bool} [total bytes (0 when unknown), supports ranges]
+     */
+    protected function probeFile(array $entry): array
+    {
+        $cacheKey = 'anime_file_meta_' . md5((string) $entry['url']);
+        $cached = Cache::get($cacheKey);
+        if (is_array($cached) && isset($cached['total'], $cached['ranges'])) {
+            return [(int) $cached['total'], (bool) $cached['ranges']];
+        }
+
+        $headers = ['Accept: */*'];
+        if (! empty($entry['referer'])) {
+            $headers[] = 'Referer: ' . $entry['referer'];
+        }
+        $headers[] = 'Range: bytes=0-1';
+
+        $response = [];
+        $status = 0;
+        $ch = curl_init((string) $entry['url']);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 3,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_HEADERFUNCTION => function ($ch, $line) use (&$response, &$status) {
+                $trim = trim($line);
+                if (preg_match('#^HTTP/\S+\s+(\d{3})#', $trim, $m)) {
+                    $status = (int) $m[1];
+                    $response = [];
+                } elseif (str_contains($trim, ':')) {
+                    [$name, $value] = explode(':', $trim, 2);
+                    $response[strtolower(trim($name))] = trim($value);
+                }
+
+                return strlen($line);
+            },
+        ]);
+        curl_exec($ch);
+        curl_close($ch);
+
+        if ($status === 206 && preg_match('#bytes\s+\d+-\d+/(\d+)#i', (string) ($response['content-range'] ?? ''), $m)) {
+            $result = [(int) $m[1], true];
+        } elseif ($status === 200 && isset($response['content-length'])) {
+            $result = [(int) $response['content-length'], false];
+        } else {
+            return [0, false];
+        }
+
+        Cache::put($cacheKey, ['total' => $result[0], 'ranges' => $result[1]], 21600);
+
+        return $result;
+    }
+
+    /**
+     * @return array{0: int|null, 1: int, 2: int} [start (null when unsatisfiable), end, status]
+     */
+    protected function fileBounds(string $range, int $total): array
+    {
+        if ($total <= 0) {
+            return [0, 0, 200];
+        }
+
+        if (preg_match('/^bytes=(\d*)-(\d*)$/', $range, $m) && ($m[1] !== '' || $m[2] !== '')) {
+            if ($m[1] === '') {
+                $start = max(0, $total - (int) $m[2]);
+                $end = $total - 1;
+            } else {
+                $start = (int) $m[1];
+                $end = $m[2] === '' ? $total - 1 : min((int) $m[2], $total - 1);
+            }
+
+            if ($start >= $total || $start > $end) {
+                return [null, 0, 416];
+            }
+
+            return [$start, $end, 206];
+        }
+
+        return [0, $total - 1, 200];
+    }
+
+    /**
+     * @param  array<string, mixed>  $entry
+     */
+    protected function streamFile(array $entry, ?string $range): void
+    {
+        $headers = ['Accept: */*'];
+        if (! empty($entry['referer'])) {
+            $headers[] = 'Referer: ' . $entry['referer'];
+        }
+        if ($range !== null) {
+            $headers[] = 'Range: ' . $range;
+        }
+
+        $ch = curl_init((string) $entry['url']);
+        curl_setopt_array($ch, [
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 3,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 1800,
+            CURLOPT_LOW_SPEED_LIMIT => 1,
+            CURLOPT_LOW_SPEED_TIME => 60,
+            CURLOPT_BUFFERSIZE => 65536,
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_WRITEFUNCTION => function ($ch, $chunk) {
+                echo $chunk;
+                if (ob_get_level() > 0) {
+                    @ob_flush();
+                }
+                flush();
+
+                return strlen($chunk);
+            },
+        ]);
+        curl_exec($ch);
+        curl_close($ch);
     }
 
     /** Subtitle proxy (same-origin VTT for the player track elements). */

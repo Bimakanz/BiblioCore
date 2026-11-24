@@ -51,6 +51,7 @@ Route::get('/anime', [AnimeController::class, 'index'])->name('anime.index');
 Route::get('/anime/api/live-search', [AnimeController::class, 'liveSearch'])->name('anime.api.live-search');
 Route::get('/anime/proxy/playlist', [AnimeController::class, 'playlistProxy'])->name('anime.proxy.playlist');
 Route::get('/anime/proxy/segment', [AnimeController::class, 'segmentProxy'])->name('anime.proxy.segment');
+Route::get('/anime/proxy/file', [AnimeController::class, 'fileProxy'])->name('anime.proxy.file');
 Route::get('/anime/proxy/subtitle', [AnimeController::class, 'subtitleProxy'])->name('anime.proxy.subtitle');
 Route::get('/anime/subtitle/id.vtt', [AnimeController::class, 'translatedSubtitle'])->name('anime.subtitle.id');
 Route::get('/anime/subtitle/en-auto.vtt', [AnimeController::class, 'autoEnglishSubtitle'])->name('anime.subtitle.en-auto');
