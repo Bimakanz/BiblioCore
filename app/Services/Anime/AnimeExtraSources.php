@@ -46,9 +46,9 @@ class AnimeExtraSources
         $this->hianime = $this->normalise(env('HIANIME_API_URL'));
         $this->consumet = $this->normalise(env('CONSUMET_BASE_URL'));
         $this->arm = $this->normalise(env('ARM_API_URL', 'https://arm.haglund.dev'));
-        $this->resolver = $this->normalise(env('ANIME_API_URL', 'https://anivexa-api-nine.vercel.app'));
+        $this->resolver = $this->normalise(env('ANIME_API_URL', 'https://api-eps-nine.vercel.app'));
         if ($this->resolver !== null && $this->isLocalHost($this->resolver)) {
-            $this->resolver = 'https://anivexa-api-nine.vercel.app';
+            $this->resolver = 'https://api-eps-nine.vercel.app';
         }
         $this->anikoto = $anikoto ?? new AnikotoSource();
         $this->animeHeaven = $animeHeaven ?? new AnimeHeavenSource();

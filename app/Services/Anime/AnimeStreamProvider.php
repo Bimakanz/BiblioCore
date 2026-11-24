@@ -41,10 +41,9 @@ class AnimeStreamProvider
         'animeonsen', 'animegg', 'senshi', 'mkissa', 'kaa', 'reanime',
     ];
 
-    /** Public resolver instances used when ANIME_API_URL is not configured. */
+    /** Self-hosted Anivexa resolver instance. */
     protected const DEFAULT_BASES = [
         'https://api-eps-nine.vercel.app',
-        'https://anivexa-api-nine.vercel.app',
     ];
 
     public function __construct(?AnimeExtraSources $extra = null)
