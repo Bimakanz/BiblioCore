@@ -808,6 +808,14 @@
                 loadingEl.style.display = 'none';
                 return;
             }
+            // Hard-subtitled sources ship a single MP4 with the text already
+            // in the frames: no manifest, no tracks, no offset.
+            if (data.source.type === 'mp4') {
+                buildSubtitleOptions([]);
+                attachFile(data.source.url);
+                loadingEl.style.display = 'none';
+                return;
+            }
             buildSubtitleOptions(data.subtitles || []);
             attachSource(data.source.url);
             loadSkipTimes();
@@ -863,6 +871,9 @@
             const oldFrame = document.getElementById('embedFrame');
             if (oldFrame) oldFrame.remove();
             video.style.visibility = '';
+            // A previous hard-subtitled file may have disabled these.
+            subtitleDropdown.btn.disabled = false;
+            subtitleDropdown.btn.title = '';
             if (window.Hls && Hls.isSupported()) {
                 hls = new Hls({
                     // Long episodes (40-60 min) need a deep forward buffer so
@@ -917,8 +928,26 @@
             video.play().catch(function () {});
         }
 
-        video.addEventListener('loadedmetadata', function () {
-            // Re-assert the chosen subtitle track: browsers may reset a
+        // Progressive MP4 with burned-in subtitles (AnimeHeaven, Samehadaku).
+        // Played by the native element: hls.js only understands playlists.
+        function attachFile(src) {
+            if (hls) { try { hls.destroy(); } catch (e) {} hls = null; }
+            playMode = 'mp4';
+            stopEmbedClock();
+            const oldFrame = document.getElementById('embedFrame');
+            if (oldFrame) oldFrame.remove();
+            video.style.visibility = '';
+            qualityDropdown.btn.disabled = true;
+            qualityDropdown.btn.title = 'This source is a single file';
+            subtitleDropdown.btn.disabled = true;
+            subtitleDropdown.btn.title = 'Subtitles are built into this video';
+            const subLabel = document.getElementById('subtitleBtnLabel');
+            if (subLabel) subLabel.textContent = 'Burned-in';
+            video.src = src;
+            video.play().catch(function () {});
+        }
+
+        video.addEventListener('loadedmetadata', function () {            // Re-assert the chosen subtitle track: browsers may reset a
             // freshly added track to hidden/disabled while its VTT loads,
             // which is why CC vanished after a refresh even though the
             // settings label still showed the right language.

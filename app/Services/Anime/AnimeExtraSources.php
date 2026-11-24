@@ -28,8 +28,17 @@ class AnimeExtraSources
 
     protected AnikotoSource $anikoto;
 
-    public function __construct(?AnikotoSource $anikoto = null)
-    {
+    /** English hard-subtitled MP4 library. */
+    protected AnimeHeavenSource $animeHeaven;
+
+    /** Indonesian hard-subtitled MP4 library. */
+    protected SamehadakuSource $samehadaku;
+
+    public function __construct(
+        ?AnikotoSource $anikoto = null,
+        ?AnimeHeavenSource $animeHeaven = null,
+        ?SamehadakuSource $samehadaku = null
+    ) {
         // HiAnime shut down in 2026 and the old public wrapper now answers
         // 503 "Service Suspended". The code path stays available for a
         // self-hosted instance, but it is opt-in so a dead host never costs
@@ -42,6 +51,8 @@ class AnimeExtraSources
             $this->resolver = 'https://anivexa-api-nine.vercel.app';
         }
         $this->anikoto = $anikoto ?? new AnikotoSource();
+        $this->animeHeaven = $animeHeaven ?? new AnimeHeavenSource();
+        $this->samehadaku = $samehadaku ?? new SamehadakuSource();
     }
 
     protected function isLocalHost(string $url): bool
@@ -132,6 +143,139 @@ class AnimeExtraSources
     public function anikotoStream(string $reference): ?array
     {
         return $this->anikoto->streamFor($reference);
+    }
+
+    /**
+     * English hard-subtitled episodes (MP4, subtitles burned in).
+     *
+     * @param  array<string, mixed>  $anime
+     * @return array<int, array<string, mixed>>
+     */
+    public function animeHeavenEpisodes(array $anime, int $anilistId): array
+    {
+        return $this->animeHeaven->episodesForAniList($anilistId, $anime);
+    }
+
+    /** Resolve an "ah|..." reference into direct MP4 sources. */
+    public function animeHeavenStream(string $reference): ?array
+    {
+        return $this->animeHeaven->streamFor($reference);
+    }
+
+    /**
+     * @param  array<string, mixed>  $anime
+     * @return array<string, mixed>|null
+     */
+    public function animeHeavenStreamFor(array $anime, int $number): ?array
+    {
+        return $this->animeHeaven->streamForEpisode($anime, $number);
+    }
+
+    /**
+     * Indonesian hard-subtitled episodes (MP4, subtitles burned in).
+     *
+     * @param  array<string, mixed>  $anime
+     * @return array<int, array<string, mixed>>
+     */
+    public function samehadakuEpisodes(array $anime): array
+    {
+        return $this->samehadaku->episodesFor($anime);
+    }
+
+    /** Resolve an "sd|..." reference into direct MP4 sources. */
+    public function samehadakuStream(string $reference): ?array
+    {
+        return $this->samehadaku->streamFor($reference);
+    }
+
+    /**
+     * @param  array<string, mixed>  $anime
+     * @return array<string, mixed>|null
+     */
+    public function samehadakuStreamFor(array $anime, int $number): ?array
+    {
+        return $this->samehadaku->streamForEpisode($anime, $number);
+    }
+
+    /**
+     * Remember every known title for a title, so playback can find a hardsub
+     * copy later without the catalogue row being passed around again.
+     *
+     * @param  array<string, mixed>  $anime
+     */
+    public function rememberTitles(int $anilistId, array $anime): void
+    {
+        if ($anilistId <= 0) {
+            return;
+        }
+
+        $titles = $this->allTitles($anime);
+        if (! empty($titles)) {
+            Cache::put("anime_titles_{$anilistId}", $titles, 2592000);
+        }
+    }
+
+    /**
+     * Last-resort hard-subtitled copy of one episode: English first (the UI
+     * is English), then Indonesian. Returns null when neither carries it.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function hardsubStreamFor(int $anilistId, int $number): ?array
+    {
+        if ($anilistId <= 0 || $number < 1) {
+            return null;
+        }
+
+        $titles = Cache::get("anime_titles_{$anilistId}");
+        if (! is_array($titles) || empty($titles)) {
+            return null;
+        }
+
+        $anime = [
+            'title' => (string) ($titles[0] ?? ''),
+            'altTitles' => array_values(array_slice($titles, 1)),
+        ];
+
+        foreach ([$this->animeHeaven, $this->samehadaku] as $source) {
+            $stream = $source->streamForEpisode($anime, $number);
+            if (is_array($stream)) {
+                return $stream;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Every title a catalogue row carries (not just the search shortlist).
+     *
+     * @param  array<string, mixed>  $anime
+     * @return array<int, string>
+     */
+    protected function allTitles(array $anime): array
+    {
+        $titles = [(string) ($anime['title'] ?? '')];
+        foreach (['titles', 'altTitles', 'synonyms'] as $field) {
+            $value = $anime[$field] ?? null;
+            if (is_string($value)) {
+                $titles[] = $value;
+                continue;
+            }
+            foreach ((is_array($value) ? $value : []) as $title) {
+                $titles[] = (string) $title;
+            }
+        }
+
+        $out = [];
+        foreach ($titles as $title) {
+            $title = trim($title);
+            if ($title !== '' && ! in_array($title, $out, true)) {
+                $out[] = $title;
+            }
+        }
+
+        return $out;
     }
 
     /** Best-effort HiAnime slug lookup, cached for a day. */

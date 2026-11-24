@@ -46,7 +46,7 @@ class AnimeStreamProvider
         'https://anivexa-api-nine.vercel.app',
     ];
 
-    public function __construct()
+    public function __construct(?AnimeExtraSources $extra = null)
     {
         $configured = collect(explode(',', (string) env('ANIME_API_URL', env('CONSUMET_API_URL', ''))))
             ->map(fn ($u) => rtrim(trim($u), '/'))
@@ -63,7 +63,7 @@ class AnimeStreamProvider
         $this->fallbacks = $urls->slice(1)->all();
         $key = env('ANIME_API_KEY');
         $this->apiKey = is_string($key) && $key !== '' ? $key : null;
-        $this->extra = new AnimeExtraSources();
+        $this->extra = $extra ?? new AnimeExtraSources();
     }
 
     /** Localhost resolvers can never work on Vercel. */
@@ -254,6 +254,13 @@ $headers = ['Accept: application/json'];
             return $empty;
         }
 
+        // Cache the title list for playback fallbacks: a stream request only
+        // carries the AniList id and episode number, but the hardsub sources
+        // are searched by title.
+        if (is_array($anime) && ! empty($anime)) {
+            $this->extra->rememberTitles($anilistId, $anime);
+        }
+
         $cacheKey = "anivexa_episodes_{$anilistId}_{$audio}";
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && !empty($cached['episodes'])
@@ -338,6 +345,28 @@ $headers = ['Accept: application/json'];
                 if (! empty($list)) {
                     $audioAvailable[$audio] = true;
                     $extraProvider = $source;
+                }
+            }
+        }
+
+        // Still nothing playable: fall back to a hard-subtitled file. These
+        // are single MP4s with the subtitles burned into the frames, so they
+        // work even when every soft-sub provider is missing an English track.
+        // Dub requests are skipped because both libraries are sub-only.
+        if (empty($byNumber) && $audio === 'sub') {
+            foreach (['animeheaven', 'samehadaku'] as $source) {
+                $list = $source === 'animeheaven'
+                    ? $this->extra->animeHeavenEpisodes($anime ?? [], $anilistId)
+                    : $this->extra->samehadakuEpisodes($anime ?? []);
+                foreach ($list as $ep) {
+                    if (! isset($byNumber[$ep['number']])) {
+                        $byNumber[$ep['number']] = $ep;
+                    }
+                }
+                if (! empty($list)) {
+                    $audioAvailable['sub'] = true;
+                    $extraProvider = $source;
+                    break;
                 }
             }
         }
@@ -502,7 +531,9 @@ $headers = ['Accept: application/json'];
         }
         if (! str_starts_with($reference, 'hn|')
             && ! str_starts_with($reference, 'cs|')
-            && ! str_starts_with($reference, 'ak|')) {
+            && ! str_starts_with($reference, 'ak|')
+            && ! str_starts_with($reference, 'ah|')
+            && ! str_starts_with($reference, 'sd|')) {
             return null;
         }
 
@@ -514,6 +545,10 @@ $headers = ['Accept: application/json'];
 
         if (str_starts_with($reference, 'ak|')) {
             $stream = $this->extra->anikotoStream($reference);
+        } elseif (str_starts_with($reference, 'ah|')) {
+            $stream = $this->extra->animeHeavenStream($reference);
+        } elseif (str_starts_with($reference, 'sd|')) {
+            $stream = $this->extra->samehadakuStream($reference);
         } elseif (str_starts_with($reference, 'hn|')) {
             $stream = $this->extra->hianimeStream($reference, 'sub');
         } else {
@@ -533,6 +568,18 @@ $headers = ['Accept: application/json'];
         $extraStream = $this->extraStream($watchPath);
         if ($extraStream !== null) {
             return $extraStream;
+        }
+
+        // Force a hard-subtitled copy: "?server=animeheaven" or
+        // "?server=samehadaku" on the stream endpoint.
+        if ($providerOverride !== null && in_array($providerOverride, ['animeheaven', 'samehadaku'], true)) {
+            $forced = $this->parseWatchPath($watchPath);
+            if ($forced) {
+                $hardsub = $this->hardsubFor($forced['anilistId'], (int) $forced['number'], $providerOverride);
+                if ($hardsub !== null) {
+                    return $hardsub;
+                }
+            }
         }
 
         $parsed = $this->parseWatchPath($watchPath);
@@ -614,10 +661,48 @@ $headers = ['Accept: application/json'];
             }
         }
 
+        // Last resort: a copy with the subtitles burned into the video. It
+        // has no tracks to sync, so it still works when every provider in
+        // the chain shipped an unusable or non-English subtitle track.
+        if (! $stream && $parsed && $audio === 'sub') {
+            $stream = $this->hardsubFor($parsed['anilistId'], (int) $parsed['number']);
+        }
+
         if ($stream) {
             Cache::put($cacheKey, $stream, 3600);
         }
         return $stream;
+    }
+
+    /**
+     * Hard-subtitled stream for one episode, optionally pinned to a source.
+     * Titles are read from the cache filled by getEpisodes().
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function hardsubFor(int $anilistId, int $number, ?string $source = null): ?array
+    {
+        if ($anilistId <= 0 || $number < 1) {
+            return null;
+        }
+
+        $titles = Cache::get("anime_titles_{$anilistId}");
+        if (! is_array($titles) || empty($titles)) {
+            return null;
+        }
+
+        $anime = [
+            'title' => (string) ($titles[0] ?? ''),
+            'altTitles' => array_values(array_slice($titles, 1)),
+        ];
+
+        if ($source === 'animeheaven' || $source === 'samehadaku') {
+            return $source === 'animeheaven'
+                ? $this->extra->animeHeavenStreamFor($anime, $number)
+                : $this->extra->samehadakuStreamFor($anime, $number);
+        }
+
+        return $this->extra->hardsubStreamFor($anilistId, $number);
     }
 
     /**
