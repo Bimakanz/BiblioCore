@@ -507,6 +507,10 @@ class AnimeController extends Controller
             'servers' => $this->streamProvider->servers(),
             'activeServer' => $stream['provider'] ?? $server,
             'provider' => $stream['provider'] ?? null,
+            // Samehadaku mirrors are hard-subtitled too, so the player keeps
+            // the subtitle/offset controls out of the way when that is the
+            // only copy left.
+            'hardSub' => ! empty($stream['hard_sub']),
             'audioFallback' => $stream['audio_fallback'] ?? null,
             'intro' => $stream['intro'],
             'outro' => $stream['outro'],

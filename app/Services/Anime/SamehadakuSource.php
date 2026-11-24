@@ -137,17 +137,19 @@ class SamehadakuSource
             return null;
         }
 
-        $cacheKey = 'samehadaku_slug_'.md5(implode('|', $titles));
+        $cacheKey = 'samehadaku_slug_v2_'.md5(implode('|', $titles));
         $cached = Cache::get($cacheKey);
         if (is_string($cached)) {
             return $cached;
         }
 
+        // Searching the full English title usually returns nothing on this
+        // WordPress catalogue, so the distinctive word is the real query.
         $best = null;
         $bestScore = 0.0;
         $anchor = $this->anchorToken((string) ($titles[0] ?? ''));
         foreach ($titles as $title) {
-            foreach ($this->queryVariants($title) as $query) {
+            foreach ($this->searchQueries($title) as $query) {
                 foreach ($this->slugsFromSearch($query) as $slug) {
                     $name = str_replace('-', ' ', $slug);
                     $slugTokens = $this->tokens($this->normaliseTitle($name));
@@ -157,6 +159,7 @@ class SamehadakuSource
                         if ($sharesAnchor) {
                             $score = max($score, 0.68);
                         }
+                        $score = $this->adjustForSeason($candidate, $name, $score);
                         if ($score > $bestScore) {
                             $bestScore = $score;
                             $best = $slug;
@@ -179,33 +182,6 @@ class SamehadakuSource
         Cache::put($cacheKey, $best, 604800);
 
         return $best;
-    }
-
-    /**
-     * Search queries worth spending a request on: the full title, the same
-     * title without punctuation, and its last significant words.
-     *
-     * @return array<int, string>
-     */
-    protected function queryVariants(string $title): array
-    {
-        $variants = [$title];
-
-        $clean = (string) preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $title);
-        $clean = trim((string) preg_replace('/\s+/', ' ', $clean));
-        if ($clean !== '' && $clean !== $title) {
-            $variants[] = $clean;
-        }
-
-        $words = array_values(array_filter(explode(' ', $clean)));
-        if (count($words) > 2) {
-            $variants[] = implode(' ', array_slice($words, -2));
-        }
-        if (count($words) > 3) {
-            $variants[] = (string) end($words);
-        }
-
-        return array_values(array_unique(array_filter($variants)));
     }
 
     /**

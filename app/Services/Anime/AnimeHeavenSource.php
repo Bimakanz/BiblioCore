@@ -158,7 +158,7 @@ class AnimeHeavenSource
             return null;
         }
 
-        $cacheKey = 'animeheaven_id_'.md5(implode('|', $titles));
+        $cacheKey = 'animeheaven_id_v2_'.md5(implode('|', $titles));
         $cached = Cache::get($cacheKey);
         if (is_string($cached)) {
             return $cached;
@@ -168,18 +168,24 @@ class AnimeHeavenSource
         $bestScore = 0.0;
         $anchor = $this->anchorToken((string) ($titles[0] ?? ''));
         foreach ($titles as $title) {
-            foreach ($this->search($title) as $rank => $row) {
-                $hitTokens = $this->tokens($this->normaliseTitle($row['title']));
-                $firstHitSharesAnchor = $rank === 0 && $anchor !== '' && in_array($anchor, $hitTokens, true);
-                foreach ($titles as $candidate) {
-                    $score = $this->titleScore($candidate, $row['title']);
-                    if ($firstHitSharesAnchor) {
-                        $score = max($score, 0.7);
+            foreach ($this->searchQueries($title) as $query) {
+                foreach ($this->search($query) as $rank => $row) {
+                    $hitTokens = $this->tokens($this->normaliseTitle($row['title']));
+                    $firstHitSharesAnchor = $rank === 0 && $anchor !== '' && in_array($anchor, $hitTokens, true);
+                    foreach ($titles as $candidate) {
+                        $score = $this->titleScore($candidate, $row['title']);
+                        if ($firstHitSharesAnchor) {
+                            $score = max($score, 0.7);
+                        }
+                        $score = $this->adjustForSeason($candidate, $row['title'], $score);
+                        if ($score > $bestScore) {
+                            $bestScore = $score;
+                            $best = $row['id'];
+                        }
                     }
-                    if ($score > $bestScore) {
-                        $bestScore = $score;
-                        $best = $row['id'];
-                    }
+                }
+                if ($bestScore >= 0.92) {
+                    break;
                 }
             }
             if ($bestScore >= 0.92) {

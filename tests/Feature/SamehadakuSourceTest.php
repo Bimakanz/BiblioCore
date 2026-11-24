@@ -44,6 +44,7 @@ class SamehadakuSourceTest extends TestCase
     {
         return <<<'HTML'
 <div class='postbody'>
+<a href="https://v2.samehadaku.how/black-clover-season-2-episode-1/">1</a>
 <a href="https://v2.samehadaku.how/sousou-no-frieren-season-2-episode-10-end/">10</a>
 <a href="https://v2.samehadaku.how/sousou-no-frieren-episode-25/">25</a>
 </div>
@@ -111,6 +112,26 @@ HTML;
             'altTitles' => ['Sousou no Frieren Season 2'],
         ]);
 
+        $this->assertSame('sd|sousou-no-frieren-season-2|1', $episodes[0]['id']);
+    }
+
+    public function test_it_ignores_a_generic_season_match_from_another_show(): void
+    {
+        // Searching "season 2" lists Black Clover; that hit must never beat the
+        // real series just because it shares the release words.
+        $provider = $this->provider([
+            '?s=' => $this->searchPage(),
+            '/anime/black-clover-season-2/' => '<div><a href="https://v2.samehadaku.how/black-clover-season-2-episode-1/">1</a></div>',
+            '/anime/sousou-no-frieren-season-2/' => $this->seasonTwoPage(),
+            '/anime/sousou-no-frieren/' => $this->seriesPage(),
+        ]);
+
+        $episodes = $provider->episodesFor([
+            'title' => 'Sousou no Frieren 2nd Season',
+            'altTitles' => ['Sousou no Frieren Season 2'],
+        ]);
+
+        $this->assertNotEmpty($episodes);
         $this->assertSame('sd|sousou-no-frieren-season-2|1', $episodes[0]['id']);
     }
 
