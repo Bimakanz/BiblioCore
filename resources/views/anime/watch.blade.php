@@ -981,17 +981,24 @@
             qualityDropdown.btn.title = '';
             if (window.Hls && Hls.isSupported()) {
                 hls = new Hls({
-                    // Long episodes (40-60 min) need a deep forward buffer so
-                    // a short CDN hiccup never reaches the decoder.
-                    maxBufferLength: 90,
-                    maxMaxBufferLength: 180,
-                    maxBufferSize: 120 * 1024 * 1024,
-                    backBufferLength: 30,
-                    abrEwmaDefaultEstimate: 8000000,
+                    // Balanced buffer for mobile + serverless proxy: avoids flooding
+                    // Vercel lambdas on startup while keeping smooth playback.
+                    maxBufferLength: 30,
+                    maxMaxBufferLength: 60,
+                    maxBufferSize: 60 * 1024 * 1024,
+                    backBufferLength: 20,
+                    abrEwmaDefaultEstimate: 4000000,
                     enableWorker: true,
                     lowLatencyMode: false,
                     startLevel: -1,
                     capLevelToPlayerSize: true,
+                    manifestLoadingMaxRetry: 4,
+                    manifestLoadingRetryDelay: 1000,
+                    levelLoadingMaxRetry: 4,
+                    levelLoadingRetryDelay: 1000,
+                    fragLoadingMaxRetry: 5,
+                    fragLoadingRetryDelay: 1000,
+                    fragLoadingTimeOut: 25000,
                 });
                 // Never let HLS show subtitles baked into the stream: some
                 // providers embed an Arabic track and hls.js would render it
@@ -1008,19 +1015,32 @@
                     loadingEl.style.display = 'none';
                     buildQualityOptions();
                 });
+                // Reset recovery counter once segments flow normally so an early
+                // hiccup never prevents recovery later in a 24-minute episode.
+                hls.on(Hls.Events.FRAG_LOADED, function () {
+                    fatalRecoveries = 0;
+                });
                 hls.on(Hls.Events.ERROR, function (ev, data) {
                     if (!data || !data.fatal) return;
-                    if (data.type === Hls.ErrorTypes.MEDIA_ERROR && fatalRecoveries < 1) {
+                    if (window.console) console.warn('[BiblioAnime HLS]', data.type, data.details, data.response && data.response.code);
+                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR && fatalRecoveries < 3) {
+                        fatalRecoveries++;
+                        setTimeout(function () {
+                            try { if (hls) hls.startLoad(); } catch (e) {}
+                        }, 800 * fatalRecoveries);
+                        return;
+                    }
+                    if (data.type === Hls.ErrorTypes.MEDIA_ERROR && fatalRecoveries < 2) {
                         fatalRecoveries++;
                         try { hls.recoverMediaError(); } catch (e) {}
                         return;
                     }
-                    if (fatalRecoveries < 1) {
-                        fatalRecoveries++;
+                    if (fatalRecoveries < 4) {
+                        fatalRecoveries = 4;
                         loadStream();
                         return;
                     }
-                    showError('The stream was interrupted and no backup source was available.');
+                    showError('The stream was interrupted. Tap Try Again to reconnect.');
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 qualityDropdown.btn.disabled = true;

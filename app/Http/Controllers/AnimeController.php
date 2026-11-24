@@ -1034,15 +1034,20 @@ class AnimeController extends Controller
             return null;
         }
 
-        $headers = ['User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'];
+        $headers = ['User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'];
         if ($referer) {
             $headers[] = 'Referer: ' . $referer;
+            $refParts = parse_url($referer);
+            if (!empty($refParts['scheme']) && !empty($refParts['host'])) {
+                $headers[] = 'Origin: ' . $refParts['scheme'] . '://' . $refParts['host'];
+            }
         }
 
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+        curl_setopt($ch, CURLOPT_ENCODING, '');
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
