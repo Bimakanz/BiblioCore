@@ -120,7 +120,10 @@ async function resolveLaunchConfig() {
     if (process.env.VERCEL || process.platform === 'linux') {
         const { default: sparticuz } = await import('@sparticuz/chromium');
         const executablePath = await sparticuz.executablePath();
-        const filteredArgs = sparticuz.args.filter((arg) => !arg.startsWith('--headless'));
+        const blockedFlags = new Set(['--disable-web-security', '--disable-site-isolation-trials']);
+        const filteredArgs = sparticuz.args.filter(
+            (arg) => !arg.startsWith('--headless') && !blockedFlags.has(arg)
+        );
         return {
             executablePath,
             args: [...filteredArgs, '--disable-blink-features=AutomationControlled'],
@@ -176,11 +179,15 @@ async function getContext() {
             contextPromise = null;
         });
 
-        return browser.newContext({
+        const context = await browser.newContext({
             userAgent: USER_AGENT,
             locale: 'id-ID',
             viewport: { width: 1280, height: 720 },
         });
+        await context.addInitScript(() => {
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        });
+        return context;
     })().catch((err) => {
         browserPromise = null;
         contextPromise = null;
