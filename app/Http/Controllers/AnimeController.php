@@ -355,14 +355,18 @@ class AnimeController extends Controller
 
             $this->animeService->markAvailable((int) preg_replace('/[^0-9]/', '', $id));
 
-            // AnimeHeaven's and Nimegami's (Berkasdrive) file CDNs reject
-            // cross-site media requests with HTTP 403 (checking Sec-Fetch-Site
-            // or Referer), so the browser cannot open the file directly even
-            // though a server-side fetch succeeds. Route those MP4s through our
-            // range-capable proxy instead.
+            // AnimeHeaven's, Nimegami's (Berkasdrive), and Kuramanime's file CDNs
+            // reject or serve decoy clips for cross-site media requests (checking
+            // Sec-Fetch-Site or Referer), so the browser cannot open the file
+            // directly even though a server-side fetch succeeds. Route those
+            // MP4s through our range-capable proxy instead.
             $playbackUrl = $url;
             $host = strtolower((string) parse_url($url, PHP_URL_HOST));
-            if (str_ends_with($host, 'animeheaven.me') || str_ends_with($host, 'berkasdrive.com')) {
+            $needsFileProxy = ! empty($stream['proxy_file'])
+                || str_ends_with($host, 'animeheaven.me')
+                || str_ends_with($host, 'berkasdrive.com')
+                || str_ends_with($host, 'komari.my.id');
+            if ($needsFileProxy) {
                 $entry = ['url' => $url, 'referer' => $stream['referer'] ?? null];
                 // Stateless signed token: each range request may land on a
                 // different serverless container, so it cannot rely on /tmp.

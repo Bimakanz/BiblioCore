@@ -371,10 +371,11 @@ $headers = ['Accept: application/json'];
         // work even when every soft-sub provider is missing an English track.
         // Dub requests are skipped because all hardsub libraries are sub-only.
         if (empty($byNumber) && $audio === 'sub') {
-            foreach (['animeheaven', 'nimegami', 'samehadaku'] as $source) {
+            foreach (['animeheaven', 'nimegami', 'kuramanime', 'samehadaku'] as $source) {
                 $list = match ($source) {
                     'animeheaven' => $this->extra->animeHeavenEpisodes($anime ?? [], $anilistId),
                     'nimegami' => $this->extra->nimegamiEpisodes($anime ?? []),
+                    'kuramanime' => $this->extra->kuramanimeEpisodes($anime ?? []),
                     default => $this->extra->samehadakuEpisodes($anime ?? []),
                 };
                 foreach ($list as $ep) {
@@ -553,6 +554,7 @@ $headers = ['Accept: application/json'];
             && ! str_starts_with($reference, 'ak|')
             && ! str_starts_with($reference, 'ah|')
             && ! str_starts_with($reference, 'ng|')
+            && ! str_starts_with($reference, 'km|')
             && ! str_starts_with($reference, 'sd|')) {
             return null;
         }
@@ -569,6 +571,8 @@ $headers = ['Accept: application/json'];
             $stream = $this->extra->animeHeavenStream($reference);
         } elseif (str_starts_with($reference, 'ng|')) {
             $stream = $this->extra->nimegamiStream($reference);
+        } elseif (str_starts_with($reference, 'km|')) {
+            $stream = $this->extra->kuramanimeStream($reference);
         } elseif (str_starts_with($reference, 'sd|')) {
             $stream = $this->extra->samehadakuStream($reference);
         } elseif (str_starts_with($reference, 'hn|')) {
@@ -742,10 +746,12 @@ $headers = ['Accept: application/json'];
         if ($source === 'id') {
             // Walk every Indonesian burned-in library until one yields a
             // direct MP4 (refusing iframe embeds so "Burned-in" never lies).
-            foreach (['nimegami', 'samehadaku'] as $idSource) {
-                $stream = $idSource === 'nimegami'
-                    ? $this->extra->nimegamiStreamFor($anime, $number)
-                    : $this->extra->samehadakuStreamFor($anime, $number);
+            foreach (['nimegami', 'kuramanime', 'samehadaku'] as $idSource) {
+                $stream = match ($idSource) {
+                    'nimegami' => $this->extra->nimegamiStreamFor($anime, $number),
+                    'kuramanime' => $this->extra->kuramanimeStreamFor($anime, $number),
+                    default => $this->extra->samehadakuStreamFor($anime, $number),
+                };
                 if (is_array($stream) && ($stream['kind'] ?? '') === 'mp4') {
                     return $stream;
                 }
@@ -754,10 +760,12 @@ $headers = ['Accept: application/json'];
             return null;
         }
 
-        if ($source === 'nimegami' || $source === 'samehadaku') {
-            $stream = $source === 'nimegami'
-                ? $this->extra->nimegamiStreamFor($anime, $number)
-                : $this->extra->samehadakuStreamFor($anime, $number);
+        if (in_array($source, ['nimegami', 'kuramanime', 'samehadaku'], true)) {
+            $stream = match ($source) {
+                'nimegami' => $this->extra->nimegamiStreamFor($anime, $number),
+                'kuramanime' => $this->extra->kuramanimeStreamFor($anime, $number),
+                default => $this->extra->samehadakuStreamFor($anime, $number),
+            };
 
             // The picker promises a file with the subtitles burned into the
             // frames. An iframe mirror may well be a hardsub too,

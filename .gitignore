@@ -25,3 +25,5 @@ Thumbs.db
 
 .env*.local
 /.vercel
+/workers/kuramanime-worker/node_modules
+/workers/kuramanime-worker/.env
