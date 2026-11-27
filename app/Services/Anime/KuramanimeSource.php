@@ -174,7 +174,7 @@ class KuramanimeSource
             foreach ($this->searchQueries($title) as $query) {
                 foreach ($this->search($query) as $rank => $row) {
                     $hitTokens = $this->tokens($this->normaliseTitle($row['title']));
-                    $firstHitSharesAnchor = $rank === 0 && $anchor !== '' && in_array($anchor, $hitTokens, true);
+                    $firstHitSharesAnchor = $rank === 0 && $this->sharesStrongAnchor($anchor, $hitTokens);
                     foreach ($titles as $candidate) {
                         $score = $this->titleScore($candidate, $row['title']);
                         if ($firstHitSharesAnchor) {

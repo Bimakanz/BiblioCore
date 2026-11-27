@@ -137,7 +137,7 @@ class SamehadakuSource
             return null;
         }
 
-        $cacheKey = 'samehadaku_slug_v2_'.md5(implode('|', $titles));
+        $cacheKey = 'samehadaku_slug_v5_'.md5(implode('|', $titles));
         $cached = Cache::get($cacheKey);
         if (is_string($cached)) {
             return $cached;
@@ -153,7 +153,7 @@ class SamehadakuSource
                 foreach ($this->slugsFromSearch($query) as $slug) {
                     $name = str_replace('-', ' ', $slug);
                     $slugTokens = $this->tokens($this->normaliseTitle($name));
-                    $sharesAnchor = $anchor !== '' && in_array($anchor, $slugTokens, true);
+                    $sharesAnchor = $this->sharesStrongAnchor($anchor, $slugTokens);
                     foreach ($titles as $candidate) {
                         $score = $this->titleScore($candidate, $name);
                         if ($sharesAnchor) {

@@ -209,4 +209,32 @@ HTML;
 
         $this->assertStringContainsString('/anime/proxy/file?t=', (string) $response->json('source.url'));
     }
+
+    public function test_it_resolves_archive_play_url_wrappers_with_direct_video_src(): void
+    {
+        $archiveSeriesHtml = <<<'HTML'
+<script>self.__next_f.push([1,"{\"id\":\"994\",\"playUrl\":\"https://workers-anime.berkasdrive.com/https://desustream.net/dstream/playdesu/new/index.php?id=abc\",\"kind\":\"episode\",\"episode\":12,\"quality\":\"Original\",\"streamOnly\":true}"])</script>
+HTML;
+
+        $playdesuHtml = <<<'HTML'
+<video id="video" src="https://workers-anime.berkasdrive.com/https://rr2---sn.googlevideo.com/videoplayback?expire=999&amp;mime=video/mp4" controls></video>
+HTML;
+
+        $provider = $this->provider([
+            '/anime/?q=' => '<a class="card-title" href="/danshi-koukousei-no-nichijou-sub-indo-2/">Danshi Koukousei no Nichijou</a>',
+            '/danshi-koukousei-no-nichijou-sub-indo-2/' => $archiveSeriesHtml,
+            'workers-anime.berkasdrive.com/https://desustream.net/dstream/playdesu/' => $playdesuHtml,
+        ]);
+
+        $stream = $provider->streamForEpisode([
+            'title' => 'Daily Lives of High School Boys',
+            'altTitles' => ['Danshi Koukousei no Nichijou'],
+        ], 12);
+
+        $this->assertNotNull($stream);
+        $this->assertSame('mp4', $stream['kind']);
+        $this->assertSame('Nimegami', $stream['provider']);
+        $this->assertTrue($stream['proxy_file']);
+        $this->assertStringContainsString('videoplayback', $stream['sources'][0]['url']);
+    }
 }

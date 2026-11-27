@@ -92,6 +92,9 @@ trait MatchesTitles
 
         similar_text($na, $nb, $percent);
         $ratio = $percent / 100;
+        if (count($tokensA) >= 3 && count($tokensB) >= 3 && count(array_intersect($tokensA, $tokensB)) <= 1) {
+            $ratio = min($ratio, 0.55);
+        }
 
         // "Frieren" inside "Frieren Beyond Journeys End Season 2" is a real
         // match, but containment alone must stay below an exact token match.
@@ -127,6 +130,36 @@ trait MatchesTitles
             'specials', 'ova', 'ona', 'final', 'finale', 'end', 'arc', 'chapter',
             's', 'ii', 'iii', 'iv',
         ];
+    }
+
+    /**
+     * Words common enough across unrelated anime titles that sharing just one
+     * of them is not proof of a match ("High School DxD" vs "Daily Lives of
+     * High School Boys").
+     *
+     * @return array<int, string>
+     */
+    protected function weakAnchorTokens(): array
+    {
+        return [
+            'school', 'high', 'daily', 'lives', 'life', 'days', 'boys', 'girls',
+            'world', 'love', 'story', 'hero', 'magic', 'black', 'white', 'blue',
+            'zero', 'time', 'house', 'club', 'king', 'queen', 'angel', 'death',
+            'blood', 'sword', 'night', 'summer', 'winter', 'spring', 'another',
+            'nichijou', 'monogatari', 'koukousei', 'gakuen', 'seishun', 'sensei',
+            'isekai', 'tensei', 'mahou', 'yuusha', 'kawaii', 'kanojo', 'kareshi',
+        ];
+    }
+
+    /**
+     * @param  array<int, string>  $hitTokens
+     */
+    protected function sharesStrongAnchor(string $anchor, array $hitTokens): bool
+    {
+        return $anchor !== ''
+            && strlen($anchor) >= 7
+            && ! in_array($anchor, $this->weakAnchorTokens(), true)
+            && in_array($anchor, $hitTokens, true);
     }
 
     /**

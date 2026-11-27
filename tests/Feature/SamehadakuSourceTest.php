@@ -176,4 +176,17 @@ HTML,
         $this->assertNull($provider->streamForEpisode(['title' => 'Nothing Here'], 1));
         $this->assertNull($provider->streamFor('sd|missing|1'));
     }
+
+    public function test_it_does_not_hijack_titles_on_a_single_weak_common_word(): void
+    {
+        $provider = $this->provider([
+            '?s=' => '<a href="https://v2.samehadaku.how/high-school-dxd-hero-episode-1/">1</a>',
+            '/anime/high-school-dxd-hero/' => '<a href="https://v2.samehadaku.how/high-school-dxd-hero-episode-1/">1</a>',
+        ]);
+
+        $this->assertSame([], $provider->episodesFor([
+            'title' => 'Daily Lives of High School Boys',
+            'altTitles' => ['Danshi Koukousei no Nichijou'],
+        ]));
+    }
 }

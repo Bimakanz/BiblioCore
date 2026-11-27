@@ -131,7 +131,7 @@ class NimegamiSource
             return null;
         }
 
-        $cacheKey = 'nimegami_slug_v1_'.md5(implode('|', $titles));
+        $cacheKey = 'nimegami_slug_v2_'.md5(implode('|', $titles));
         $cached = Cache::get($cacheKey);
         if (is_string($cached)) {
             return $cached;
@@ -144,7 +144,7 @@ class NimegamiSource
             foreach ($this->searchQueries($title) as $query) {
                 foreach ($this->search($query) as $rank => $row) {
                     $hitTokens = $this->tokens($this->normaliseTitle($row['title']));
-                    $firstHitSharesAnchor = $rank === 0 && $anchor !== '' && in_array($anchor, $hitTokens, true);
+                    $firstHitSharesAnchor = $rank === 0 && $this->sharesStrongAnchor($anchor, $hitTokens);
                     foreach ($titles as $candidate) {
                         $score = $this->titleScore($candidate, $row['title']);
                         if ($firstHitSharesAnchor) {
@@ -248,7 +248,7 @@ class NimegamiSource
             return [];
         }
 
-        $cacheKey = 'nimegami_series_v1_'.$slug;
+        $cacheKey = 'nimegami_series_v2_'.$slug;
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             return $cached;
@@ -340,6 +340,36 @@ class NimegamiSource
             }
         }
 
+        // 3. Archive/Komikcast-sourced titles store worker-proxied playdesu URLs
+        //    inside the Next.js RSC server objects instead of /streaming/ routes.
+        $unescaped = str_replace(['\\"', '\\/'], ['"', '/'], $html);
+        if (preg_match_all('#\{[^{}]*"playUrl":"https?://[^"]+"[^{}]*\}#i', $unescaped, $rscObjects)) {
+            foreach ($rscObjects[0] as $json) {
+                $item = json_decode($json, true);
+                if (! is_array($item) || ($item['kind'] ?? '') !== 'episode') {
+                    continue;
+                }
+                $ep = (int) ($item['episode'] ?? 0);
+                if ($ep < 1) {
+                    continue;
+                }
+                $playUrl = trim((string) ($item['playUrl'] ?? $item['url'] ?? ''));
+                if (! $this->isSupportedPlayUrl($playUrl)) {
+                    continue;
+                }
+                $rawQuality = strtolower(trim((string) ($item['quality'] ?? 'auto')));
+                $quality = preg_match('/^\d{3,4}p$/', $rawQuality) ? $rawQuality : 'auto';
+                $rank = $this->qualityRank($quality) * 10 + (str_contains($playUrl, 'berkasdrive.com') ? 2 : 1);
+                if (! isset($byEpisode[$ep][$playUrl])) {
+                    $byEpisode[$ep][$playUrl] = [
+                        'path' => $playUrl,
+                        'quality' => $quality,
+                        'rank' => $rank,
+                    ];
+                }
+            }
+        }
+
         $episodes = [];
         foreach ($byEpisode as $ep => $candidates) {
             $list = array_values($candidates);
@@ -355,13 +385,24 @@ class NimegamiSource
         return $episodes;
     }
 
+    protected function isSupportedPlayUrl(string $url): bool
+    {
+        if (! preg_match('#^https?://#i', $url)) {
+            return false;
+        }
+
+        return str_contains($url, 'berkasdrive.com/')
+            || str_contains($url, '.workers.dev/')
+            || str_contains($url, 'desustream.');
+    }
+
     /**
      * @param  array<int, array{path: string, quality: string, rank: int}>  $candidates
      * @return array<string, mixed>|null
      */
     protected function resolveEpisode(string $slug, int $number, array $candidates): ?array
     {
-        $cacheKey = 'nimegami_stream_v1_'.md5($slug.'|'.$number);
+        $cacheKey = 'nimegami_stream_v2_'.md5($slug.'|'.$number);
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             return $cached;
@@ -370,24 +411,18 @@ class NimegamiSource
         $sources = [];
         $seen = [];
         foreach (array_slice($candidates, 0, 4) as $candidate) {
-            $html = $this->fetch($this->base.$candidate['path'], [
+            $targetUrl = preg_match('#^https?://#i', $candidate['path'])
+                ? $candidate['path']
+                : $this->base.$candidate['path'];
+            $html = $this->fetch($targetUrl, [
                 'Referer: '.$this->base.'/'.$slug.'/',
             ]);
             if ($html === null) {
                 continue;
             }
 
-            // Reject embedded third-party iframes: Burned-in mode promises a
-            // direct video file we control inside our own player.
-            if (preg_match('#\bdata-embedded="1"#i', $html)) {
-                continue;
-            }
-            if (! preg_match('#\bdata-src="([^"]+)"#i', $html, $m)) {
-                continue;
-            }
-
-            $src = trim(html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-            if ($src === '' || ! preg_match('#^https?://#i', $src) || isset($seen[$src])) {
+            $src = $this->extractDirectVideoSrc($html);
+            if ($src === null || isset($seen[$src])) {
                 continue;
             }
 
@@ -419,11 +454,43 @@ class NimegamiSource
             'audio_fallback' => null,
             'hard_sub' => true,
             'hard_sub_lang' => 'id',
+            'proxy_file' => true,
         ];
 
         Cache::put($cacheKey, $stream, 3600);
 
         return $stream;
+    }
+
+    protected function extractDirectVideoSrc(string $html): ?string
+    {
+        // Reject embedded third-party iframes on /streaming/ pages: Burned-in
+        // mode promises a direct video file we control inside our own player.
+        if (preg_match('#\bdata-embedded="1"#i', $html)) {
+            return null;
+        }
+
+        if (preg_match('#\bdata-src="([^"]+)"#i', $html, $m)) {
+            $src = trim(html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            if (preg_match('#^https?://#i', $src)) {
+                return $src;
+            }
+        }
+
+        // Worker-proxied playdesu wrappers render a direct <video id="video" src="...">
+        // pointing at a GoogleVideo / MP4 stream.
+        if (preg_match('#<(?:video|source)[^>]+src="([^"]+)"#i', $html, $m)) {
+            $src = trim(html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $lower = strtolower($src);
+            if (preg_match('#^https?://#i', $src)
+                && (str_contains($lower, '.mp4')
+                    || str_contains($lower, 'mime=video/mp4')
+                    || str_contains($lower, 'videoplayback'))) {
+                return $src;
+            }
+        }
+
+        return null;
     }
 
     protected function qualityRank(string $quality): int
