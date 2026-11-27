@@ -292,11 +292,20 @@ async function readPlayerState(page) {
         const errEl = document.querySelector('#tokenErrorText');
         const hasTokenError = Boolean(errEl && getComputedStyle(errEl).display !== 'none');
 
-        return { sources, hlsSrc, server, availableServers, hasTokenError };
+        return {
+            title: document.title || '',
+            href: location.href,
+            hasPlayer: Boolean(video),
+            sources,
+            hlsSrc,
+            server,
+            availableServers,
+            hasTokenError,
+        };
     });
 }
 
-async function resolveEpisodeInBrowser(episodeUrl) {
+async function resolveEpisodeInBrowser(episodeUrl, includeDebug = false) {
     const context = await getContext();
     const page = await context.newPage();
 
@@ -318,10 +327,11 @@ async function resolveEpisodeInBrowser(episodeUrl) {
             return route.continue();
         });
 
-        await page.goto(episodeUrl, {
+        const response = await page.goto(episodeUrl, {
             waitUntil: 'domcontentloaded',
             timeout: NAVIGATION_TIMEOUT_MS,
         });
+        const navStatus = response ? response.status() : null;
 
         await page
             .waitForFunction(
@@ -375,6 +385,23 @@ async function resolveEpisodeInBrowser(episodeUrl) {
         }
 
         if (!extracted) {
+            if (includeDebug) {
+                return {
+                    ok: false,
+                    error: 'No playable stream found on episode page',
+                    debug: {
+                        navStatus,
+                        title: state.title,
+                        href: state.href,
+                        hasPlayer: state.hasPlayer,
+                        hasTokenError: state.hasTokenError,
+                        server: state.server,
+                        availableServers: state.availableServers,
+                        sourcesCount: state.sources.length,
+                        hlsSrc: state.hlsSrc,
+                    },
+                };
+            }
             return null;
         }
 
@@ -391,7 +418,7 @@ async function resolveEpisodeInBrowser(episodeUrl) {
     }
 }
 
-async function resolveStream(episodeUrl) {
+async function resolveStream(episodeUrl, includeDebug = false) {
     const cached = streamCache.get(episodeUrl);
     if (cached && cached.expiresAt > Date.now()) {
         return cached.payload;
@@ -400,13 +427,13 @@ async function resolveStream(episodeUrl) {
         streamCache.delete(episodeUrl);
     }
 
-    if (inflight.has(episodeUrl)) {
+    if (!includeDebug && inflight.has(episodeUrl)) {
         return inflight.get(episodeUrl);
     }
 
     const promise = withPageSlot(async () => {
-        const result = await resolveEpisodeInBrowser(episodeUrl);
-        if (result) {
+        const result = await resolveEpisodeInBrowser(episodeUrl, includeDebug);
+        if (result && result.ok) {
             streamCache.set(episodeUrl, {
                 payload: result,
                 expiresAt: Date.now() + CACHE_TTL_MS,
@@ -417,7 +444,9 @@ async function resolveStream(episodeUrl) {
         inflight.delete(episodeUrl);
     });
 
-    inflight.set(episodeUrl, promise);
+    if (!includeDebug) {
+        inflight.set(episodeUrl, promise);
+    }
     return promise;
 }
 
@@ -510,9 +539,16 @@ export async function handleRequest(req, res) {
                 return sendJson(res, 400, { ok: false, error: 'Invalid or disallowed Kuramanime URL' });
             }
 
-            const payload = await resolveStream(targetUrl);
-            if (!payload) {
-                return sendJson(res, 404, { ok: false, error: 'No playable stream found on episode page' });
+            const includeDebug = reqUrl.searchParams.get('debug') === '1';
+            const payload = await resolveStream(targetUrl, includeDebug);
+            if (!payload || !payload.ok) {
+                return sendJson(
+                    res,
+                    404,
+                    payload && !payload.ok
+                        ? payload
+                        : { ok: false, error: 'No playable stream found on episode page' }
+                );
             }
 
             return sendJson(res, 200, payload);
