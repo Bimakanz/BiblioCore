@@ -4,9 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "node -e \"console.log('kuramanime-worker ready')\"",
     "start": "node server.js"
   },
   "dependencies": {
-    "playwright": "^1.58.0"
+    "@sparticuz/chromium": "^158.0.0",
+    "playwright-core": "^1.58.0"
   }
 }
