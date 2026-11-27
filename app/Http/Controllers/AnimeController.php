@@ -269,12 +269,17 @@ class AnimeController extends Controller
             return redirect()->route('anime.show', ['id' => $id, 'unavailable' => 1]);
         }
 
+        // Seed the title cache before the browser asks for the stream: a
+        // burned-in request is resolved by title, not by episode id.
+        $this->streamProvider->rememberTitles($anime);
+
         return response()->view('anime.watch', [
             'anime' => $anime,
             'episodeId' => $episodeId,
             'episodeNumber' => max(1, (int) $request->query('n', 1)),
             'audio' => $request->query('audio') === 'dub' ? 'dub' : 'sub',
             'dubAvailable' => $this->streamProvider->dubAvailable((int) preg_replace('/[^0-9]/', '', $id)),
+            'modes' => $this->streamProvider->modes(),
             'streamUrl' => route('anime.stream.json', ['id' => $id]) . '?ep=' . urlencode($episodeId),
             'episodesUrl' => route('anime.episodes.json', ['id' => $id]),
             'subtitleIdUrl' => route('anime.subtitle.id') . '?ep=' . urlencode($episodeId),
@@ -381,11 +386,14 @@ class AnimeController extends Controller
                 ],
                 'subtitles' => [],
                 'servers' => $this->streamProvider->servers(),
+                'modes' => $this->streamProvider->modes(),
                 'activeServer' => $stream['provider'] ?? $server,
                 'provider' => $stream['provider'] ?? null,
                 // The player hides the subtitle/offset controls for these:
                 // the text is already in the frames and cannot be changed.
                 'hardSub' => true,
+                'hardSubLang' => $stream['hard_sub_lang'] ?? null,
+                'hardsubFallback' => $stream['hardsub_fallback'] ?? null,
                 'audioFallback' => $stream['audio_fallback'] ?? null,
                 'intro' => $stream['intro'] ?? null,
                 'outro' => $stream['outro'] ?? null,
@@ -538,8 +546,12 @@ class AnimeController extends Controller
             ],
             'subtitles' => $subtitles,
             'servers' => $this->streamProvider->servers(),
+            'modes' => $this->streamProvider->modes(),
             'activeServer' => $stream['provider'] ?? $server,
             'provider' => $stream['provider'] ?? null,
+            'hardSub' => false,
+            'hardSubLang' => $stream['hard_sub_lang'] ?? null,
+            'hardsubFallback' => $stream['hardsub_fallback'] ?? null,
             'audioFallback' => $stream['audio_fallback'] ?? null,
             'intro' => $stream['intro'],
             'outro' => $stream['outro'],
@@ -576,12 +588,15 @@ class AnimeController extends Controller
             ],
             'subtitles' => [],
             'servers' => $this->streamProvider->servers(),
+            'modes' => $this->streamProvider->modes(),
             'activeServer' => $stream['provider'] ?? $server,
             'provider' => $stream['provider'] ?? null,
             // Samehadaku mirrors are hard-subtitled too, so the player keeps
             // the subtitle/offset controls out of the way when that is the
             // only copy left.
             'hardSub' => ! empty($stream['hard_sub']),
+            'hardSubLang' => $stream['hard_sub_lang'] ?? null,
+            'hardsubFallback' => $stream['hardsub_fallback'] ?? null,
             'audioFallback' => $stream['audio_fallback'] ?? null,
             'intro' => $stream['intro'],
             'outro' => $stream['outro'],

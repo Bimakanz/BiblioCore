@@ -337,6 +337,7 @@ class AnimeHeavenSource
             'server' => 'Hardsub EN',
             'audio_fallback' => null,
             'hard_sub' => true,
+            'hard_sub_lang' => 'en',
         ];
 
         // Gate links are stable per episode, but a rotated mirror is cheap to

@@ -310,6 +310,7 @@ class SamehadakuSource
                 'server' => 'Hardsub ID',
                 'audio_fallback' => null,
                 'hard_sub' => true,
+                'hard_sub_lang' => 'id',
             ];
             Cache::put($cacheKey, $stream, 3600);
 
@@ -333,6 +334,7 @@ class SamehadakuSource
             'server' => 'Hardsub ID',
             'audio_fallback' => null,
             'hard_sub' => true,
+            'hard_sub_lang' => 'id',
         ];
         Cache::put($cacheKey, $stream, 3600);
 

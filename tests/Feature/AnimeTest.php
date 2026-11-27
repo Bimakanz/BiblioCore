@@ -104,6 +104,7 @@ class AnimeTest extends TestCase
                 'hard_sub' => true,
             ]);
             $mock->shouldReceive('servers')->andReturn([]);
+            $mock->shouldReceive('modes')->andReturn([]);
         });
 
         $response = $this->getJson('/anime/al_1/stream.json?ep=watch%2Fkaa%2F1%2Fsub%2Fkaa-1&server=animeheaven');
@@ -146,6 +147,7 @@ class AnimeTest extends TestCase
 
         $this->mock(\App\Services\Anime\AnimeStreamProvider::class, function ($mock) {
             $mock->shouldReceive('servers')->andReturn([]);
+            $mock->shouldReceive('modes')->andReturn([]);
             $mock->shouldReceive('getStream')->andReturn([
                 'provider' => 'Samehadaku',
                 'referer' => null,
@@ -220,6 +222,7 @@ class AnimeTest extends TestCase
 
         $mock = \Mockery::mock(\App\Services\Anime\AnimeStreamProvider::class)->makePartial();
         $mock->shouldReceive('servers')->andReturn([]);
+        $mock->shouldReceive('modes')->andReturn([]);
         $mock->shouldReceive('getStream')->andReturn($stream);
         $this->app->instance(\App\Services\Anime\AnimeStreamProvider::class, $mock);
 
@@ -258,13 +261,22 @@ class AnimeTest extends TestCase
         $this->mock(\App\Services\Anime\AnimeStreamProvider::class, function ($mock) {
             $mock->shouldReceive('dubAvailable')->andReturn(false);
             $mock->shouldReceive('servers')->andReturn([]);
+            $mock->shouldReceive('rememberTitles')->andReturnNull();
+            $mock->shouldReceive('modes')->andReturn([
+                ['id' => '', 'label' => 'Standard', 'lang' => null, 'hardSub' => false],
+                ['id' => 'animeheaven', 'label' => 'Burned-in · EN', 'lang' => 'en', 'hardSub' => true],
+                ['id' => 'samehadaku', 'label' => 'Burned-in · ID', 'lang' => 'id', 'hardSub' => true],
+            ]);
         });
 
         $response = $this->get('/anime/al_1/watch?ep=watch%2Fkaa%2F1%2Fsub%2Fkaa-1&n=1');
 
         $response->assertOk()
-            // Burned-in copies are an automatic last resort, not a picker.
-            ->assertDontSee('id="versionBtn"', false)
+            // The player offers the standard stream and both burned-in
+            // libraries as an explicit choice.
+            ->assertSee('id="modeBtn"', false)
+            ->assertSee('Burned-in · EN', false)
+            ->assertSee('Burned-in · ID', false)
             ->assertSee('Burned-in', false)
             // The MP4 CDNs do not allow our origin through CORS, so the native
             // element must drop the anonymous mode or playback stays black.

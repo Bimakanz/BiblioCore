@@ -66,6 +66,10 @@
                     The dub for this episode is not available yet — playing the sub version.
                 </p>
 
+                <p id="modeNotice" class="hidden rounded-2xl border border-[#f5c99b] bg-[#fff7ed] px-4 py-2 text-xs font-semibold text-[#9a3412]">
+                    Burned-in subtitles are not available for this episode — playing the standard stream instead.
+                </p>
+
                 <div id="embedWarning" class="hidden items-start gap-3 rounded-2xl border border-[#f59e0b]/45 bg-[#fffbeb] px-4 py-3 text-xs text-[#92400e] shadow-sm">
                     <span class="material-symbols-rounded mt-0.5 flex-shrink-0 text-[19px] text-[#d97706]">warning</span>
                     <div class="min-w-0 flex-1 leading-relaxed">
@@ -92,6 +96,24 @@
                     </div>
 
                     <span class="hidden h-4 w-px bg-[#e0d9c8] sm:block"></span>
+
+                    {{-- Standard soft-sub playback or a copy with the subtitles
+                         already burned into the frames (EN / ID libraries). --}}
+                    @if(count($modes ?? []) > 1)
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[10px] font-bold uppercase tracking-wide text-[#84948a]">Mode</span>
+                            <div class="relative">
+                                <button type="button" id="modeBtn" class="pill-btn" title="Standard uses the soft-sub tracks (you can shift them). Burned-in plays a copy with the subtitles already inside the video."><span id="modeBtnLabel">Standard</span><span class="material-symbols-rounded text-[14px] opacity-60">expand_more</span></button>
+                                <div id="modeMenu" class="pill-menu hidden">
+                                    @foreach($modes as $mode)
+                                        <button type="button" class="pill-option {{ $mode['id'] === '' ? 'is-active' : '' }}" data-value="{{ $mode['id'] }}">{{ $mode['label'] }}</button>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+
+                        <span class="hidden h-4 w-px bg-[#e0d9c8] sm:block"></span>
+                    @endif
 
                     <div class="flex items-center gap-1.5">
                         <span class="text-[10px] font-bold uppercase tracking-wide text-[#84948a]">Quality</span>
@@ -253,6 +275,21 @@
         try { qualityPref = parseInt(localStorage.getItem('biblioanime_quality') || '-1', 10); if (isNaN(qualityPref)) qualityPref = -1; } catch (e) {}
         let audioValue = @js($audio) === 'dub' ? 'dub' : 'sub';
         let dubAvailable = @js($dubAvailable);
+        const MODE_IDS = @json(array_column($modes ?? [], 'id'));
+        // Burned-in mode: '' = the standard soft-sub chain, otherwise the id
+        // of a hardsub library ("animeheaven" / "samehadaku"). The URL wins so
+        // episode links and refreshes keep the choice.
+        let hardsubServer = '';
+        try {
+            const requestedMode = new URLSearchParams(location.search).get('server') || '';
+            const savedMode = localStorage.getItem('biblioanime_mode') || '';
+            hardsubServer = MODE_IDS.indexOf(requestedMode) !== -1
+                ? requestedMode
+                : (MODE_IDS.indexOf(savedMode) !== -1 ? savedMode : '');
+        } catch (e) { hardsubServer = ''; }
+        // Burned-in libraries are subtitled only: never carry the mode into a
+        // dub request.
+        if (audioValue === 'dub') hardsubServer = '';
 
         // Custom pill dropdowns: button + menu panel (no native <select>).
         function setupDropdown(btnId, menuId, labelId, onPick) {
@@ -319,12 +356,22 @@
             idle.classList.add.apply(idle.classList, AUDIO_OFF);
             dubBtn.disabled = !dubAvailable && audioValue !== 'dub';
             dubBtn.title = dubBtn.disabled ? 'Dub is not available for this title' : '';
+            // Burned-in copies only exist for the subtitled release.
+            const modeBtn = document.getElementById('modeBtn');
+            if (modeBtn) {
+                const burnedInDisabled = audioValue === 'dub';
+                modeBtn.disabled = burnedInDisabled;
+                modeBtn.title = burnedInDisabled
+                    ? 'Burned-in copies are subtitled only'
+                    : 'Standard uses the soft-sub tracks. Burned-in plays a copy with the subtitles already inside the video.';
+            }
         }
 
         function pickAudio(next) {
             if (next === audioValue) return;
             if (next === 'dub' && !dubAvailable) return;
             audioValue = next;
+            if (next === 'dub' && hardsubServer) setHardsubServer('');
             try { localStorage.setItem('biblioanime_audio', next); } catch (e) {}
             paintAudioButtons();
             goToAudio();
@@ -366,13 +413,73 @@
             applySubtitle(parseInt(v, 10));
         });
 
+        // "Mode" swaps between the soft-sub chain and a burned-in copy.
+        // The choice lives in the URL and in localStorage so episode links,
+        // refreshes and later visits keep it.
+        function rememberModeInUrl() {
+            try {
+                const url = new URL(location.href);
+                if (hardsubServer) url.searchParams.set('server', hardsubServer);
+                else url.searchParams.delete('server');
+                history.replaceState(null, '', url);
+            } catch (e) {}
+        }
+
+        function setHardsubServer(value) {
+            hardsubServer = MODE_IDS.indexOf(value) !== -1 ? value : '';
+            if (modeDropdown) modeDropdown.setActive(hardsubServer);
+            try { localStorage.setItem('biblioanime_mode', hardsubServer); } catch (e) {}
+            rememberModeInUrl();
+            refreshEpisodeLinks();
+        }
+
+        function showModeNotice(lang) {
+            const el = document.getElementById('modeNotice');
+            if (!el) return;
+            const name = lang === 'id' ? 'Indonesian' : 'English';
+            el.textContent = 'Burned-in ' + name
+                + ' subtitles are not available for this episode — playing the standard stream instead.';
+            el.classList.remove('hidden');
+        }
+
+        function hideModeNotice() {
+            const el = document.getElementById('modeNotice');
+            if (el) el.classList.add('hidden');
+        }
+
+        function burnedInLabel(lang) {
+            if (lang === 'id') return 'Burned-in · ID';
+            if (lang === 'en') return 'Burned-in · EN';
+            return 'Burned-in';
+        }
+
+        let modeDropdown = null;
+        if (document.getElementById('modeBtn')) {
+            modeDropdown = setupDropdown('modeBtn', 'modeMenu', 'modeBtnLabel', function (v) {
+                const next = MODE_IDS.indexOf(v) !== -1 ? v : '';
+                if (next === hardsubServer) return;
+                setHardsubServer(next);
+                hideModeNotice();
+                if (playMode === 'mp4' || playMode === 'embed') {
+                    try { video.pause(); } catch (e) {}
+                }
+                loadStream();
+            });
+            modeDropdown.setActive(hardsubServer);
+            if (hardsubServer) rememberModeInUrl();
+        }
+
         function streamUrl() {
-            return STREAM_URL;
+            if (!hardsubServer) return STREAM_URL;
+            return STREAM_URL
+                + (STREAM_URL.indexOf('?') === -1 ? '?' : '&')
+                + 'server=' + encodeURIComponent(hardsubServer);
         }
 
         function watchHref(epId, number, audio) {
             return '/anime/' + ANIME.id + '/watch?ep=' + encodeURIComponent(epId)
-                + '&n=' + number + '&audio=' + encodeURIComponent(audio);
+                + '&n=' + number + '&audio=' + encodeURIComponent(audio)
+                + (hardsubServer ? '&server=' + encodeURIComponent(hardsubServer) : '');
         }
 
         // The episode list is built once; keep its links in sync with the
@@ -382,6 +489,10 @@
                 const audio = a.dataset.epAudio || audioValue;
                 a.href = watchHref(a.dataset.epId, a.dataset.epN, audio);
             });
+            // Auto-next reads this once when the list loads; keep it in sync
+            // with the current mode too.
+            const nextBtn = document.getElementById('nextEpBtn');
+            if (nextBtn && !nextBtn.classList.contains('hidden')) nextEpisodeUrl = nextBtn.href;
         }
 
         let hls = null;
@@ -798,6 +909,7 @@
 
         async function loadStream() {
             hideOverlays();
+            hideModeNotice();
             const oldFrame = document.getElementById('embedFrame');
             if (oldFrame) oldFrame.remove();
             if (video.currentTime > 5) resumeOverride = Math.floor(video.currentTime);
@@ -822,13 +934,16 @@
             outro = data.outro || outro;
             const notice = document.getElementById('audioNotice');
             if (notice) notice.classList.toggle('hidden', data.audioFallback !== 'sub');
+            // The requested burned-in language was not found for this episode:
+            // say so instead of silently showing the soft-sub stream.
+            if (data.hardsubFallback) showModeNotice(data.hardsubFallback);
             if (data.source.type === 'embed') {
                 buildSubtitleOptions([]);
                 if (data.hardSub) {
                     subtitleDropdown.btn.disabled = true;
                     subtitleDropdown.btn.title = 'Subtitles are built into this video';
                     const subLabel = document.getElementById('subtitleBtnLabel');
-                    if (subLabel) subLabel.textContent = 'Burned-in';
+                    if (subLabel) subLabel.textContent = burnedInLabel(data.hardSubLang);
                 }
                 playEmbed(data.source.url);
                 loadingEl.style.display = 'none';
@@ -838,7 +953,7 @@
             // in the frames: no manifest, no tracks, no offset.
             if (data.source.type === 'mp4') {
                 buildSubtitleOptions([]);
-                attachFile(data.source.url);
+                attachFile(data.source.url, data.hardSubLang);
                 loadingEl.style.display = 'none';
                 return;
             }
@@ -982,7 +1097,7 @@
 
         // Progressive MP4 with burned-in subtitles (AnimeHeaven, Samehadaku).
         // Played by the native element: hls.js only understands playlists.
-        function attachFile(src) {
+        function attachFile(src, lang) {
             if (hls) { try { hls.destroy(); } catch (e) {} hls = null; }
             playMode = 'mp4';
             stopEmbedClock();
@@ -1001,7 +1116,7 @@
             subtitleDropdown.btn.disabled = true;
             subtitleDropdown.btn.title = 'Subtitles are built into this video';
             const subLabel = document.getElementById('subtitleBtnLabel');
-            if (subLabel) subLabel.textContent = 'Burned-in';
+            if (subLabel) subLabel.textContent = burnedInLabel(lang);
             video.src = src;
             video.play().catch(function () {});
         }

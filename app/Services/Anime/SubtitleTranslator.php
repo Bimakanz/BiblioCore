@@ -2,6 +2,7 @@
 
 namespace App\Services\Anime;
 
+use App\Services\NineRouter\NineRouterClient;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -89,7 +90,82 @@ class SubtitleTranslator
             }
         }
 
+        // Free Google endpoint is cheap but rate-limited. If it failed or
+        // returned a misaligned chunk, let the 9Router gateway try the same
+        // chunk before we give up on the track.
+        $ai = $this->translateChunkWithNineRouter($lines, $sourceLang, $targetLang);
+        if ($ai !== null) {
+            return $ai;
+        }
+
         return $lines;
+    }
+
+    /**
+     * Translate one chunk through 9Router. The model is asked for a JSON
+     * array with exactly one string per input line, so the cue count (and
+     * therefore the timing) can be verified before it is used.
+     *
+     * @param  array<int, string>  $lines
+     * @return array<int, string>|null
+     */
+    protected function translateChunkWithNineRouter(array $lines, string $sourceLang, string $targetLang): ?array
+    {
+        if (! config('ninerouter.translation.enabled')) {
+            return null;
+        }
+
+        /** @var NineRouterClient $client */
+        $client = app(NineRouterClient::class);
+        if (! $client->enabled()) {
+            return null;
+        }
+
+        $names = [
+            'en' => 'English',
+            'id' => 'Indonesian',
+            'auto' => 'the source language detected in the text',
+        ];
+        $from = $names[$sourceLang] ?? $sourceLang;
+        $to = $names[$targetLang] ?? $targetLang;
+
+        $numbered = '';
+        foreach ($lines as $i => $line) {
+            $numbered .= ($i + 1) . '. ' . ($line === '' ? '(empty)' : $line) . "\n";
+        }
+
+        $content = $client->chat([
+            [
+                'role' => 'system',
+                'content' => 'You are a subtitle translator. Translate every line from ' . $from . ' to ' . $to
+                    . '. Preserve the original order and meaning. Reply with ONLY a JSON array of strings, '
+                    . 'with exactly one translated string per input line. No markdown, no numbering, no explanations.',
+            ],
+            ['role' => 'user', 'content' => $numbered],
+        ], (string) config('ninerouter.translation.model'), ['temperature' => 0.2]);
+
+        if ($content === null) {
+            return null;
+        }
+
+        // Some models wrap the JSON in a code fence.
+        $content = trim((string) preg_replace('/^```(?:json)?\s*|\s*```$/i', '', trim($content)));
+        $data = json_decode($content, true);
+        if (! is_array($data) || ! array_is_list($data) || count($data) !== count($lines)) {
+            Log::warning('9Router subtitle translation returned a misaligned chunk');
+
+            return null;
+        }
+
+        $out = [];
+        foreach ($data as $line) {
+            if (! is_string($line)) {
+                return null;
+            }
+            $out[] = trim($line);
+        }
+
+        return $out;
     }
 
     /**

@@ -216,6 +216,66 @@ class AnimeExtraSources
     }
 
     /**
+     * Burned-in playback modes the player can offer, in display order.
+     *
+     * "Standard" is the normal soft-sub chain; the rest are single MP4 files
+     * with the subtitles already inside the frames. A disabled source (empty
+     * *_URL env) is simply not offered.
+     *
+     * @return array<int, array{id: string, label: string, lang: string|null, hardSub: bool}>
+     */
+    public function hardsubModes(): array
+    {
+        $modes = [[
+            'id' => '',
+            'label' => 'Standard',
+            'lang' => null,
+            'hardSub' => false,
+        ]];
+
+        if ($this->animeHeaven->enabled()) {
+            $modes[] = [
+                'id' => 'animeheaven',
+                'label' => 'Burned-in · EN',
+                'lang' => 'en',
+                'hardSub' => true,
+            ];
+        }
+
+        if ($this->samehadaku->enabled()) {
+            $modes[] = [
+                'id' => 'samehadaku',
+                'label' => 'Burned-in · ID',
+                'lang' => 'id',
+                'hardSub' => true,
+            ];
+        }
+
+        return $modes;
+    }
+
+    /**
+     * Metadata for one burned-in mode id ("animeheaven" / "samehadaku").
+     *
+     * @return array{id: string, label: string, lang: string|null, hardSub: bool}|null
+     */
+    public function hardsubMode(?string $id): ?array
+    {
+        $id = trim((string) $id);
+        if ($id === '') {
+            return null;
+        }
+
+        foreach ($this->hardsubModes() as $mode) {
+            if ($mode['id'] === $id) {
+                return $mode;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Last-resort hard-subtitled copy of one episode: English first (the UI
      * is English), then Indonesian. Returns null when neither carries it.
      *

@@ -200,4 +200,80 @@ HTML;
         $this->assertSame('mp4', $stream['kind']);
         $this->assertSame('AnimeHeaven', $stream['provider']);
     }
+
+    public function test_it_offers_both_burned_in_libraries_as_player_modes(): void
+    {
+        $modes = (new AnimeStreamProvider())->modes();
+        $byId = [];
+        foreach ($modes as $mode) {
+            $byId[$mode['id']] = $mode;
+        }
+
+        $this->assertArrayHasKey('', $byId);
+        $this->assertSame('en', $byId['animeheaven']['lang']);
+        $this->assertSame('id', $byId['samehadaku']['lang']);
+        $this->assertSame('Burned-in · EN', $byId['animeheaven']['label']);
+        $this->assertSame('Burned-in · ID', $byId['samehadaku']['label']);
+        $this->assertTrue($byId['animeheaven']['hardSub']);
+        $this->assertFalse($byId['']['hardSub']);
+    }
+
+    public function test_a_forced_burned_in_mode_returns_the_matching_file(): void
+    {
+        Cache::put('anime_titles_7', ['Some Show'], 3600);
+
+        $extra = new class extends AnimeExtraSources
+        {
+            public function animeHeavenStreamFor(array $anime, int $number): ?array
+            {
+                return [
+                    'sources' => [['url' => 'https://ci.animeheaven.me/video.mp4?x', 'quality' => 'auto']],
+                    'subtitles' => [],
+                    'kind' => 'mp4',
+                    'provider' => 'AnimeHeaven',
+                    'hard_sub' => true,
+                    'hard_sub_lang' => 'en',
+                ];
+            }
+        };
+
+        $stream = (new AnimeStreamProvider($extra))->getStream('watch/kaa/7/sub/kaa-1', 'animeheaven');
+
+        $this->assertNotNull($stream);
+        $this->assertSame('mp4', $stream['kind']);
+        $this->assertSame('en', $stream['hard_sub_lang']);
+        $this->assertArrayNotHasKey('hardsub_fallback', $stream);
+    }
+
+    public function test_a_missing_burned_in_copy_falls_back_to_the_standard_stream(): void
+    {
+        Cache::put('anime_titles_9', ['Some Show'], 3600);
+
+        $extra = new class extends AnimeExtraSources
+        {
+            public function animeHeavenStreamFor(array $anime, int $number): ?array
+            {
+                return null;
+            }
+        };
+
+        $provider = new class($extra) extends AnimeStreamProvider
+        {
+            protected function fetchStream(string $watchPath): ?array
+            {
+                return [
+                    'sources' => [['url' => 'https://example.com/master.m3u8', 'quality' => 'auto']],
+                    'subtitles' => [],
+                    'kind' => 'hls',
+                    'provider' => 'anikoto',
+                ];
+            }
+        };
+
+        $stream = $provider->getStream('watch/anikoto/9/sub/anikoto-1', 'animeheaven');
+
+        $this->assertNotNull($stream);
+        $this->assertSame('hls', $stream['kind']);
+        $this->assertSame('en', $stream['hardsub_fallback']);
+    }
 }

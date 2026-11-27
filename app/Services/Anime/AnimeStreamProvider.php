@@ -581,28 +581,36 @@ $headers = ['Accept: application/json'];
 
     public function getStream(string $watchPath, ?string $providerOverride = null): ?array
     {
-        // Episodes that came from a secondary source route back to it.
-        $extraStream = $this->extraStream($watchPath);
-        if ($extraStream !== null) {
-            return $extraStream;
-        }
-
-        // Force a hard-subtitled copy: "?server=animeheaven" or
-        // "?server=samehadaku" on the stream endpoint.
-        if ($providerOverride !== null && in_array($providerOverride, ['animeheaven', 'samehadaku'], true)) {
-            $forced = $this->parseWatchPath($watchPath);
-            if ($forced) {
-                $hardsub = $this->hardsubFor($forced['anilistId'], (int) $forced['number'], $providerOverride);
+        // A burned-in mode is an explicit user choice: resolve that copy
+        // before anything else, so an episode id that already points at a
+        // different hardsub library cannot silently win.
+        $forced = $this->hardsubMode($providerOverride);
+        if ($forced !== null) {
+            $forcedPath = $this->parseWatchPath($watchPath);
+            if ($forcedPath) {
+                $hardsub = $this->hardsubFor($forcedPath['anilistId'], (int) $forcedPath['number'], $forced['id']);
                 if ($hardsub !== null) {
+                    $hardsub['hard_sub_lang'] = $forced['lang'];
+
                     return $hardsub;
                 }
             }
         }
 
+        // Episodes that came from a secondary source route back to it.
+        $extraStream = $this->extraStream($watchPath);
+        if ($extraStream !== null) {
+            if ($forced !== null && ($extraStream['hard_sub_lang'] ?? null) !== $forced['lang']) {
+                $extraStream['hardsub_fallback'] = $forced['lang'];
+            }
+
+            return $extraStream;
+        }
+
         $parsed = $this->parseWatchPath($watchPath);
         $audio = $parsed['audio'] ?? 'sub';
 
-        if ($providerOverride && $parsed && $providerOverride !== $parsed['provider']) {
+        if ($forced === null && $providerOverride && $parsed && $providerOverride !== $parsed['provider']) {
             $alt = $this->alternativePath($parsed['anilistId'], $parsed['number'], $providerOverride, $audio);
             if ($alt) {
                 $watchPath = $alt;
@@ -610,7 +618,7 @@ $headers = ['Accept: application/json'];
             }
         }
 
-        $cacheKey = 'anivexa_stream_v6_' . md5($watchPath);
+        $cacheKey = 'anivexa_stream_v7_' . md5($watchPath . '|' . ($providerOverride ?? ''));
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             return $cached;
@@ -683,6 +691,13 @@ $headers = ['Accept: application/json'];
         // the chain shipped an unusable or non-English subtitle track.
         if (! $stream && $parsed && $audio === 'sub') {
             $stream = $this->hardsubFor($parsed['anilistId'], (int) $parsed['number']);
+        }
+
+        // The requested burned-in language was not available and the player
+        // is getting something else. Flag it so the UI can say so instead of
+        // pretending the subtitles are burned in.
+        if ($stream && $forced !== null && ($stream['hard_sub_lang'] ?? null) !== $forced['lang']) {
+            $stream['hardsub_fallback'] = $forced['lang'];
         }
 
         if ($stream) {
@@ -913,6 +928,42 @@ $headers = ['Accept: application/json'];
     public function servers(): array
     {
         return $this->priority;
+    }
+
+    /**
+     * Playback modes offered by the player: the standard soft-sub chain plus
+     * every burned-in library that is enabled.
+     *
+     * @return array<int, array{id: string, label: string, lang: string|null, hardSub: bool}>
+     */
+    public function modes(): array
+    {
+        return $this->extra->hardsubModes();
+    }
+
+    /**
+     * Cache every known title of a catalogue row so a burned-in request can
+     * find its copy by title. Called while rendering the watch page, before
+     * the browser asks for the stream.
+     *
+     * @param  array<string, mixed>  $anime
+     */
+    public function rememberTitles(array $anime): void
+    {
+        $id = (int) ($anime['anilistId'] ?? preg_replace('/[^0-9]/', '', (string) ($anime['id'] ?? '')));
+        if ($id > 0) {
+            $this->extra->rememberTitles($id, $anime);
+        }
+    }
+
+    /**
+     * Metadata for a burned-in mode id, or null when the id is not one.
+     *
+     * @return array{id: string, label: string, lang: string|null, hardSub: bool}|null
+     */
+    protected function hardsubMode(?string $id): ?array
+    {
+        return $this->extra->hardsubMode($id);
     }
 }
 
