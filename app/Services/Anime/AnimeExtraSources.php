@@ -31,13 +31,17 @@ class AnimeExtraSources
     /** English hard-subtitled MP4 library. */
     protected AnimeHeavenSource $animeHeaven;
 
-    /** Indonesian hard-subtitled MP4 library. */
+    /** Indonesian hard-subtitled MP4 library (primary, ~3,000+ titles). */
+    protected NimegamiSource $nimegami;
+
+    /** Indonesian hard-subtitled MP4 library (fallback). */
     protected SamehadakuSource $samehadaku;
 
     public function __construct(
         ?AnikotoSource $anikoto = null,
         ?AnimeHeavenSource $animeHeaven = null,
-        ?SamehadakuSource $samehadaku = null
+        ?SamehadakuSource $samehadaku = null,
+        ?NimegamiSource $nimegami = null
     ) {
         // HiAnime shut down in 2026 and the old public wrapper now answers
         // 503 "Service Suspended". The code path stays available for a
@@ -52,6 +56,7 @@ class AnimeExtraSources
         }
         $this->anikoto = $anikoto ?? new AnikotoSource();
         $this->animeHeaven = $animeHeaven ?? new AnimeHeavenSource();
+        $this->nimegami = $nimegami ?? new NimegamiSource();
         $this->samehadaku = $samehadaku ?? new SamehadakuSource();
     }
 
@@ -172,6 +177,32 @@ class AnimeExtraSources
     }
 
     /**
+     * Indonesian hard-subtitled episodes (Nimegami MP4 library).
+     *
+     * @param  array<string, mixed>  $anime
+     * @return array<int, array<string, mixed>>
+     */
+    public function nimegamiEpisodes(array $anime): array
+    {
+        return $this->nimegami->episodesFor($anime);
+    }
+
+    /** Resolve an "ng|..." reference into direct MP4 sources. */
+    public function nimegamiStream(string $reference): ?array
+    {
+        return $this->nimegami->streamFor($reference);
+    }
+
+    /**
+     * @param  array<string, mixed>  $anime
+     * @return array<string, mixed>|null
+     */
+    public function nimegamiStreamFor(array $anime, int $number): ?array
+    {
+        return $this->nimegami->streamForEpisode($anime, $number);
+    }
+
+    /**
      * Indonesian hard-subtitled episodes (MP4, subtitles burned in).
      *
      * @param  array<string, mixed>  $anime
@@ -242,9 +273,9 @@ class AnimeExtraSources
             ];
         }
 
-        if ($this->samehadaku->enabled()) {
+        if ($this->nimegami->enabled() || $this->samehadaku->enabled()) {
             $modes[] = [
-                'id' => 'samehadaku',
+                'id' => 'id',
                 'label' => 'Burned-in · ID',
                 'lang' => 'id',
                 'hardSub' => true,
@@ -255,7 +286,8 @@ class AnimeExtraSources
     }
 
     /**
-     * Metadata for one burned-in mode id ("animeheaven" / "samehadaku").
+     * Metadata for one burned-in mode id ("animeheaven", "id", "nimegami" or
+     * "samehadaku").
      *
      * @return array{id: string, label: string, lang: string|null, hardSub: bool}|null
      */
@@ -272,12 +304,31 @@ class AnimeExtraSources
             }
         }
 
+        if ($id === 'nimegami' && $this->nimegami->enabled()) {
+            return [
+                'id' => 'nimegami',
+                'label' => 'Burned-in · ID',
+                'lang' => 'id',
+                'hardSub' => true,
+            ];
+        }
+
+        if ($id === 'samehadaku' && $this->samehadaku->enabled()) {
+            return [
+                'id' => 'samehadaku',
+                'label' => 'Burned-in · ID',
+                'lang' => 'id',
+                'hardSub' => true,
+            ];
+        }
+
         return null;
     }
 
     /**
      * Last-resort hard-subtitled copy of one episode: English first (the UI
-     * is English), then Indonesian. Returns null when neither carries it.
+     * is English), then Indonesian (Nimegami, then Samehadaku). Returns null
+     * when none of them carries it.
      *
      * @return array<string, mixed>|null
      */
@@ -297,7 +348,7 @@ class AnimeExtraSources
             'altTitles' => array_values(array_slice($titles, 1)),
         ];
 
-        foreach ([$this->animeHeaven, $this->samehadaku] as $source) {
+        foreach ([$this->animeHeaven, $this->nimegami, $this->samehadaku] as $source) {
             $stream = $source->streamForEpisode($anime, $number);
             if (is_array($stream)) {
                 return $stream;

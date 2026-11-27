@@ -281,8 +281,12 @@
         // episode links and refreshes keep the choice.
         let hardsubServer = '';
         try {
-            const requestedMode = new URLSearchParams(location.search).get('server') || '';
-            const savedMode = localStorage.getItem('biblioanime_mode') || '';
+            const normalizeMode = function (m) {
+                if ((m === 'samehadaku' || m === 'nimegami') && MODE_IDS.indexOf('id') !== -1) return 'id';
+                return m;
+            };
+            const requestedMode = normalizeMode(new URLSearchParams(location.search).get('server') || '');
+            const savedMode = normalizeMode(localStorage.getItem('biblioanime_mode') || '');
             hardsubServer = MODE_IDS.indexOf(requestedMode) !== -1
                 ? requestedMode
                 : (MODE_IDS.indexOf(savedMode) !== -1 ? savedMode : '');

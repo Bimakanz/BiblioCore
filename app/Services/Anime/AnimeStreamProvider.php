@@ -369,12 +369,14 @@ $headers = ['Accept: application/json'];
         // Still nothing playable: fall back to a hard-subtitled file. These
         // are single MP4s with the subtitles burned into the frames, so they
         // work even when every soft-sub provider is missing an English track.
-        // Dub requests are skipped because both libraries are sub-only.
+        // Dub requests are skipped because all hardsub libraries are sub-only.
         if (empty($byNumber) && $audio === 'sub') {
-            foreach (['animeheaven', 'samehadaku'] as $source) {
-                $list = $source === 'animeheaven'
-                    ? $this->extra->animeHeavenEpisodes($anime ?? [], $anilistId)
-                    : $this->extra->samehadakuEpisodes($anime ?? []);
+            foreach (['animeheaven', 'nimegami', 'samehadaku'] as $source) {
+                $list = match ($source) {
+                    'animeheaven' => $this->extra->animeHeavenEpisodes($anime ?? [], $anilistId),
+                    'nimegami' => $this->extra->nimegamiEpisodes($anime ?? []),
+                    default => $this->extra->samehadakuEpisodes($anime ?? []),
+                };
                 foreach ($list as $ep) {
                     if (! isset($byNumber[$ep['number']])) {
                         $byNumber[$ep['number']] = $ep;
@@ -550,6 +552,7 @@ $headers = ['Accept: application/json'];
             && ! str_starts_with($reference, 'cs|')
             && ! str_starts_with($reference, 'ak|')
             && ! str_starts_with($reference, 'ah|')
+            && ! str_starts_with($reference, 'ng|')
             && ! str_starts_with($reference, 'sd|')) {
             return null;
         }
@@ -564,6 +567,8 @@ $headers = ['Accept: application/json'];
             $stream = $this->extra->anikotoStream($reference);
         } elseif (str_starts_with($reference, 'ah|')) {
             $stream = $this->extra->animeHeavenStream($reference);
+        } elseif (str_starts_with($reference, 'ng|')) {
+            $stream = $this->extra->nimegamiStream($reference);
         } elseif (str_starts_with($reference, 'sd|')) {
             $stream = $this->extra->samehadakuStream($reference);
         } elseif (str_starts_with($reference, 'hn|')) {
@@ -728,13 +733,34 @@ $headers = ['Accept: application/json'];
             'altTitles' => array_values(array_slice($titles, 1)),
         ];
 
-        if ($source === 'animeheaven' || $source === 'samehadaku') {
-            $stream = $source === 'animeheaven'
-                ? $this->extra->animeHeavenStreamFor($anime, $number)
+        if ($source === 'animeheaven') {
+            $stream = $this->extra->animeHeavenStreamFor($anime, $number);
+
+            return is_array($stream) && ($stream['kind'] ?? '') === 'mp4' ? $stream : null;
+        }
+
+        if ($source === 'id') {
+            // Walk every Indonesian burned-in library until one yields a
+            // direct MP4 (refusing iframe embeds so "Burned-in" never lies).
+            foreach (['nimegami', 'samehadaku'] as $idSource) {
+                $stream = $idSource === 'nimegami'
+                    ? $this->extra->nimegamiStreamFor($anime, $number)
+                    : $this->extra->samehadakuStreamFor($anime, $number);
+                if (is_array($stream) && ($stream['kind'] ?? '') === 'mp4') {
+                    return $stream;
+                }
+            }
+
+            return null;
+        }
+
+        if ($source === 'nimegami' || $source === 'samehadaku') {
+            $stream = $source === 'nimegami'
+                ? $this->extra->nimegamiStreamFor($anime, $number)
                 : $this->extra->samehadakuStreamFor($anime, $number);
 
             // The picker promises a file with the subtitles burned into the
-            // frames. A samehadaku iframe mirror may well be a hardsub too,
+            // frames. An iframe mirror may well be a hardsub too,
             // but it is a third-party page, not something we can call
             // "Burned-in" — refuse it rather than show the wrong thing.
             return is_array($stream) && ($stream['kind'] ?? '') === 'mp4' ? $stream : null;

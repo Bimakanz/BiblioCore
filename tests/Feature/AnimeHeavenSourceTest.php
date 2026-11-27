@@ -211,9 +211,9 @@ HTML;
 
         $this->assertArrayHasKey('', $byId);
         $this->assertSame('en', $byId['animeheaven']['lang']);
-        $this->assertSame('id', $byId['samehadaku']['lang']);
+        $this->assertSame('id', $byId['id']['lang']);
         $this->assertSame('Burned-in · EN', $byId['animeheaven']['label']);
-        $this->assertSame('Burned-in · ID', $byId['samehadaku']['label']);
+        $this->assertSame('Burned-in · ID', $byId['id']['label']);
         $this->assertTrue($byId['animeheaven']['hardSub']);
         $this->assertFalse($byId['']['hardSub']);
     }

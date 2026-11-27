@@ -341,7 +341,7 @@ class AnimeController extends Controller
 
             $vKey = 'anime_mp4_ok_' . md5($url);
             if (! Cache::get($vKey) && ! app()->runningUnitTests()) {
-                if (! $this->mp4Reachable($url)) {
+                if (! $this->mp4Reachable($url, $stream['referer'] ?? null)) {
                     $this->markUnavailableWhenNoEpisodes($id);
 
                     return response()->json([
@@ -355,13 +355,14 @@ class AnimeController extends Controller
 
             $this->animeService->markAvailable((int) preg_replace('/[^0-9]/', '', $id));
 
-            // AnimeHeaven's file CDN rejects cross-site media requests with
-            // HTTP 403 (it checks Sec-Fetch-Site), so the browser cannot open
-            // the file directly even though a server-side fetch succeeds. Route
-            // its MP4s through our range-capable proxy instead.
+            // AnimeHeaven's and Nimegami's (Berkasdrive) file CDNs reject
+            // cross-site media requests with HTTP 403 (checking Sec-Fetch-Site
+            // or Referer), so the browser cannot open the file directly even
+            // though a server-side fetch succeeds. Route those MP4s through our
+            // range-capable proxy instead.
             $playbackUrl = $url;
             $host = strtolower((string) parse_url($url, PHP_URL_HOST));
-            if (str_ends_with($host, 'animeheaven.me')) {
+            if (str_ends_with($host, 'animeheaven.me') || str_ends_with($host, 'berkasdrive.com')) {
                 $entry = ['url' => $url, 'referer' => $stream['referer'] ?? null];
                 // Stateless signed token: each range request may land on a
                 // different serverless container, so it cannot rely on /tmp.
@@ -1249,7 +1250,7 @@ class AnimeController extends Controller
      * Cheap liveness check for a hard-subtitled MP4: HEAD first, then a small
      * ranged GET for CDNs that reject HEAD.
      */
-    protected function mp4Reachable(string $url): bool
+    protected function mp4Reachable(string $url, ?string $referer = null): bool
     {
         $parts = parse_url($url);
         $scheme = strtolower($parts['scheme'] ?? '');
@@ -1272,9 +1273,15 @@ class AnimeController extends Controller
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
             curl_setopt($ch, CURLOPT_MAXREDIRS, 2);
             curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+            $headers = $headOnly ? [] : ['Accept: video/*,*/*'];
+            if ($referer !== null && $referer !== '') {
+                $headers[] = 'Referer: ' . $referer;
+            }
+            if (!empty($headers)) {
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            }
             if (!$headOnly) {
                 curl_setopt($ch, CURLOPT_RANGE, '0-1024');
-                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: video/*,*/*']);
             }
             curl_exec($ch);
             $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);

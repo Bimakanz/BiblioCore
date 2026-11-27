@@ -265,7 +265,7 @@ class AnimeTest extends TestCase
             $mock->shouldReceive('modes')->andReturn([
                 ['id' => '', 'label' => 'Standard', 'lang' => null, 'hardSub' => false],
                 ['id' => 'animeheaven', 'label' => 'Burned-in · EN', 'lang' => 'en', 'hardSub' => true],
-                ['id' => 'samehadaku', 'label' => 'Burned-in · ID', 'lang' => 'id', 'hardSub' => true],
+                ['id' => 'id', 'label' => 'Burned-in · ID', 'lang' => 'id', 'hardSub' => true],
             ]);
         });
 
