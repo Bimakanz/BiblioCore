@@ -298,6 +298,7 @@ async function readPlayerState(page) {
             : [];
         const errEl = document.querySelector('#tokenErrorText');
         const hasTokenError = Boolean(errEl && getComputedStyle(errEl).display !== 'none');
+        const bodyText = (document.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 220);
 
         return {
             title: document.title || '',
@@ -308,6 +309,7 @@ async function readPlayerState(page) {
             server,
             availableServers,
             hasTokenError,
+            bodyText,
         };
     });
 }
@@ -406,6 +408,7 @@ async function resolveEpisodeInBrowser(episodeUrl, includeDebug = false) {
                         availableServers: state.availableServers,
                         sourcesCount: state.sources.length,
                         hlsSrc: state.hlsSrc,
+                        bodyText: state.bodyText,
                     },
                 };
             }
