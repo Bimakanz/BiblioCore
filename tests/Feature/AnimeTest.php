@@ -282,4 +282,47 @@ class AnimeTest extends TestCase
             // element must drop the anonymous mode or playback stays black.
             ->assertSee("video.removeAttribute('crossorigin')", false);
     }
+
+    public function test_stream_json_seeds_titles_when_cache_is_cold_and_never_caches_hardsub_fallback(): void
+    {
+        \Illuminate\Support\Facades\Cache::flush();
+
+        $this->mock(\App\Services\Anime\AnimeService::class, function ($mock) {
+            $mock->shouldReceive('getDetail')->with('al_11843')->once()->andReturn([
+                'id' => 'al_11843',
+                'anilistId' => 11843,
+                'title' => 'Daily Lives of High School Boys',
+                'altTitles' => ['Danshi Koukousei no Nichijou'],
+            ]);
+            $mock->shouldReceive('markAvailable')->andReturnNull();
+        });
+
+        $this->mock(\App\Services\Anime\AnimeStreamProvider::class, function ($mock) {
+            $mock->shouldReceive('rememberTitles')->once()->andReturnNull();
+            $mock->shouldReceive('getStream')
+                ->with('ak|11843|12|sub', 'id', 11843, 12)
+                ->once()
+                ->andReturn([
+                    'provider' => 'anikoto',
+                    'referer' => null,
+                    'sources' => [['url' => 'https://example.com/master.m3u8', 'quality' => 'auto']],
+                    'subtitles' => [],
+                    'kind' => 'hls',
+                    'intro' => null,
+                    'outro' => null,
+                    'hardsub_fallback' => 'id',
+                ]);
+            $mock->shouldReceive('servers')->andReturn([]);
+            $mock->shouldReceive('modes')->andReturn([]);
+        });
+
+        \Illuminate\Support\Facades\Cache::put('anime_verified_'.md5('ak|11843|12|sub|anikoto'), 1, 3600);
+
+        $response = $this->getJson('/anime/al_11843/stream.json?ep=ak%7C11843%7C12%7Csub&n=12&server=id');
+
+        $response->assertOk()
+            ->assertJsonPath('hardsubFallback', 'id');
+
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+    }
 }

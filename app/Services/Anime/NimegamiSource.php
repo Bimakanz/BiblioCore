@@ -520,7 +520,10 @@ class NimegamiSource
             CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
             CURLOPT_ENCODING => '',
             CURLOPT_USERAGENT => self::UA,
-            CURLOPT_HTTPHEADER => array_merge(['Accept: text/html,application/xhtml+xml'], $headers),
+            CURLOPT_HTTPHEADER => array_merge([
+                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language: id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+            ], $headers),
         ]);
 
         $body = curl_exec($ch);

@@ -588,16 +588,22 @@ $headers = ['Accept: application/json'];
         return $stream;
     }
 
-    public function getStream(string $watchPath, ?string $providerOverride = null): ?array
-    {
+    public function getStream(
+        string $watchPath,
+        ?string $providerOverride = null,
+        ?int $anilistId = null,
+        ?int $episodeNumber = null
+    ): ?array {
         // A burned-in mode is an explicit user choice: resolve that copy
         // before anything else, so an episode id that already points at a
         // different hardsub library cannot silently win.
         $forced = $this->hardsubMode($providerOverride);
         if ($forced !== null) {
             $forcedPath = $this->parseWatchPath($watchPath);
-            if ($forcedPath) {
-                $hardsub = $this->hardsubFor($forcedPath['anilistId'], (int) $forcedPath['number'], $forced['id']);
+            $forcedId = $forcedPath['anilistId'] ?? $anilistId;
+            $forcedEp = isset($forcedPath['number']) ? (int) $forcedPath['number'] : $episodeNumber;
+            if ($forcedId && $forcedEp && $forcedEp >= 1) {
+                $hardsub = $this->hardsubFor((int) $forcedId, (int) $forcedEp, $forced['id']);
                 if ($hardsub !== null) {
                     $hardsub['hard_sub_lang'] = $forced['lang'];
 
@@ -709,7 +715,7 @@ $headers = ['Accept: application/json'];
             $stream['hardsub_fallback'] = $forced['lang'];
         }
 
-        if ($stream) {
+        if ($stream && empty($stream['hardsub_fallback'])) {
             Cache::put($cacheKey, $stream, 3600);
         }
         return $stream;

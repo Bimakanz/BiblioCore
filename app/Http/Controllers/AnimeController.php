@@ -280,7 +280,9 @@ class AnimeController extends Controller
             'audio' => $request->query('audio') === 'dub' ? 'dub' : 'sub',
             'dubAvailable' => $this->streamProvider->dubAvailable((int) preg_replace('/[^0-9]/', '', $id)),
             'modes' => $this->streamProvider->modes(),
-            'streamUrl' => route('anime.stream.json', ['id' => $id]) . '?ep=' . urlencode($episodeId),
+            'streamUrl' => route('anime.stream.json', ['id' => $id])
+                . '?ep=' . urlencode($episodeId)
+                . '&n=' . max(1, (int) $request->query('n', 1)),
             'episodesUrl' => route('anime.episodes.json', ['id' => $id]),
             'subtitleIdUrl' => route('anime.subtitle.id') . '?ep=' . urlencode($episodeId),
         ])->header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600');
@@ -299,6 +301,22 @@ class AnimeController extends Controller
         }
         $server = $request->query('server');
         $server = is_string($server) && $server !== '' ? $server : null;
+        $numericId = (int) preg_replace('/[^0-9]/', '', $id);
+        $episodeNumber = max(0, (int) $request->query('n', 0));
+
+        // Watch pages are edge-cached and serverless containers may not share
+        // /tmp cache, so re-seed the title cache on demand whenever a burned-in
+        // mode is requested and the cache is cold.
+        if ($server !== null && $numericId > 0 && ! Cache::has("anime_titles_{$numericId}")) {
+            try {
+                $anime = $this->animeService->getDetail($id);
+                if (is_array($anime) && ! empty($anime)) {
+                    $this->streamProvider->rememberTitles($anime);
+                }
+            } catch (\Throwable $e) {
+                Log::debug("streamJson title seed failed for {$id}: " . $e->getMessage());
+            }
+        }
 
         // Resolve the episode. getStream() already walks the episode's own
         // provider plus one alternate and falls back from dub to sub, so the
@@ -306,7 +324,7 @@ class AnimeController extends Controller
         // upstream and the request budget is 60 s.
         $stream = null;
         try {
-            $stream = $this->streamProvider->getStream($episodeId, $server);
+            $stream = $this->streamProvider->getStream($episodeId, $server, $numericId ?: null, $episodeNumber ?: null);
         } catch (\Throwable $e) {
             Log::error("streamJson failed for {$episodeId}: " . $e->getMessage());
         }
@@ -560,7 +578,7 @@ class AnimeController extends Controller
             'audioFallback' => $stream['audio_fallback'] ?? null,
             'intro' => $stream['intro'],
             'outro' => $stream['outro'],
-        ])->header('Cache-Control', 'public, max-age=300');
+        ])->header('Cache-Control', ! empty($stream['hardsub_fallback']) ? 'no-store' : 'public, max-age=300');
     }
 
     /**
@@ -605,7 +623,7 @@ class AnimeController extends Controller
             'audioFallback' => $stream['audio_fallback'] ?? null,
             'intro' => $stream['intro'],
             'outro' => $stream['outro'],
-        ])->header('Cache-Control', 'public, max-age=300');
+        ])->header('Cache-Control', ! empty($stream['hardsub_fallback']) ? 'no-store' : 'public, max-age=300');
     }
 
     /**
