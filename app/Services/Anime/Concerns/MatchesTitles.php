@@ -295,6 +295,18 @@ trait MatchesTitles
             return $score * 0.5;
         }
 
+        // Do not let "Specials", "OVA", or "Live Action" outrank the TV series
+        // unless the requested title explicitly asks for that release kind.
+        $normTitle = $this->normaliseTitle($title);
+        $normCandidate = $this->normaliseTitle($candidate);
+        foreach (['specials', 'special', 'ova', 'ona', 'movie', 'live action'] as $extra) {
+            $wantedExtra = preg_match('/\b'.preg_quote($extra, '/').'\b/', $normTitle) === 1;
+            $foundExtra = preg_match('/\b'.preg_quote($extra, '/').'\b/', $normCandidate) === 1;
+            if ($foundExtra && ! $wantedExtra) {
+                return $score * 0.55;
+            }
+        }
+
         return $score;
     }
 }

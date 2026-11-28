@@ -3,6 +3,7 @@
 namespace App\Services\Anime;
 
 use App\Services\Anime\Concerns\MatchesTitles;
+use App\Services\Anime\Concerns\ResolvesVideoEmbeds;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -25,6 +26,7 @@ use Illuminate\Support\Facades\Log;
 class SamehadakuSource
 {
     use MatchesTitles;
+    use ResolvesVideoEmbeds;
 
     protected const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
@@ -309,7 +311,7 @@ class SamehadakuSource
      */
     protected function resolveEpisode(string $url, string $slug): ?array
     {
-        $cacheKey = 'samehadaku_stream_'.md5($url);
+        $cacheKey = 'samehadaku_stream_v2_'.md5($url);
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             return $cached;
@@ -343,6 +345,45 @@ class SamehadakuSource
             Cache::put($cacheKey, $stream, 3600);
 
             return $stream;
+        }
+
+        // Many older Samehadaku episodes use Blogger video.g embeds, which
+        // resolve server-side to direct GoogleVideo MP4s.
+        if (preg_match_all('#https?://(?:www\.)?blogger\.com/video\.g\?token=[A-Za-z0-9_\-]+#i', $html, $bloggerMatches)) {
+            $bloggerSources = [];
+            $seen = [];
+            $fetcher = fn (string $target, array $headers = []) => $this->fetch($target, $headers);
+            foreach (array_unique($bloggerMatches[0]) as $bloggerUrl) {
+                foreach ($this->extractBloggerMp4s($bloggerUrl, $fetcher) as $entry) {
+                    if (! isset($seen[$entry['url']])) {
+                        $seen[$entry['url']] = true;
+                        $bloggerSources[] = $entry;
+                    }
+                }
+                if (! empty($bloggerSources)) {
+                    break;
+                }
+            }
+            if (! empty($bloggerSources)) {
+                $stream = [
+                    'sources' => array_slice($bloggerSources, 0, 2),
+                    'subtitles' => [],
+                    'kind' => 'mp4',
+                    'embed' => null,
+                    'referer' => null,
+                    'intro' => null,
+                    'outro' => null,
+                    'provider' => 'Samehadaku',
+                    'server' => 'Hardsub ID',
+                    'audio_fallback' => null,
+                    'hard_sub' => true,
+                    'hard_sub_lang' => 'id',
+                    'proxy_file' => true,
+                ];
+                Cache::put($cacheKey, $stream, 3600);
+
+                return $stream;
+            }
         }
 
         $embed = $this->embedUrl($html);

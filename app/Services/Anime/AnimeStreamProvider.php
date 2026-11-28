@@ -371,10 +371,11 @@ $headers = ['Accept: application/json'];
         // work even when every soft-sub provider is missing an English track.
         // Dub requests are skipped because all hardsub libraries are sub-only.
         if (empty($byNumber) && $audio === 'sub') {
-            foreach (['animeheaven', 'nimegami', 'kuramanime', 'samehadaku'] as $source) {
+            foreach (['animeheaven', 'nimegami', 'animasu', 'kuramanime', 'samehadaku'] as $source) {
                 $list = match ($source) {
                     'animeheaven' => $this->extra->animeHeavenEpisodes($anime ?? [], $anilistId),
                     'nimegami' => $this->extra->nimegamiEpisodes($anime ?? []),
+                    'animasu' => $this->extra->animasuEpisodes($anime ?? []),
                     'kuramanime' => $this->extra->kuramanimeEpisodes($anime ?? []),
                     default => $this->extra->samehadakuEpisodes($anime ?? []),
                 };
@@ -554,6 +555,7 @@ $headers = ['Accept: application/json'];
             && ! str_starts_with($reference, 'ak|')
             && ! str_starts_with($reference, 'ah|')
             && ! str_starts_with($reference, 'ng|')
+            && ! str_starts_with($reference, 'am|')
             && ! str_starts_with($reference, 'km|')
             && ! str_starts_with($reference, 'sd|')) {
             return null;
@@ -571,6 +573,8 @@ $headers = ['Accept: application/json'];
             $stream = $this->extra->animeHeavenStream($reference);
         } elseif (str_starts_with($reference, 'ng|')) {
             $stream = $this->extra->nimegamiStream($reference);
+        } elseif (str_starts_with($reference, 'am|')) {
+            $stream = $this->extra->animasuStream($reference);
         } elseif (str_starts_with($reference, 'km|')) {
             $stream = $this->extra->kuramanimeStream($reference);
         } elseif (str_starts_with($reference, 'sd|')) {
@@ -758,9 +762,10 @@ $headers = ['Accept: application/json'];
         if ($source === 'id') {
             // Walk every Indonesian burned-in library until one yields a
             // direct MP4 (refusing iframe embeds so "Burned-in" never lies).
-            foreach (['nimegami', 'kuramanime', 'samehadaku'] as $idSource) {
+            foreach (['nimegami', 'animasu', 'kuramanime', 'samehadaku'] as $idSource) {
                 $stream = match ($idSource) {
                     'nimegami' => $this->extra->nimegamiStreamFor($anime, $number),
+                    'animasu' => $this->extra->animasuStreamFor($anime, $number),
                     'kuramanime' => $this->extra->kuramanimeStreamFor($anime, $number),
                     default => $this->extra->samehadakuStreamFor($anime, $number),
                 };
@@ -772,9 +777,10 @@ $headers = ['Accept: application/json'];
             return null;
         }
 
-        if (in_array($source, ['nimegami', 'kuramanime', 'samehadaku'], true)) {
+        if (in_array($source, ['nimegami', 'animasu', 'kuramanime', 'samehadaku'], true)) {
             $stream = match ($source) {
                 'nimegami' => $this->extra->nimegamiStreamFor($anime, $number),
+                'animasu' => $this->extra->animasuStreamFor($anime, $number),
                 'kuramanime' => $this->extra->kuramanimeStreamFor($anime, $number),
                 default => $this->extra->samehadakuStreamFor($anime, $number),
             };

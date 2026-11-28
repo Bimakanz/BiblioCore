@@ -189,4 +189,22 @@ HTML,
             'altTitles' => ['Danshi Koukousei no Nichijou'],
         ]));
     }
+
+    public function test_it_extracts_direct_mp4_from_blogger_embeds(): void
+    {
+        $bloggerHtml = 'data-p="{\"streamingData\":{\"formats\":[{\"itag\":18,\"url\":\"https://rr1---sn.googlevideo.com/videoplayback?id=xyz\\u0026mime=video/mp4\",\"qualityLabel\":\"360p\"}]}}"';
+
+        $provider = $this->provider([
+            '/anime/sousou-no-frieren/' => $this->seriesPage(),
+            '/sousou-no-frieren-episode-1/' => '<iframe src="https://www.blogger.com/video.g?token=AD6v5tok"></iframe>',
+            'blogger.com/video.g' => $bloggerHtml,
+        ]);
+
+        $stream = $provider->streamFor('sd|sousou-no-frieren|1');
+
+        $this->assertNotNull($stream);
+        $this->assertSame('mp4', $stream['kind']);
+        $this->assertTrue($stream['proxy_file']);
+        $this->assertStringContainsString('googlevideo.com/videoplayback', $stream['sources'][0]['url']);
+    }
 }

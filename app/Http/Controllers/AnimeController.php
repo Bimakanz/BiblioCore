@@ -354,14 +354,19 @@ class AnimeController extends Controller
                 if ($candidateUrl === '') {
                     continue;
                 }
-                $vKey = 'anime_mp4_ok_' . md5($candidateUrl);
+                $candidateReferer = array_key_exists('referer', $candidateSource)
+                    ? $candidateSource['referer']
+                    : ($stream['referer'] ?? null);
+                $vKey = 'anime_mp4_ok_' . md5($candidateUrl . '|' . ($candidateReferer ?? ''));
                 if (Cache::get($vKey) || app()->runningUnitTests()) {
                     $chosenSource = $candidateSource;
+                    $chosenSource['referer'] = $candidateReferer;
                     break;
                 }
-                if ($this->mp4Reachable($candidateUrl, $stream['referer'] ?? null)) {
+                if ($this->mp4Reachable($candidateUrl, $candidateReferer)) {
                     Cache::put($vKey, 1, 3600);
                     $chosenSource = $candidateSource;
+                    $chosenSource['referer'] = $candidateReferer;
                     break;
                 }
             }
@@ -384,6 +389,7 @@ class AnimeController extends Controller
             }
 
             $url = (string) $chosenSource['url'];
+            $sourceReferer = $chosenSource['referer'] ?? null;
 
             $this->animeService->markAvailable((int) preg_replace('/[^0-9]/', '', $id));
 
@@ -399,7 +405,7 @@ class AnimeController extends Controller
                 || str_ends_with($host, 'berkasdrive.com')
                 || str_ends_with($host, 'komari.my.id');
             if ($needsFileProxy) {
-                $entry = ['url' => $url, 'referer' => $stream['referer'] ?? null];
+                $entry = ['url' => $url, 'referer' => $sourceReferer];
                 // Stateless signed token: each range request may land on a
                 // different serverless container, so it cannot rely on /tmp.
                 $fileToken = $this->signProxyPayload([
@@ -941,6 +947,7 @@ class AnimeController extends Controller
             CURLOPT_MAXREDIRS => 3,
             CURLOPT_CONNECTTIMEOUT => 5,
             CURLOPT_TIMEOUT => 15,
+            CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
             CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_HEADERFUNCTION => function ($ch, $line) use (&$response, &$status) {
@@ -1022,6 +1029,7 @@ class AnimeController extends Controller
             CURLOPT_LOW_SPEED_LIMIT => 1,
             CURLOPT_LOW_SPEED_TIME => 60,
             CURLOPT_BUFFERSIZE => 65536,
+            CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
             CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_WRITEFUNCTION => function ($ch, $chunk) {
@@ -1309,7 +1317,8 @@ class AnimeController extends Controller
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
             curl_setopt($ch, CURLOPT_TIMEOUT, 8);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_MAXREDIRS, 2);
+            curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
+            curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
             curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
             $headers = $headOnly ? [] : ['Accept: video/*,*/*'];
             if ($referer !== null && $referer !== '') {

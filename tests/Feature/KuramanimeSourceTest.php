@@ -205,6 +205,11 @@ HTML;
                 return null;
             }
 
+            public function animasuStreamFor(array $anime, int $number): ?array
+            {
+                return null;
+            }
+
             public function kuramanimeStreamFor(array $anime, int $number): ?array
             {
                 return [
