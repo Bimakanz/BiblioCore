@@ -278,7 +278,7 @@ class NimegamiSource
             return [];
         }
 
-        $cacheKey = 'nimegami_series_v3_'.$slug;
+        $cacheKey = 'nimegami_series_v4_'.$slug;
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             return $cached;
@@ -398,6 +398,18 @@ class NimegamiSource
                             'rank' => $rank,
                         ];
                     }
+                    // If the worker-wrapped desustream URL returns 502 from a
+                    // cloud region, try fetching desustream directly as a fallback.
+                    if (preg_match('#^https?://[^/]+/(https?://desustream\.[^/]+/.+)$#i', $candidateUrl, $directMatch)) {
+                        $directUrl = $directMatch[1];
+                        if (! isset($byEpisode[$ep][$directUrl])) {
+                            $byEpisode[$ep][$directUrl] = [
+                                'path' => $directUrl,
+                                'quality' => $quality,
+                                'rank' => $this->qualityRank($quality) * 10,
+                            ];
+                        }
+                    }
                 }
             }
         }
@@ -433,7 +445,7 @@ class NimegamiSource
      */
     protected function resolveEpisode(string $slug, int $number, array $candidates): ?array
     {
-        $cacheKey = 'nimegami_stream_v3_'.md5($slug.'|'.$number);
+        $cacheKey = 'nimegami_stream_v4_'.md5($slug.'|'.$number);
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             return $cached;
@@ -517,6 +529,10 @@ class NimegamiSource
                 && (str_contains($lower, '.mp4')
                     || str_contains($lower, 'mime=video/mp4')
                     || str_contains($lower, 'videoplayback'))) {
+                if (preg_match('#^https://[^/]*googlevideo\.com/#i', $src)) {
+                    return 'https://workers-anime.berkasdrive.com/'.$src;
+                }
+
                 return $src;
             }
         }

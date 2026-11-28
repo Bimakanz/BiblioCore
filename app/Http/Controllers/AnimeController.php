@@ -15,8 +15,8 @@ use Illuminate\Support\Facades\Log;
 
 class AnimeController extends Controller
 {
-    /** Largest slice the MP4 proxy streams in one request (8 MiB). */
-    protected const FILE_CHUNK = 8 * 1024 * 1024;
+    /** Largest slice the MP4 proxy streams in one request (2 MiB, under Vercel's 4.5 MB cap). */
+    protected const FILE_CHUNK = 2 * 1024 * 1024;
 
     public function __construct(
         protected AnimeService $animeService,
