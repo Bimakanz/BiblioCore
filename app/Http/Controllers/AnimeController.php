@@ -348,28 +348,42 @@ class AnimeController extends Controller
         // Hard-subtitled sources ship one MP4 per episode: the subtitles are
         // part of the video, so there is nothing to proxy or track.
         if (($stream['kind'] ?? 'hls') === 'mp4') {
-            $url = (string) ($stream['sources'][0]['url'] ?? '');
-            if ($url === '') {
-                return response()->json([
-                    'error' => 'This episode is not available on any provider yet.',
-                    'unavailable' => true,
-                    'reason' => 'no_stream',
-                ], 404)->header('Cache-Control', 'no-store');
+            $chosenSource = null;
+            foreach (($stream['sources'] ?? []) as $candidateSource) {
+                $candidateUrl = (string) ($candidateSource['url'] ?? '');
+                if ($candidateUrl === '') {
+                    continue;
+                }
+                $vKey = 'anime_mp4_ok_' . md5($candidateUrl);
+                if (Cache::get($vKey) || app()->runningUnitTests()) {
+                    $chosenSource = $candidateSource;
+                    break;
+                }
+                if ($this->mp4Reachable($candidateUrl, $stream['referer'] ?? null)) {
+                    Cache::put($vKey, 1, 3600);
+                    $chosenSource = $candidateSource;
+                    break;
+                }
             }
 
-            $vKey = 'anime_mp4_ok_' . md5($url);
-            if (! Cache::get($vKey) && ! app()->runningUnitTests()) {
-                if (! $this->mp4Reachable($url, $stream['referer'] ?? null)) {
-                    $this->markUnavailableWhenNoEpisodes($id);
-
+            if ($chosenSource === null) {
+                if (empty($stream['sources'][0]['url'])) {
                     return response()->json([
                         'error' => 'This episode is not available on any provider yet.',
                         'unavailable' => true,
-                        'reason' => 'dead_mp4',
+                        'reason' => 'no_stream',
                     ], 404)->header('Cache-Control', 'no-store');
                 }
-                Cache::put($vKey, 1, 3600);
+                $this->markUnavailableWhenNoEpisodes($id);
+
+                return response()->json([
+                    'error' => 'This episode is not available on any provider yet.',
+                    'unavailable' => true,
+                    'reason' => 'dead_mp4',
+                ], 404)->header('Cache-Control', 'no-store');
             }
+
+            $url = (string) $chosenSource['url'];
 
             $this->animeService->markAvailable((int) preg_replace('/[^0-9]/', '', $id));
 
@@ -404,7 +418,7 @@ class AnimeController extends Controller
             return response()->json([
                 'source' => [
                     'url' => $playbackUrl,
-                    'quality' => $stream['sources'][0]['quality'] ?? 'auto',
+                    'quality' => $chosenSource['quality'] ?? 'auto',
                     'type' => 'mp4',
                 ],
                 'subtitles' => [],

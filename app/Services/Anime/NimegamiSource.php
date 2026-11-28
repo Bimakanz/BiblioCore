@@ -123,21 +123,23 @@ class NimegamiSource
 
         $slug = $this->resolveSlug($anime);
         if ($slug === null) {
-            $this->lastError ??= 'no_slug';
+            $this->lastError = $this->lastError ? 's:'.$this->lastError : 's:no_slug';
 
             return null;
         }
 
+        $this->lastError = null;
         $candidates = $this->seriesEpisodes($slug)[$number] ?? [];
         if (empty($candidates)) {
-            $this->lastError ??= 'no_ep_'.$number;
+            $this->lastError = $this->lastError ? 'p:'.$this->lastError : 'p:no_ep_'.$number;
 
             return null;
         }
 
+        $this->lastError = null;
         $stream = $this->resolveEpisode($slug, $number, $candidates);
         if ($stream === null) {
-            $this->lastError ??= 'no_src';
+            $this->lastError = $this->lastError ? 'e:'.$this->lastError : 'e:no_src';
 
             return null;
         }
@@ -276,7 +278,7 @@ class NimegamiSource
             return [];
         }
 
-        $cacheKey = 'nimegami_series_v2_'.$slug;
+        $cacheKey = 'nimegami_series_v3_'.$slug;
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             return $cached;
@@ -381,19 +383,21 @@ class NimegamiSource
                 if ($ep < 1) {
                     continue;
                 }
-                $playUrl = trim((string) ($item['playUrl'] ?? $item['url'] ?? ''));
-                if (! $this->isSupportedPlayUrl($playUrl)) {
-                    continue;
-                }
                 $rawQuality = strtolower(trim((string) ($item['quality'] ?? 'auto')));
                 $quality = preg_match('/^\d{3,4}p$/', $rawQuality) ? $rawQuality : 'auto';
-                $rank = $this->qualityRank($quality) * 10 + (str_contains($playUrl, 'berkasdrive.com') ? 2 : 1);
-                if (! isset($byEpisode[$ep][$playUrl])) {
-                    $byEpisode[$ep][$playUrl] = [
-                        'path' => $playUrl,
-                        'quality' => $quality,
-                        'rank' => $rank,
-                    ];
+                foreach (['playUrl', 'url'] as $field) {
+                    $candidateUrl = trim((string) ($item[$field] ?? ''));
+                    if (! $this->isSupportedPlayUrl($candidateUrl)) {
+                        continue;
+                    }
+                    $rank = $this->qualityRank($quality) * 10 + (str_contains($candidateUrl, 'berkasdrive.com') ? 2 : 1);
+                    if (! isset($byEpisode[$ep][$candidateUrl])) {
+                        $byEpisode[$ep][$candidateUrl] = [
+                            'path' => $candidateUrl,
+                            'quality' => $quality,
+                            'rank' => $rank,
+                        ];
+                    }
                 }
             }
         }
@@ -420,8 +424,7 @@ class NimegamiSource
         }
 
         return str_contains($url, 'berkasdrive.com/')
-            || str_contains($url, '.workers.dev/')
-            || str_contains($url, 'desustream.');
+            || str_contains($url, '.workers.dev/');
     }
 
     /**
@@ -430,7 +433,7 @@ class NimegamiSource
      */
     protected function resolveEpisode(string $slug, int $number, array $candidates): ?array
     {
-        $cacheKey = 'nimegami_stream_v2_'.md5($slug.'|'.$number);
+        $cacheKey = 'nimegami_stream_v3_'.md5($slug.'|'.$number);
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             return $cached;
@@ -438,7 +441,7 @@ class NimegamiSource
 
         $sources = [];
         $seen = [];
-        foreach (array_slice($candidates, 0, 4) as $candidate) {
+        foreach (array_slice($candidates, 0, 6) as $candidate) {
             $targetUrl = preg_match('#^https?://#i', $candidate['path'])
                 ? $candidate['path']
                 : $this->base.$candidate['path'];
@@ -460,9 +463,9 @@ class NimegamiSource
                 'quality' => $candidate['quality'] ?? 'auto',
                 'isM3U8' => false,
             ];
-            // One verified direct MP4 is enough for playback; avoid extra
-            // round-trips unless the first quality failed to resolve.
-            break;
+            if (count($sources) >= 2) {
+                break;
+            }
         }
 
         if (empty($sources)) {
@@ -537,39 +540,48 @@ class NimegamiSource
      */
     protected function fetch(string $url, array $headers = [], int $timeout = 15): ?string
     {
-        $ch = curl_init($url);
-        $opts = [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS => 3,
-            CURLOPT_CONNECTTIMEOUT => 4,
-            CURLOPT_TIMEOUT => $timeout,
-            CURLOPT_NOSIGNAL => 1,
-            CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
-            CURLOPT_ENCODING => '',
-            CURLOPT_USERAGENT => self::UA,
-            CURLOPT_HTTPHEADER => array_merge([
-                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language: id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-            ], $headers),
-        ];
-        if (defined('CURL_HTTP_VERSION_2TLS')) {
-            $opts[CURLOPT_HTTP_VERSION] = CURL_HTTP_VERSION_2TLS;
-        }
-        curl_setopt_array($ch, $opts);
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            $ch = curl_init($url);
+            $opts = [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS => 3,
+                CURLOPT_CONNECTTIMEOUT => 4,
+                CURLOPT_TIMEOUT => $timeout,
+                CURLOPT_NOSIGNAL => 1,
+                CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+                CURLOPT_ENCODING => '',
+                CURLOPT_USERAGENT => self::UA,
+                CURLOPT_HTTPHEADER => array_merge([
+                    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language: id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+                ], $headers),
+            ];
+            if (defined('CURL_HTTP_VERSION_2TLS')) {
+                $opts[CURLOPT_HTTP_VERSION] = CURL_HTTP_VERSION_2TLS;
+            }
+            curl_setopt_array($ch, $opts);
 
-        $body = curl_exec($ch);
-        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $errno = curl_errno($ch);
-        curl_close($ch);
+            $body = curl_exec($ch);
+            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $errno = curl_errno($ch);
+            curl_close($ch);
 
-        if ($body === false || $code < 200 || $code >= 400) {
+            if ($body !== false && $code >= 200 && $code < 400) {
+                return (string) $body;
+            }
+
             $this->lastError = $code > 0 ? 'http_'.$code : 'curl_'.$errno;
-            Log::debug('Nimegami request failed', ['url' => $url, 'status' => $code, 'errno' => $errno]);
+            Log::debug('Nimegami request failed', ['url' => $url, 'status' => $code, 'errno' => $errno, 'attempt' => $attempt]);
 
-            return null;
+            if ($attempt === 0 && in_array($code, [502, 503, 504], true)) {
+                usleep(200_000);
+                continue;
+            }
+
+            break;
         }
 
-        return (string) $body;
+        return null;
     }
 }
