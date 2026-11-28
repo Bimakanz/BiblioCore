@@ -260,6 +260,19 @@ class AnimeExtraSources
     }
 
     /**
+     * Last failure code per hardsub source (for diagnosing fallback misses).
+     *
+     * @return array<string, string|null>
+     */
+    public function hardsubErrors(): array
+    {
+        return array_filter([
+            'ng' => $this->nimegami->lastError(),
+            'sd' => $this->samehadaku->lastError(),
+        ], fn ($v) => $v !== null);
+    }
+
+    /**
      * Remember every known title for a title, so playback can find a hardsub
      * copy later without the catalogue row being passed around again.
      *

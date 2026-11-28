@@ -437,12 +437,20 @@
             refreshEpisodeLinks();
         }
 
-        function showModeNotice(lang) {
+        function showModeNotice(lang, debug) {
             const el = document.getElementById('modeNotice');
             if (!el) return;
             const name = lang === 'id' ? 'Indonesian' : 'English';
-            el.textContent = 'Burned-in ' + name
+            let text = 'Burned-in ' + name
                 + ' subtitles are not available for this episode — playing the standard stream instead.';
+            if (debug && typeof debug === 'object') {
+                const parts = Object.entries(debug).map(function (kv) { return kv[0] + ':' + kv[1]; });
+                if (parts.length) {
+                    text += ' (' + parts.join(', ') + ')';
+                    try { console.warn('[BiblioAnime] hardsub fallback:', debug); } catch (e) {}
+                }
+            }
+            el.textContent = text;
             el.classList.remove('hidden');
         }
 
@@ -940,7 +948,7 @@
             if (notice) notice.classList.toggle('hidden', data.audioFallback !== 'sub');
             // The requested burned-in language was not found for this episode:
             // say so instead of silently showing the soft-sub stream.
-            if (data.hardsubFallback) showModeNotice(data.hardsubFallback);
+            if (data.hardsubFallback) showModeNotice(data.hardsubFallback, data.hardsubDebug);
             if (data.source.type === 'embed') {
                 buildSubtitleOptions([]);
                 if (data.hardSub) {

@@ -30,10 +30,17 @@ class SamehadakuSource
 
     protected ?string $base;
 
+    protected ?string $lastError = null;
+
     public function __construct()
     {
         $base = trim((string) env('SAMEHADAKU_URL', 'https://v2.samehadaku.how'));
         $this->base = $base === '' ? null : rtrim($base, '/');
+    }
+
+    public function lastError(): ?string
+    {
+        return $this->lastError;
     }
 
     public function enabled(): bool
@@ -104,21 +111,42 @@ class SamehadakuSource
      */
     public function streamForEpisode(array $anime, int $number): ?array
     {
+        $this->lastError = null;
+        if (! $this->enabled()) {
+            $this->lastError = 'disabled';
+
+            return null;
+        }
         if ($number < 1) {
+            $this->lastError = 'bad_ep';
+
             return null;
         }
 
         $slug = $this->resolveSlug($anime);
         if ($slug === null) {
+            $this->lastError ??= 'no_slug';
+
             return null;
         }
 
         $url = $this->seriesEpisodes($slug)[$number] ?? null;
         if ($url === null) {
+            $this->lastError ??= 'no_ep_'.$number;
+
             return null;
         }
 
-        return $this->resolveEpisode($url, $slug);
+        $stream = $this->resolveEpisode($url, $slug);
+        if ($stream === null) {
+            $this->lastError ??= 'no_src';
+
+            return null;
+        }
+
+        $this->lastError = ($stream['kind'] ?? '') === 'mp4' ? 'ok' : 'embed_only';
+
+        return $stream;
     }
 
     /**
@@ -435,7 +463,7 @@ class SamehadakuSource
     protected function fetch(string $url, array $headers = [], int $timeout = 15): ?string
     {
         $ch = curl_init($url);
-        curl_setopt_array($ch, [
+        $opts = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 3,
@@ -445,15 +473,24 @@ class SamehadakuSource
             CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
             CURLOPT_ENCODING => '',
             CURLOPT_USERAGENT => self::UA,
-            CURLOPT_HTTPHEADER => array_merge(['Accept: text/html,application/xhtml+xml'], $headers),
-        ]);
+            CURLOPT_HTTPHEADER => array_merge([
+                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language: id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+            ], $headers),
+        ];
+        if (defined('CURL_HTTP_VERSION_2TLS')) {
+            $opts[CURLOPT_HTTP_VERSION] = CURL_HTTP_VERSION_2TLS;
+        }
+        curl_setopt_array($ch, $opts);
 
         $body = curl_exec($ch);
         $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $errno = curl_errno($ch);
         curl_close($ch);
 
         if ($body === false || $code < 200 || $code >= 400) {
-            Log::debug('Samehadaku request failed', ['url' => $url, 'status' => $code]);
+            $this->lastError = $code > 0 ? 'http_'.$code : 'curl_'.$errno;
+            Log::debug('Samehadaku request failed', ['url' => $url, 'status' => $code, 'errno' => $errno]);
 
             return null;
         }

@@ -598,6 +598,7 @@ $headers = ['Accept: application/json'];
         // before anything else, so an episode id that already points at a
         // different hardsub library cannot silently win.
         $forced = $this->hardsubMode($providerOverride);
+        $forcedId = null;
         if ($forced !== null) {
             $forcedPath = $this->parseWatchPath($watchPath);
             $forcedId = $forcedPath['anilistId'] ?? $anilistId;
@@ -713,6 +714,11 @@ $headers = ['Accept: application/json'];
         // pretending the subtitles are burned in.
         if ($stream && $forced !== null && ($stream['hard_sub_lang'] ?? null) !== $forced['lang']) {
             $stream['hardsub_fallback'] = $forced['lang'];
+            $errors = $this->extra->hardsubErrors();
+            $titlesCount = is_array(Cache::get('anime_titles_'.($forcedId ?? 0)))
+                ? count((array) Cache::get('anime_titles_'.($forcedId ?? 0)))
+                : 0;
+            $stream['hardsub_debug'] = array_merge(['titles' => $titlesCount], $errors);
         }
 
         if ($stream && empty($stream['hardsub_fallback'])) {
